@@ -35,6 +35,11 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
 
+  if (user.suspended) {
+    res.status(403).json({ error: "Your account has been suspended. Please contact support." });
+    return;
+  }
+
   const token = signToken({ userId: user.id, role: user.role });
   res.json({
     token,
