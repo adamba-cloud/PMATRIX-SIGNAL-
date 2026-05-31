@@ -23,6 +23,7 @@ import AdminUsers from "@/pages/admin/users";
 import AdminSubscriptions from "@/pages/admin/subscriptions";
 import AdminPayments from "@/pages/admin/payments";
 import AdminConfig from "@/pages/admin/config";
+import AdminMt5 from "@/pages/admin/mt5";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ function Router() {
         <Route path="/admin/subscriptions" component={AdminSubscriptions} />
         <Route path="/admin/payments" component={AdminPayments} />
         <Route path="/admin/config" component={AdminConfig} />
+        <Route path="/admin/mt5" component={AdminMt5} />
         
         <Route component={NotFound} />
       </Switch>

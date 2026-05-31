@@ -443,3 +443,65 @@ export const ReconnectMt5AccountResponse = zod.object({
 })
 
 
+/**
+ * @summary Admin — list all MT5 accounts across all users
+ */
+export const AdminListMt5AccountsResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string(),
+  "userEmail": zod.string(),
+  "mt5Login": zod.string(),
+  "brokerServer": zod.string(),
+  "status": zod.enum(['CONNECTED', 'SYNCING', 'DISCONNECTED', 'ERROR']),
+  "statusMessage": zod.string().nullable(),
+  "metaApiAccountId": zod.string().nullable(),
+  "lastSyncAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const AdminListMt5AccountsResponse = zod.array(AdminListMt5AccountsResponseItem)
+
+
+/**
+ * @summary Admin — force reconnect for any MT5 account
+ */
+export const AdminReconnectMt5AccountParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AdminReconnectMt5AccountResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "mt5Login": zod.string(),
+  "brokerServer": zod.string(),
+  "status": zod.enum(['CONNECTED', 'SYNCING', 'DISCONNECTED', 'ERROR']),
+  "statusMessage": zod.string().nullable(),
+  "metaApiAccountId": zod.string().nullable(),
+  "lastSyncAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Admin — force disconnect for any MT5 account
+ */
+export const AdminDisconnectMt5AccountParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AdminDisconnectMt5AccountResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "mt5Login": zod.string(),
+  "brokerServer": zod.string(),
+  "status": zod.enum(['CONNECTED', 'SYNCING', 'DISCONNECTED', 'ERROR']),
+  "statusMessage": zod.string().nullable(),
+  "metaApiAccountId": zod.string().nullable(),
+  "lastSyncAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+

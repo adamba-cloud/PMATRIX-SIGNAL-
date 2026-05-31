@@ -534,6 +534,71 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /admin/mt5/accounts:
+    get:
+      operationId: adminListMt5Accounts
+      tags: [mt5]
+      summary: Admin — list all MT5 accounts across all users
+      responses:
+        "200":
+          description: All slave accounts with user info
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminSlaveAccount"
+
+  /admin/mt5/accounts/{id}/reconnect:
+    post:
+      operationId: adminReconnectMt5Account
+      tags: [mt5]
+      summary: Admin — force reconnect for any MT5 account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Account reconnecting
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlaveAccount"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/mt5/accounts/{id}/disconnect:
+    post:
+      operationId: adminDisconnectMt5Account
+      tags: [mt5]
+      summary: Admin — force disconnect for any MT5 account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Account disconnected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlaveAccount"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -876,4 +941,33 @@ components:
         mt5Password:
           type: string
         brokerServer:
+          type: string
+
+    AdminSlaveAccount:
+      type: object
+      required: [id, userId, userName, userEmail, mt5Login, brokerServer, status, statusMessage, metaApiAccountId, lastSyncAt, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        userEmail:
+          type: string
+        mt5Login:
+          type: string
+        brokerServer:
+          type: string
+        status:
+          $ref: "#/components/schemas/Mt5ConnectionStatus"
+        statusMessage:
+          type: ["string", "null"]
+        metaApiAccountId:
+          type: ["string", "null"]
+        lastSyncAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
           type: string

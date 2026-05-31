@@ -263,3 +263,21 @@ export interface UpdateMt5Input {
   brokerServer?: string;
 }
 
+export interface AdminSlaveAccount {
+  id: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  mt5Login: string;
+  brokerServer: string;
+  status: Mt5ConnectionStatus;
+  /** @nullable */
+  statusMessage: string | null;
+  /** @nullable */
+  metaApiAccountId: string | null;
+  /** @nullable */
+  lastSyncAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+

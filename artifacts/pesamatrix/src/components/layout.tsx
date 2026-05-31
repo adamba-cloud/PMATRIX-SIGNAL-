@@ -102,6 +102,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/admin/subscriptions" icon={ShieldCheck}>Subscriptions</SidebarLink>
                 <SidebarLink href="/admin/payments" icon={CreditCard}>Payments</SidebarLink>
                 <SidebarLink href="/admin/config" icon={Settings}>System Config</SidebarLink>
+                <SidebarLink href="/admin/mt5" icon={Cpu}>MT5 Accounts</SidebarLink>
                 <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 mt-4">
                   User View
                 </div>

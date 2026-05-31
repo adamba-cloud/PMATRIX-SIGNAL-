@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './adminSlaveAccount';
 export * from './adminSummary';
 export * from './authResponse';
 export * from './callbackAck';

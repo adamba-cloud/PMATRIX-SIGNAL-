@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AdminSlaveAccount,
   AdminSummary,
   AuthResponse,
   CallbackAck,
@@ -2066,5 +2067,222 @@ export const useReconnectMt5Account = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getReconnectMt5AccountMutationOptions(options));
+    }
+
+export const getAdminListMt5AccountsUrl = () => {
+
+
+
+
+  return `/api/admin/mt5/accounts`
+}
+
+/**
+ * @summary Admin — list all MT5 accounts across all users
+ */
+export const adminListMt5Accounts = async ( options?: RequestInit): Promise<AdminSlaveAccount[]> => {
+
+  return customFetch<AdminSlaveAccount[]>(getAdminListMt5AccountsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getAdminListMt5AccountsQueryKey = () => {
+    return [
+    `/api/admin/mt5/accounts`
+    ] as const;
+    }
+
+
+export const getAdminListMt5AccountsQueryOptions = <TData = Awaited<ReturnType<typeof adminListMt5Accounts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof adminListMt5Accounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getAdminListMt5AccountsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof adminListMt5Accounts>>> = ({ signal }) => adminListMt5Accounts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof adminListMt5Accounts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type AdminListMt5AccountsQueryResult = NonNullable<Awaited<ReturnType<typeof adminListMt5Accounts>>>
+export type AdminListMt5AccountsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Admin — list all MT5 accounts across all users
+ */
+
+export function useAdminListMt5Accounts<TData = Awaited<ReturnType<typeof adminListMt5Accounts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof adminListMt5Accounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getAdminListMt5AccountsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAdminReconnectMt5AccountUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/mt5/accounts/${id}/reconnect`
+}
+
+/**
+ * @summary Admin — force reconnect for any MT5 account
+ */
+export const adminReconnectMt5Account = async (id: number, options?: RequestInit): Promise<SlaveAccount> => {
+
+  return customFetch<SlaveAccount>(getAdminReconnectMt5AccountUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAdminReconnectMt5AccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminReconnectMt5Account>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminReconnectMt5Account>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['adminReconnectMt5Account'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminReconnectMt5Account>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  adminReconnectMt5Account(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminReconnectMt5AccountMutationResult = NonNullable<Awaited<ReturnType<typeof adminReconnectMt5Account>>>
+
+    export type AdminReconnectMt5AccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Admin — force reconnect for any MT5 account
+ */
+export const useAdminReconnectMt5Account = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminReconnectMt5Account>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof adminReconnectMt5Account>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getAdminReconnectMt5AccountMutationOptions(options));
+    }
+
+export const getAdminDisconnectMt5AccountUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/mt5/accounts/${id}/disconnect`
+}
+
+/**
+ * @summary Admin — force disconnect for any MT5 account
+ */
+export const adminDisconnectMt5Account = async (id: number, options?: RequestInit): Promise<SlaveAccount> => {
+
+  return customFetch<SlaveAccount>(getAdminDisconnectMt5AccountUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAdminDisconnectMt5AccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDisconnectMt5Account>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminDisconnectMt5Account>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['adminDisconnectMt5Account'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminDisconnectMt5Account>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  adminDisconnectMt5Account(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminDisconnectMt5AccountMutationResult = NonNullable<Awaited<ReturnType<typeof adminDisconnectMt5Account>>>
+
+    export type AdminDisconnectMt5AccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Admin — force disconnect for any MT5 account
+ */
+export const useAdminDisconnectMt5Account = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminDisconnectMt5Account>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof adminDisconnectMt5Account>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getAdminDisconnectMt5AccountMutationOptions(options));
     }
 
