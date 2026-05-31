@@ -226,3 +226,40 @@ export interface AdminSummary {
   recentUsers: User[];
 }
 
+export type Mt5ConnectionStatus = typeof Mt5ConnectionStatus[keyof typeof Mt5ConnectionStatus];
+
+
+export const Mt5ConnectionStatus = {
+  CONNECTED: 'CONNECTED',
+  SYNCING: 'SYNCING',
+  DISCONNECTED: 'DISCONNECTED',
+  ERROR: 'ERROR',
+} as const;
+
+export interface SlaveAccount {
+  id: number;
+  userId: number;
+  mt5Login: string;
+  brokerServer: string;
+  status: Mt5ConnectionStatus;
+  /** @nullable */
+  statusMessage: string | null;
+  /** @nullable */
+  metaApiAccountId: string | null;
+  /** @nullable */
+  lastSyncAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConnectMt5Input {
+  mt5Login: string;
+  mt5Password: string;
+  brokerServer: string;
+}
+
+export interface UpdateMt5Input {
+  mt5Password?: string;
+  brokerServer?: string;
+}
+

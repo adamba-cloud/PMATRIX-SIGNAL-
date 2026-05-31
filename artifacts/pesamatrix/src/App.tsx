@@ -15,6 +15,7 @@ import Signals from "@/pages/signals";
 import Payments from "@/pages/payments";
 import Subscription from "@/pages/subscription";
 import Profile from "@/pages/profile";
+import Mt5Accounts from "@/pages/mt5";
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -38,6 +39,7 @@ function Router() {
         <Route path="/payments" component={Payments} />
         <Route path="/subscription" component={Subscription} />
         <Route path="/profile" component={Profile} />
+        <Route path="/mt5" component={Mt5Accounts} />
         
         {/* Admin Routes */}
         <Route path="/admin/dashboard" component={AdminDashboard} />

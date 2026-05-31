@@ -25,6 +25,8 @@ tags:
     description: System configuration
   - name: dashboard
     description: Dashboard summaries
+  - name: mt5
+    description: MT5 account management
 
 paths:
   /healthz:
@@ -396,6 +398,142 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminSummary"
 
+  /mt5/accounts:
+    get:
+      operationId: getMt5Accounts
+      tags: [mt5]
+      summary: List connected MT5 accounts
+      responses:
+        "200":
+          description: List of slave accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SlaveAccount"
+    post:
+      operationId: connectMt5Account
+      tags: [mt5]
+      summary: Connect a new MT5 account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectMt5Input"
+      responses:
+        "201":
+          description: Account connected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlaveAccount"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Account already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /mt5/accounts/{id}:
+    get:
+      operationId: getMt5Account
+      tags: [mt5]
+      summary: Get a single MT5 account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Slave account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlaveAccount"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateMt5Account
+      tags: [mt5]
+      summary: Update an MT5 account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMt5Input"
+      responses:
+        "200":
+          description: Updated account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlaveAccount"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteMt5Account
+      tags: [mt5]
+      summary: Remove an MT5 account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /mt5/accounts/{id}/reconnect:
+    post:
+      operationId: reconnectMt5Account
+      tags: [mt5]
+      summary: Trigger a reconnect attempt for an MT5 account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Account reconnecting
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlaveAccount"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -691,3 +829,51 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/User"
+
+    Mt5ConnectionStatus:
+      type: string
+      enum: [CONNECTED, SYNCING, DISCONNECTED, ERROR]
+
+    SlaveAccount:
+      type: object
+      required: [id, userId, mt5Login, brokerServer, status, statusMessage, metaApiAccountId, lastSyncAt, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        mt5Login:
+          type: string
+        brokerServer:
+          type: string
+        status:
+          $ref: "#/components/schemas/Mt5ConnectionStatus"
+        statusMessage:
+          type: ["string", "null"]
+        metaApiAccountId:
+          type: ["string", "null"]
+        lastSyncAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    ConnectMt5Input:
+      type: object
+      required: [mt5Login, mt5Password, brokerServer]
+      properties:
+        mt5Login:
+          type: string
+        mt5Password:
+          type: string
+        brokerServer:
+          type: string
+
+    UpdateMt5Input:
+      type: object
+      properties:
+        mt5Password:
+          type: string
+        brokerServer:
+          type: string

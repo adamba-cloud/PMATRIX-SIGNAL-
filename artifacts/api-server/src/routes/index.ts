@@ -8,6 +8,7 @@ import paymentsRouter from "./payments";
 import mpesaRouter from "./mpesa";
 import configRouter from "./config";
 import dashboardRouter from "./dashboard";
+import mt5Router from "./mt5";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(mpesaRouter);
 router.use(paymentsRouter);
 router.use(configRouter);
 router.use(dashboardRouter);
+router.use(mt5Router);
 
 export default router;

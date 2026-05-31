@@ -339,3 +339,107 @@ export const GetAdminSummaryResponse = zod.object({
 })
 
 
+/**
+ * @summary List connected MT5 accounts
+ */
+export const GetMt5AccountsResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "mt5Login": zod.string(),
+  "brokerServer": zod.string(),
+  "status": zod.enum(['CONNECTED', 'SYNCING', 'DISCONNECTED', 'ERROR']),
+  "statusMessage": zod.string().nullable(),
+  "metaApiAccountId": zod.string().nullable(),
+  "lastSyncAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const GetMt5AccountsResponse = zod.array(GetMt5AccountsResponseItem)
+
+
+/**
+ * @summary Connect a new MT5 account
+ */
+export const ConnectMt5AccountBody = zod.object({
+  "mt5Login": zod.string(),
+  "mt5Password": zod.string(),
+  "brokerServer": zod.string()
+})
+
+
+/**
+ * @summary Get a single MT5 account
+ */
+export const GetMt5AccountParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetMt5AccountResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "mt5Login": zod.string(),
+  "brokerServer": zod.string(),
+  "status": zod.enum(['CONNECTED', 'SYNCING', 'DISCONNECTED', 'ERROR']),
+  "statusMessage": zod.string().nullable(),
+  "metaApiAccountId": zod.string().nullable(),
+  "lastSyncAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Update an MT5 account
+ */
+export const UpdateMt5AccountParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateMt5AccountBody = zod.object({
+  "mt5Password": zod.string().optional(),
+  "brokerServer": zod.string().optional()
+})
+
+export const UpdateMt5AccountResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "mt5Login": zod.string(),
+  "brokerServer": zod.string(),
+  "status": zod.enum(['CONNECTED', 'SYNCING', 'DISCONNECTED', 'ERROR']),
+  "statusMessage": zod.string().nullable(),
+  "metaApiAccountId": zod.string().nullable(),
+  "lastSyncAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Remove an MT5 account
+ */
+export const DeleteMt5AccountParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Trigger a reconnect attempt for an MT5 account
+ */
+export const ReconnectMt5AccountParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ReconnectMt5AccountResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "mt5Login": zod.string(),
+  "brokerServer": zod.string(),
+  "status": zod.enum(['CONNECTED', 'SYNCING', 'DISCONNECTED', 'ERROR']),
+  "statusMessage": zod.string().nullable(),
+  "metaApiAccountId": zod.string().nullable(),
+  "lastSyncAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+

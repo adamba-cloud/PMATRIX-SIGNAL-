@@ -24,6 +24,7 @@ import type {
   AuthResponse,
   CallbackAck,
   ChangePasswordInput,
+  ConnectMt5Input,
   DashboardSummary,
   ErrorResponse,
   HealthStatus,
@@ -33,12 +34,14 @@ import type {
   RegisterInput,
   Signal,
   SignalSummary,
+  SlaveAccount,
   StkPushInput,
   StkPushResponse,
   Subscription,
   SubscriptionInput,
   SystemConfig,
   SystemConfigInput,
+  UpdateMt5Input,
   User
 } from './api.schemas';
 
@@ -1627,4 +1630,441 @@ export function useGetAdminSummary<TData = Awaited<ReturnType<typeof getAdminSum
 
 
 
+
+export const getGetMt5AccountsUrl = () => {
+
+
+
+
+  return `/api/mt5/accounts`
+}
+
+/**
+ * @summary List connected MT5 accounts
+ */
+export const getMt5Accounts = async ( options?: RequestInit): Promise<SlaveAccount[]> => {
+
+  return customFetch<SlaveAccount[]>(getGetMt5AccountsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMt5AccountsQueryKey = () => {
+    return [
+    `/api/mt5/accounts`
+    ] as const;
+    }
+
+
+export const getGetMt5AccountsQueryOptions = <TData = Awaited<ReturnType<typeof getMt5Accounts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMt5Accounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMt5AccountsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMt5Accounts>>> = ({ signal }) => getMt5Accounts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMt5Accounts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMt5AccountsQueryResult = NonNullable<Awaited<ReturnType<typeof getMt5Accounts>>>
+export type GetMt5AccountsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List connected MT5 accounts
+ */
+
+export function useGetMt5Accounts<TData = Awaited<ReturnType<typeof getMt5Accounts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMt5Accounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMt5AccountsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getConnectMt5AccountUrl = () => {
+
+
+
+
+  return `/api/mt5/accounts`
+}
+
+/**
+ * @summary Connect a new MT5 account
+ */
+export const connectMt5Account = async (connectMt5Input: ConnectMt5Input, options?: RequestInit): Promise<SlaveAccount> => {
+
+  return customFetch<SlaveAccount>(getConnectMt5AccountUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      connectMt5Input,)
+  }
+);}
+
+
+
+
+export const getConnectMt5AccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof connectMt5Account>>, TError,{data: BodyType<ConnectMt5Input>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof connectMt5Account>>, TError,{data: BodyType<ConnectMt5Input>}, TContext> => {
+
+const mutationKey = ['connectMt5Account'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof connectMt5Account>>, {data: BodyType<ConnectMt5Input>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  connectMt5Account(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConnectMt5AccountMutationResult = NonNullable<Awaited<ReturnType<typeof connectMt5Account>>>
+    export type ConnectMt5AccountMutationBody = BodyType<ConnectMt5Input>
+    export type ConnectMt5AccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Connect a new MT5 account
+ */
+export const useConnectMt5Account = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof connectMt5Account>>, TError,{data: BodyType<ConnectMt5Input>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof connectMt5Account>>,
+        TError,
+        {data: BodyType<ConnectMt5Input>},
+        TContext
+      > => {
+      return useMutation(getConnectMt5AccountMutationOptions(options));
+    }
+
+export const getGetMt5AccountUrl = (id: number,) => {
+
+
+
+
+  return `/api/mt5/accounts/${id}`
+}
+
+/**
+ * @summary Get a single MT5 account
+ */
+export const getMt5Account = async (id: number, options?: RequestInit): Promise<SlaveAccount> => {
+
+  return customFetch<SlaveAccount>(getGetMt5AccountUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMt5AccountQueryKey = (id: number,) => {
+    return [
+    `/api/mt5/accounts/${id}`
+    ] as const;
+    }
+
+
+export const getGetMt5AccountQueryOptions = <TData = Awaited<ReturnType<typeof getMt5Account>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMt5Account>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMt5AccountQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMt5Account>>> = ({ signal }) => getMt5Account(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMt5Account>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMt5AccountQueryResult = NonNullable<Awaited<ReturnType<typeof getMt5Account>>>
+export type GetMt5AccountQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get a single MT5 account
+ */
+
+export function useGetMt5Account<TData = Awaited<ReturnType<typeof getMt5Account>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMt5Account>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMt5AccountQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateMt5AccountUrl = (id: number,) => {
+
+
+
+
+  return `/api/mt5/accounts/${id}`
+}
+
+/**
+ * @summary Update an MT5 account
+ */
+export const updateMt5Account = async (id: number,
+    updateMt5Input: UpdateMt5Input, options?: RequestInit): Promise<SlaveAccount> => {
+
+  return customFetch<SlaveAccount>(getUpdateMt5AccountUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateMt5Input,)
+  }
+);}
+
+
+
+
+export const getUpdateMt5AccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMt5Account>>, TError,{id: number;data: BodyType<UpdateMt5Input>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMt5Account>>, TError,{id: number;data: BodyType<UpdateMt5Input>}, TContext> => {
+
+const mutationKey = ['updateMt5Account'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMt5Account>>, {id: number;data: BodyType<UpdateMt5Input>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateMt5Account(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMt5AccountMutationResult = NonNullable<Awaited<ReturnType<typeof updateMt5Account>>>
+    export type UpdateMt5AccountMutationBody = BodyType<UpdateMt5Input>
+    export type UpdateMt5AccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Update an MT5 account
+ */
+export const useUpdateMt5Account = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMt5Account>>, TError,{id: number;data: BodyType<UpdateMt5Input>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMt5Account>>,
+        TError,
+        {id: number;data: BodyType<UpdateMt5Input>},
+        TContext
+      > => {
+      return useMutation(getUpdateMt5AccountMutationOptions(options));
+    }
+
+export const getDeleteMt5AccountUrl = (id: number,) => {
+
+
+
+
+  return `/api/mt5/accounts/${id}`
+}
+
+/**
+ * @summary Remove an MT5 account
+ */
+export const deleteMt5Account = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteMt5AccountUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteMt5AccountMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMt5Account>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMt5Account>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteMt5Account'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMt5Account>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteMt5Account(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMt5AccountMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMt5Account>>>
+
+    export type DeleteMt5AccountMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove an MT5 account
+ */
+export const useDeleteMt5Account = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMt5Account>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMt5Account>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteMt5AccountMutationOptions(options));
+    }
+
+export const getReconnectMt5AccountUrl = (id: number,) => {
+
+
+
+
+  return `/api/mt5/accounts/${id}/reconnect`
+}
+
+/**
+ * @summary Trigger a reconnect attempt for an MT5 account
+ */
+export const reconnectMt5Account = async (id: number, options?: RequestInit): Promise<SlaveAccount> => {
+
+  return customFetch<SlaveAccount>(getReconnectMt5AccountUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getReconnectMt5AccountMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reconnectMt5Account>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reconnectMt5Account>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['reconnectMt5Account'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reconnectMt5Account>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  reconnectMt5Account(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReconnectMt5AccountMutationResult = NonNullable<Awaited<ReturnType<typeof reconnectMt5Account>>>
+
+    export type ReconnectMt5AccountMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Trigger a reconnect attempt for an MT5 account
+ */
+export const useReconnectMt5Account = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reconnectMt5Account>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reconnectMt5Account>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getReconnectMt5AccountMutationOptions(options));
+    }
 
