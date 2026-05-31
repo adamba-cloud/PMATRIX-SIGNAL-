@@ -12,6 +12,7 @@ import {
   signToken,
   requireAuth,
 } from "../lib/auth";
+import { generateReferralCode, applyReferralReward } from "../lib/referrals";
 
 const router = Router();
 
@@ -61,11 +62,32 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     return;
   }
   const { email, password, name } = parsed.data;
+  const referralCodeUsed = (req.body.referralCode as string | undefined)?.trim().toUpperCase();
 
   const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase()));
   if (existing) {
     res.status(409).json({ error: "Email already registered" });
     return;
+  }
+
+  // Validate referral code if provided
+  let referrer: { id: number } | null = null;
+  if (referralCodeUsed) {
+    const [found] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.referralCode, referralCodeUsed));
+    if (found) referrer = found;
+  }
+
+  // Generate a unique referral code for the new user
+  let newCode = generateReferralCode();
+  let attempts = 0;
+  while (attempts < 5) {
+    const [conflict] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.referralCode, newCode));
+    if (!conflict) break;
+    newCode = generateReferralCode();
+    attempts++;
   }
 
   const passwordHash = await hashPassword(password);
@@ -75,7 +97,13 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     passwordHash,
     role: "USER",
     mustChangePassword: false,
+    referralCode: newCode,
   }).returning();
+
+  // Apply referral rewards asynchronously (don't block registration)
+  if (referrer) {
+    applyReferralReward(referrer.id, user.id).catch(() => {});
+  }
 
   const token = signToken({ userId: user.id, role: user.role });
   res.status(201).json({
@@ -86,6 +114,7 @@ router.post("/auth/register", async (req, res): Promise<void> => {
       name: user.name,
       role: user.role,
       mustChangePassword: user.mustChangePassword,
+      referralCode: user.referralCode,
       createdAt: user.createdAt.toISOString(),
     },
   });
@@ -103,6 +132,8 @@ router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
     name: user.name,
     role: user.role,
     mustChangePassword: user.mustChangePassword,
+    whatsappNumber: user.whatsappNumber,
+    referralCode: user.referralCode,
     createdAt: user.createdAt.toISOString(),
   });
 });
@@ -121,6 +152,7 @@ router.patch("/auth/me", requireAuth, async (req, res): Promise<void> => {
     name: updated.name,
     role: updated.role,
     whatsappNumber: updated.whatsappNumber,
+    referralCode: updated.referralCode,
     mustChangePassword: updated.mustChangePassword,
     createdAt: updated.createdAt.toISOString(),
   });

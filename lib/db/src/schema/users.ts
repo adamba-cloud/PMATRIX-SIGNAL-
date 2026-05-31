@@ -13,6 +13,7 @@ export const usersTable = pgTable("users", {
   mustChangePassword: boolean("must_change_password").notNull().default(false),
   suspended: boolean("suspended").notNull().default(false),
   whatsappNumber: text("whatsapp_number"),
+  referralCode: text("referral_code").unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

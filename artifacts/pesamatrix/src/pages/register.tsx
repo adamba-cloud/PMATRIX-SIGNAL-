@@ -1,39 +1,57 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
-import { useRegister, getGetMeQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { customFetch, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ActivitySquare, Loader2 } from "lucide-react";
+import { ActivitySquare, Loader2, Gift } from "lucide-react";
 
 export default function Register() {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("ref") || "";
+    } catch {
+      return "";
+    }
+  });
   const [error, setError] = useState("");
-  
-  const registerMutation = useRegister();
+
+  const registerMutation = useMutation({
+    mutationFn: (data: { name: string; email: string; password: string; referralCode?: string }) =>
+      customFetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }).then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({ error: "Registration failed" }));
+          throw new Error(body.error || "Registration failed");
+        }
+        return r.json();
+      }),
+    onSuccess: (data) => {
+      localStorage.setItem("token", data.token);
+      queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+      setLocation("/dashboard");
+    },
+    onError: (err: Error) => setError(err.message),
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    
-    registerMutation.mutate(
-      { data: { name, email, password } },
-      {
-        onSuccess: (data) => {
-          localStorage.setItem("token", data.token);
-          queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
-          setLocation("/dashboard");
-        },
-        onError: (err: any) => {
-          setError(err.message || "Registration failed");
-        }
-      }
-    );
+    registerMutation.mutate({
+      name,
+      email,
+      password,
+      ...(referralCode ? { referralCode } : {}),
+    });
   };
 
   return (
@@ -45,21 +63,28 @@ export default function Register() {
             <span className="font-bold text-2xl tracking-tight text-white">PESAMATRIX</span>
           </div>
         </div>
-        
+
         <h2 className="text-2xl font-bold text-white mb-2 text-center">Create Account</h2>
         <p className="text-slate-400 text-center text-sm mb-8">Join the elite trading network</p>
-        
+
+        {referralCode && (
+          <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 text-green-400 p-3 rounded-md text-sm mb-6">
+            <Gift className="w-4 h-4 flex-shrink-0" />
+            <span>Referral code applied — you'll get <strong>3 free days</strong> on signup!</span>
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-md text-sm mb-6 text-center">
             {error}
           </div>
         )}
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
+
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="name" className="text-slate-300">Full Name</Label>
-            <Input 
-              id="name" 
+            <Input
+              id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="bg-slate-950 border-slate-800 text-white focus:border-green-500 focus:ring-green-500/20"
@@ -70,9 +95,9 @@ export default function Register() {
 
           <div className="space-y-2">
             <Label htmlFor="email" className="text-slate-300">Email Address</Label>
-            <Input 
-              id="email" 
-              type="email" 
+            <Input
+              id="email"
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="bg-slate-950 border-slate-800 text-white focus:border-green-500 focus:ring-green-500/20"
@@ -80,12 +105,12 @@ export default function Register() {
               required
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="password" className="text-slate-300">Password</Label>
-            <Input 
-              id="password" 
-              type="password" 
+            <Input
+              id="password"
+              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="bg-slate-950 border-slate-800 text-white focus:border-green-500 focus:ring-green-500/20"
@@ -93,18 +118,35 @@ export default function Register() {
               required
             />
           </div>
-          
-          <Button 
-            type="submit" 
+
+          <div className="space-y-2">
+            <Label htmlFor="referral" className="text-slate-300">
+              Referral Code <span className="text-slate-500 font-normal">(optional)</span>
+            </Label>
+            <Input
+              id="referral"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+              className="bg-slate-950 border-slate-800 text-white focus:border-green-500 focus:ring-green-500/20 font-mono tracking-widest"
+              placeholder="e.g. PESA4B2K"
+              maxLength={8}
+            />
+          </div>
+
+          <Button
+            type="submit"
             className="w-full bg-green-600 hover:bg-green-500 text-white border-0 h-12 text-md"
             disabled={registerMutation.isPending}
           >
             {registerMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Account"}
           </Button>
         </form>
-        
+
         <div className="mt-8 text-center text-sm text-slate-400">
-          Already have an account? <Link href="/login" className="text-green-500 hover:text-green-400 font-medium">Sign in</Link>
+          Already have an account?{" "}
+          <Link href="/login" className="text-green-500 hover:text-green-400 font-medium">
+            Sign in
+          </Link>
         </div>
       </div>
     </div>

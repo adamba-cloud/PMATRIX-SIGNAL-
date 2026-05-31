@@ -26,6 +26,7 @@ import {
   Bell,
   BellOff,
   BellRing,
+  Gift,
 } from "lucide-react";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { Button } from "./ui/button";
@@ -134,6 +135,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/admin/content" icon={FolderOpen}>Content</SidebarLink>
                 <SidebarLink href="/admin/signals" icon={Radio}>Signals</SidebarLink>
                 <SidebarLink href="/admin/announcements" icon={Megaphone}>Announcements</SidebarLink>
+                <SidebarLink href="/admin/referrals" icon={Gift}>Referrals</SidebarLink>
                 <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 mt-4">
                   User View
                 </div>

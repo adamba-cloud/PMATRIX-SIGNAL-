@@ -6,8 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, User as UserIcon, Mail, Shield, Calendar, Phone, Save } from "lucide-react";
+import {
+  Loader2, User as UserIcon, Mail, Shield, Calendar,
+  Phone, Save, Gift, Copy, Check, TrendingUp,
+} from "lucide-react";
 import { format } from "date-fns";
+
+type ReferralStats = {
+  referralCode: string;
+  totalReferrals: number;
+  rewardedCount: number;
+  totalBonusDays: number;
+  referrals: Array<{ id: number; status: string; bonusDays: number; createdAt: string }>;
+};
 
 export default function Profile() {
   const { toast } = useToast();
@@ -15,6 +26,14 @@ export default function Profile() {
   const { data: user, isLoading } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
   const [whatsapp, setWhatsapp] = useState<string>("");
   const [editing, setEditing] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const { data: referralStats } = useQuery<ReferralStats>({
+    queryKey: ["referral-stats"],
+    queryFn: () => customFetch("/api/referral/stats").then((r) => r.json()),
+    enabled: !!user,
+  });
 
   const saveMutation = useMutation({
     mutationFn: (whatsappNumber: string) =>
@@ -31,6 +50,22 @@ export default function Profile() {
     onError: () => toast({ title: "Failed to save", variant: "destructive" }),
   });
 
+  const copyCode = () => {
+    if (!referralStats?.referralCode) return;
+    navigator.clipboard.writeText(referralStats.referralCode);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
+  };
+
+  const copyLink = () => {
+    if (!referralStats?.referralCode) return;
+    const link = `${window.location.origin}/register?ref=${referralStats.referralCode}`;
+    navigator.clipboard.writeText(link);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+    toast({ title: "Link copied to clipboard" });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -42,6 +77,9 @@ export default function Profile() {
   if (!user) return null;
 
   const currentWhatsapp = (user as any).whatsappNumber ?? "";
+  const shareLink = referralStats
+    ? `${window.location.origin}/register?ref=${referralStats.referralCode}`
+    : "";
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -50,6 +88,7 @@ export default function Profile() {
         <p className="text-muted-foreground">View your account details and preferences.</p>
       </div>
 
+      {/* Account Info */}
       <Card className="bg-card border-border">
         <CardHeader className="border-b border-border pb-6 mb-6">
           <div className="flex items-center gap-4">
@@ -76,7 +115,6 @@ export default function Profile() {
                 <p className="text-sm font-medium mt-1">{user.email}</p>
               </div>
             </div>
-
             <div className="flex items-center gap-3 p-4 rounded-lg bg-background border border-border">
               <Shield className="w-5 h-5 text-muted-foreground" />
               <div>
@@ -86,7 +124,6 @@ export default function Profile() {
                 </p>
               </div>
             </div>
-
             <div className="flex items-center gap-3 p-4 rounded-lg bg-background border border-border md:col-span-2">
               <Calendar className="w-5 h-5 text-muted-foreground" />
               <div>
@@ -152,13 +189,109 @@ export default function Profile() {
                   className="bg-green-600 hover:bg-green-700 text-white"
                   size="sm"
                 >
-                  {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-1" /> Save</>}
+                  {saveMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <><Save className="w-4 h-4 mr-1" /> Save</>
+                  )}
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setEditing(false)} className="border-border">
                   Cancel
                 </Button>
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Referral Program */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Gift className="w-5 h-5 text-green-500" />
+            Referral Program
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Invite friends — they get <strong className="text-foreground">3 free days</strong>, you earn{" "}
+            <strong className="text-foreground">7 bonus days</strong> per referral.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!referralStats ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin text-green-500" />
+            </div>
+          ) : (
+            <>
+              {/* Code */}
+              <div className="flex items-center justify-between p-4 rounded-lg bg-background border border-border">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Your Referral Code</p>
+                  <p className="font-mono text-2xl font-bold text-green-500 tracking-widest">
+                    {referralStats.referralCode}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={copyCode} className="border-border gap-1.5">
+                  {codeCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                  {codeCopied ? "Copied" : "Copy Code"}
+                </Button>
+              </div>
+
+              {/* Share link */}
+              <div className="flex items-center gap-2 p-4 rounded-lg bg-background border border-border">
+                <input
+                  readOnly
+                  value={shareLink}
+                  className="flex-1 min-w-0 bg-transparent text-xs text-muted-foreground outline-none truncate"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyLink}
+                  className="border-border gap-1.5 flex-shrink-0"
+                >
+                  {linkCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                  {linkCopied ? "Copied!" : "Copy Link"}
+                </Button>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-4 rounded-lg bg-background border border-border text-center">
+                  <p className="text-3xl font-bold">{referralStats.totalReferrals}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Friends Referred</p>
+                </div>
+                <div className="p-4 rounded-lg bg-background border border-border text-center">
+                  <p className="text-3xl font-bold text-green-500">+{referralStats.totalBonusDays}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Bonus Days Earned</p>
+                </div>
+              </div>
+
+              {/* Referral history */}
+              {referralStats.referrals.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">History</p>
+                  <div className="space-y-1">
+                    {referralStats.referrals.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between py-2 px-3 rounded-md bg-background border border-border text-sm">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="w-3.5 h-3.5 text-green-500" />
+                          <span className="text-muted-foreground">
+                            {format(new Date(r.createdAt), "MMM d, yyyy")}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-500 font-medium">+{r.bonusDays} days</span>
+                          <Badge variant="secondary" className="text-xs py-0">
+                            {r.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
