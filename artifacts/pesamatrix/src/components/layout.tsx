@@ -117,6 +117,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/mt5" icon={Cpu}>MT5 Accounts</SidebarLink>
                 <SidebarLink href="/copy-trading" icon={GitFork}>Copy Trading</SidebarLink>
                 <SidebarLink href="/trading-calculator" icon={Calculator}>Growth Calculator</SidebarLink>
+                <SidebarLink href="/trade-journal" icon={BookOpen}>Trade Journal</SidebarLink>
                 <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 mt-4">
                   Content
                 </div>

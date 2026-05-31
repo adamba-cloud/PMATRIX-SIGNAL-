@@ -24,6 +24,7 @@ import Gallery from "@/pages/gallery";
 import News from "@/pages/news";
 import Resources from "@/pages/resources";
 import TradingCalculator from "@/pages/trading-calculator";
+import TradeJournal from "@/pages/trade-journal";
 
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
@@ -60,6 +61,7 @@ function Router() {
         <Route path="/news" component={News} />
         <Route path="/resources" component={Resources} />
         <Route path="/trading-calculator" component={TradingCalculator} />
+        <Route path="/trade-journal" component={TradeJournal} />
 
         <Route path="/admin/dashboard" component={AdminDashboard} />
         <Route path="/admin/users" component={AdminUsers} />
