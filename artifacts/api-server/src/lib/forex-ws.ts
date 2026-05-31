@@ -74,8 +74,21 @@ function buildSnapshot(): ForexPrice[] {
   return Object.keys(BASE_PRICES).map(nextPrice);
 }
 
+let _wss: WebSocketServer | null = null;
+
+export function broadcastMt5Status(payload: object): void {
+  if (!_wss) return;
+  const msg = JSON.stringify({ type: "mt5_status", data: payload });
+  for (const client of _wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(msg);
+    }
+  }
+}
+
 export function attachForexWebSocket(server: Server): void {
   const wss = new WebSocketServer({ server, path: "/api/ws" });
+  _wss = wss;
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     logger.info({ ip: req.socket.remoteAddress }, "Forex WS client connected");

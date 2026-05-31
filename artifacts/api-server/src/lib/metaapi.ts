@@ -72,20 +72,26 @@ export async function createMetaApiAccount(params: {
   password: string;
   server: string;
   name: string;
+  webhookUrl?: string;
 }): Promise<{ id: string }> {
+  const body: Record<string, unknown> = {
+    login: params.login,
+    password: params.password,
+    server: params.server,
+    platform: "mt5",
+    name: params.name,
+    magic: 0,
+    quoteStreamingIntervalInSeconds: 2.5,
+    reliability: "high",
+  };
+  if (params.webhookUrl) {
+    body.webhookUrl = params.webhookUrl;
+  }
+
   const res = await fetch(`${BASE}/users/current/accounts`, {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify({
-      login: params.login,
-      password: params.password,
-      server: params.server,
-      platform: "mt5",
-      name: params.name,
-      magic: 0,
-      quoteStreamingIntervalInSeconds: 2.5,
-      reliability: "high",
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

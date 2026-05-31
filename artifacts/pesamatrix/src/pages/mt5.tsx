@@ -8,6 +8,7 @@ import {
 } from "@workspace/api-client-react";
 import type { SlaveAccount } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useMt5WebSocket, type Mt5StatusPush } from "@/hooks/useMt5WebSocket";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -183,41 +184,23 @@ function TelemetryGrid({ telemetry, currency }: { telemetry: Telemetry; currency
 
 function AccountCard({
   account,
+  liveTelemetry,
   onDelete,
   onReconnect,
   isDeleting,
   isReconnecting,
 }: {
   account: AccountWithTelemetry;
+  liveTelemetry?: Telemetry;
   onDelete: (id: number) => void;
   onReconnect: (id: number) => void;
   isDeleting: boolean;
   isReconnecting: boolean;
 }) {
-  const [telemetry, setTelemetry] = useState<Telemetry | undefined>(account.telemetry);
+  const telemetry = liveTelemetry ?? account.telemetry;
   const status = account.status as Mt5Status;
   const isSyncing = status === "SYNCING";
   const isConnected = status === "CONNECTED";
-
-  // Poll /mt5/accounts/:id/status every 5 seconds while syncing or connected
-  useEffect(() => {
-    if (!isSyncing && !isConnected) return;
-    const interval = setInterval(async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/api/mt5/accounts/${account.id}/status`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (res.ok) {
-          const data = (await res.json()) as AccountWithTelemetry;
-          if (data.telemetry) setTelemetry(data.telemetry);
-        }
-      } catch {
-        // ignore
-      }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [account.id, isSyncing, isConnected]);
 
   return (
     <Card className="bg-slate-900 border-slate-800">
@@ -471,16 +454,52 @@ export default function Mt5Accounts() {
   const reconnectMutation = useReconnectMt5Account();
   const { toast } = useToast();
 
-  const hasSyncing = accounts.some((a) => a.status === "SYNCING");
+  // Live telemetry pushed via WebSocket, keyed by local account ID
+  const [telemetryMap, setTelemetryMap] = useState<Record<number, Telemetry>>({});
 
   const invalidate = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: getGetMt5AccountsQueryKey() });
   }, [queryClient]);
 
-  // Auto-refresh account list every 8 seconds when any are syncing
+  // Real-time MetaApi status pushes — update query cache + telemetry in place
+  useMt5WebSocket(
+    useCallback(
+      (push: Mt5StatusPush) => {
+        // Patch the cached accounts list without a full refetch
+        queryClient.setQueryData<SlaveAccount[]>(
+          getGetMt5AccountsQueryKey(),
+          (prev) =>
+            prev?.map((a) =>
+              a.id === push.accountId
+                ? {
+                    ...a,
+                    status: push.status as SlaveAccount["status"],
+                    statusMessage: push.statusMessage,
+                    lastSyncAt: push.lastSyncAt,
+                    updatedAt: push.updatedAt,
+                  }
+                : a
+            ) ?? prev
+        );
+
+        // Stash telemetry so the card can render it without a separate HTTP call
+        if (push.telemetry) {
+          setTelemetryMap((prev) => ({
+            ...prev,
+            [push.accountId]: push.telemetry as Telemetry,
+          }));
+        }
+      },
+      [queryClient]
+    )
+  );
+
+  const hasSyncing = accounts.some((a) => a.status === "SYNCING");
+
+  // Fallback poll every 15 s while syncing (WebSocket is primary; this is belt-and-suspenders)
   useEffect(() => {
     if (!hasSyncing) return;
-    const interval = setInterval(invalidate, 8000);
+    const interval = setInterval(invalidate, 15000);
     return () => clearInterval(interval);
   }, [hasSyncing, invalidate]);
 
@@ -567,6 +586,7 @@ export default function Mt5Accounts() {
             <AccountCard
               key={account.id}
               account={account as AccountWithTelemetry}
+              liveTelemetry={telemetryMap[account.id]}
               onDelete={handleDelete}
               onReconnect={handleReconnect}
               isDeleting={deleteMutation.isPending}
