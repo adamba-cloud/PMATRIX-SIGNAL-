@@ -27,6 +27,7 @@ import {
   BellOff,
   BellRing,
   Gift,
+  Calculator,
 } from "lucide-react";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { Button } from "./ui/button";
@@ -39,7 +40,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { theme, toggleTheme } = useTheme();
   const { state: pushState, subscribe: subscribePush, unsubscribe: unsubscribePush } = usePushNotifications();
 
-  const isAuthPage = location === "/login" || location === "/register";
+  const isAuthPage =
+    location === "/login" ||
+    location === "/register" ||
+    location.startsWith("/verify-email") ||
+    location.startsWith("/forgot-password") ||
+    location.startsWith("/reset-password");
   const isLandingPage = location === "/";
   const isChangePassword = location === "/change-password";
 
@@ -110,6 +116,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/payments" icon={CreditCard}>Payments</SidebarLink>
                 <SidebarLink href="/mt5" icon={Cpu}>MT5 Accounts</SidebarLink>
                 <SidebarLink href="/copy-trading" icon={GitFork}>Copy Trading</SidebarLink>
+                <SidebarLink href="/trading-calculator" icon={Calculator}>Growth Calculator</SidebarLink>
                 <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 mt-4">
                   Content
                 </div>

@@ -23,6 +23,7 @@ import CopyTrading from "@/pages/copy-trading";
 import Gallery from "@/pages/gallery";
 import News from "@/pages/news";
 import Resources from "@/pages/resources";
+import TradingCalculator from "@/pages/trading-calculator";
 
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
@@ -58,6 +59,7 @@ function Router() {
         <Route path="/gallery" component={Gallery} />
         <Route path="/news" component={News} />
         <Route path="/resources" component={Resources} />
+        <Route path="/trading-calculator" component={TradingCalculator} />
 
         <Route path="/admin/dashboard" component={AdminDashboard} />
         <Route path="/admin/users" component={AdminUsers} />
