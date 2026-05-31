@@ -1,22 +1,35 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: PESAMATRIX SIGNAL API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: signals
+    description: Trading signals
+  - name: subscriptions
+    description: Subscription management
+  - name: payments
+    description: Payment history
+  - name: config
+    description: System configuration
+  - name: dashboard
+    description: Dashboard summaries
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +37,300 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change user password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "200":
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Invalid password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (admin only)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get a user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /signals:
+    get:
+      operationId: listSignals
+      tags: [signals]
+      summary: Get recent trading signals
+      responses:
+        "200":
+          description: List of signals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Signal"
+
+  /signals/summary:
+    get:
+      operationId: getSignalSummary
+      tags: [signals]
+      summary: Get signal statistics summary
+      responses:
+        "200":
+          description: Signal stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignalSummary"
+
+  /subscriptions/my:
+    get:
+      operationId: getMySubscription
+      tags: [subscriptions]
+      summary: Get current user's active subscription
+      responses:
+        "200":
+          description: User subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+
+  /subscriptions:
+    post:
+      operationId: createSubscription
+      tags: [subscriptions]
+      summary: Create a new subscription request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscriptionInput"
+      responses:
+        "201":
+          description: Subscription created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+    get:
+      operationId: listSubscriptions
+      tags: [subscriptions]
+      summary: List all subscriptions (admin only)
+      responses:
+        "200":
+          description: List of subscriptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Subscription"
+
+  /payments/my:
+    get:
+      operationId: getMyPayments
+      tags: [payments]
+      summary: Get current user's payment history
+      responses:
+        "200":
+          description: Payment history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+
+  /payments:
+    get:
+      operationId: listPayments
+      tags: [payments]
+      summary: List all payments (admin only)
+      responses:
+        "200":
+          description: All payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+
+  /config:
+    get:
+      operationId: getConfig
+      tags: [config]
+      summary: Get system configuration
+      responses:
+        "200":
+          description: System config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemConfig"
+    put:
+      operationId: updateConfig
+      tags: [config]
+      summary: Update system configuration (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SystemConfigInput"
+      responses:
+        "200":
+          description: Config updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemConfig"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get user dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /admin/summary:
+    get:
+      operationId: getAdminSummary
+      tags: [dashboard]
+      summary: Get admin dashboard overview
+      responses:
+        "200":
+          description: Admin summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +341,225 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    RegisterInput:
+      type: object
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        name:
+          type: string
+
+    ChangePasswordInput:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+
+    User:
+      type: object
+      required: [id, email, name, role, mustChangePassword, createdAt]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, USER]
+        mustChangePassword:
+          type: boolean
+        createdAt:
+          type: string
+
+    Signal:
+      type: object
+      required: [id, pair, direction, entryPrice, stopLoss, takeProfit, status, pips, createdAt]
+      properties:
+        id:
+          type: integer
+        pair:
+          type: string
+        direction:
+          type: string
+          enum: [BUY, SELL]
+        entryPrice:
+          type: number
+        stopLoss:
+          type: number
+        takeProfit:
+          type: number
+        status:
+          type: string
+          enum: [ACTIVE, CLOSED, PENDING]
+        pips:
+          type: ["number", "null"]
+        createdAt:
+          type: string
+
+    SignalSummary:
+      type: object
+      required: [totalSignals, winRate, activePlan, totalProfitPips, weeklyChange, winRateChange]
+      properties:
+        totalSignals:
+          type: integer
+        winRate:
+          type: number
+        activePlan:
+          type: string
+        totalProfitPips:
+          type: number
+        weeklyChange:
+          type: integer
+        winRateChange:
+          type: number
+
+    Subscription:
+      type: object
+      required: [id, userId, status, daysSelected, totalAmount, feePerDay, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        status:
+          type: string
+          enum: [ACTIVE, EXPIRED, PENDING, CANCELLED]
+        daysSelected:
+          type: integer
+        totalAmount:
+          type: number
+        feePerDay:
+          type: number
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    SubscriptionInput:
+      type: object
+      required: [daysSelected]
+      properties:
+        daysSelected:
+          type: integer
+
+    Payment:
+      type: object
+      required: [id, userId, amount, status, method, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        subscriptionId:
+          type: ["integer", "null"]
+        amount:
+          type: number
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, FAILED]
+        method:
+          type: string
+        reference:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    SystemConfig:
+      type: object
+      required: [feePerDay, minDays]
+      properties:
+        feePerDay:
+          type: number
+        minDays:
+          type: integer
+
+    SystemConfigInput:
+      type: object
+      properties:
+        feePerDay:
+          type: number
+        minDays:
+          type: integer
+
+    DashboardSummary:
+      type: object
+      required: [totalSignals, winRate, activePlan, totalProfitPips, weeklySignalChange, winRateChange, performanceData]
+      properties:
+        totalSignals:
+          type: integer
+        winRate:
+          type: number
+        activePlan:
+          type: string
+        totalProfitPips:
+          type: number
+        weeklySignalChange:
+          type: integer
+        winRateChange:
+          type: number
+        performanceData:
+          type: array
+          items:
+            $ref: "#/components/schemas/PerformancePoint"
+
+    PerformancePoint:
+      type: object
+      required: [day, value]
+      properties:
+        day:
+          type: string
+        value:
+          type: number
+
+    AdminSummary:
+      type: object
+      required: [totalUsers, activeSubscriptions, totalRevenue, pendingPayments, recentUsers]
+      properties:
+        totalUsers:
+          type: integer
+        activeSubscriptions:
+          type: integer
+        totalRevenue:
+          type: number
+        pendingPayments:
+          type: integer
+        recentUsers:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"

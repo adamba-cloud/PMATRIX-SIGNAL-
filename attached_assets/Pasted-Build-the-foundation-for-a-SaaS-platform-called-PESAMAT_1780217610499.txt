@@ -1,0 +1,152 @@
+Build the foundation for a SaaS platform called PESAMATRIX SIGNAL.
+
+Business Information:
+
+- Business Name: PESAMATRIX SIGNAL
+- Phone: +254781585319
+- Support: +254717434943
+- WhatsApp: +254717434943
+
+Tech Stack:
+
+- React
+- TypeScript
+- Tailwind CSS
+- Node.js
+- Express
+- PostgreSQL
+- Prisma ORM
+
+Create only the project foundation and architecture.
+
+FRONTEND
+
+Use React + TypeScript + Tailwind CSS.
+
+Design:
+
+- Premium Modern SaaS Layout
+- Dark Theme
+- Mobile Responsive
+
+Pages:
+
+- Landing Page
+- Login Page
+- Register Page
+- User Dashboard
+- Admin Dashboard
+- Subscription Page
+
+Add an animated running ticker banner at the top of every page displaying forex pairs such as:
+
+EURUSD • GBPUSD • USDJPY • XAUUSD • XAGUSD • AUDUSD • USDCAD
+
+The ticker should continuously scroll across the screen.
+
+BACKEND
+
+Configure:
+
+- Express Server
+- TypeScript
+- Prisma ORM
+- JWT Authentication
+- Environment Variables
+
+USER ROLES
+
+Roles:
+
+- ADMIN
+- USER
+
+Seed Admin Account:
+
+Email:
+craigphilip761@gmail.com
+
+Password:
+TempPass123!
+
+mustChangePassword=true
+
+Create middleware that forces password change before access to protected routes.
+
+DATABASE
+
+Create Prisma models:
+
+User
+Subscription
+Payment
+SystemConfig
+
+Relationships included.
+
+SUBSCRIPTION FOUNDATION
+
+Admin Dashboard:
+
+Admin can set:
+
+- Subscription Fee Per Day
+- Minimum Subscription Days
+
+User Dashboard:
+
+Users can:
+
+- Select number of subscription days
+- View calculated subscription amount
+- View subscription status
+- View payment history
+
+Example:
+
+Fee Per Day = 150 KES
+Days Selected = 30
+
+Total = 4,500 KES
+
+Create database structure and UI only.
+
+Do not implement payment gateway logic yet.
+
+FOLDER STRUCTURE
+
+backend/
+frontend/
+prisma/
+routes/
+controllers/
+middleware/
+services/
+components/
+pages/
+
+GENERATE ONLY
+
+- Folder Structure
+- Prisma Schema
+- Authentication System
+- Dashboard Layouts
+- Admin Layout
+- User Layout
+- Subscription UI
+- Forex Ticker Component
+- Environment Configuration
+- Database Configuration
+
+DO NOT IMPLEMENT:
+
+- M-Pesa
+- MetaApi
+- Telegram
+- Copy Trading
+- AI Features
+- Redis
+- BullMQ
+- Trading Logic
+
+Create a clean, scalable SaaS foundation ready for future phases.
