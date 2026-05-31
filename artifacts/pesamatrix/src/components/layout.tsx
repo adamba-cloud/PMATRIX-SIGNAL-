@@ -12,6 +12,7 @@ import {
   Users,
   ShieldCheck,
   Cpu,
+  GitFork,
 } from "lucide-react";
 import { Button } from "./ui/button";
 
@@ -90,6 +91,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/subscription" icon={ShieldCheck}>Subscription</SidebarLink>
                 <SidebarLink href="/payments" icon={CreditCard}>Payments</SidebarLink>
                 <SidebarLink href="/mt5" icon={Cpu}>MT5 Accounts</SidebarLink>
+                <SidebarLink href="/copy-trading" icon={GitFork}>Copy Trading</SidebarLink>
                 <SidebarLink href="/profile" icon={UserIcon}>Profile</SidebarLink>
               </>
             ) : (

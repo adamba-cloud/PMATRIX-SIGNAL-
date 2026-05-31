@@ -140,6 +140,64 @@ export async function undeployMetaApiAccount(metaApiId: string): Promise<void> {
   }
 }
 
+export interface MetaApiPosition {
+  id: string;
+  symbol: string;
+  type: "POSITION_TYPE_BUY" | "POSITION_TYPE_SELL";
+  volume: number;
+  openPrice: number;
+  currentPrice?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  profit?: number;
+  comment?: string;
+}
+
+export interface MetaApiTradeResult {
+  numericCode: number;
+  stringCode: string;
+  message: string;
+  orderId?: string;
+}
+
+export async function getAccountPositions(metaApiId: string): Promise<MetaApiPosition[]> {
+  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}/positions`, {
+    headers: headers(),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`MetaApi getPositions failed (${res.status}): ${body}`);
+  }
+
+  return res.json() as Promise<MetaApiPosition[]>;
+}
+
+export async function placeTrade(
+  metaApiId: string,
+  params: {
+    actionType: "ORDER_TYPE_BUY" | "ORDER_TYPE_SELL";
+    symbol: string;
+    volume: number;
+    stopLoss?: number;
+    takeProfit?: number;
+    comment?: string;
+  }
+): Promise<MetaApiTradeResult> {
+  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}/trade`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`MetaApi placeTrade failed (${res.status}): ${body}`);
+  }
+
+  return res.json() as Promise<MetaApiTradeResult>;
+}
+
 export async function deleteMetaApiAccount(metaApiId: string): Promise<void> {
   const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}`, {
     method: "DELETE",

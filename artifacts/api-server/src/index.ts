@@ -4,6 +4,8 @@ import { logger } from "./lib/logger";
 import { attachForexWebSocket } from "./lib/forex-ws";
 import { startExpiryJob } from "./lib/expiry-job";
 import { startMetaApiSyncJob } from "./lib/metaapi-sync-job";
+import { startCopyTradeWorker } from "./lib/copy-trade-worker";
+import { startMasterPoller } from "./lib/master-poller";
 
 const rawPort = process.env["PORT"];
 
@@ -23,6 +25,8 @@ const server = createServer(app);
 attachForexWebSocket(server);
 startExpiryJob();
 startMetaApiSyncJob();
+startCopyTradeWorker();
+startMasterPoller();
 
 server.listen(port, () => {
   logger.info({ port }, "Server listening");

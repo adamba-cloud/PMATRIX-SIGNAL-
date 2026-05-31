@@ -1,2 +1,4 @@
 - [Express Request augmentation](express-augment.md) — must use global `Express.Request` namespace in a `.d.ts` file; not `declare module "express"` inside a TS module.
 - [Subscription expiry enforcement](subscription-expiry.md) — background job + middleware pattern for gating signal access behind active subscriptions.
+- [Redis auto-start in dev](redis-dev-start.md) — Redis must be started inside the `dev` npm script; daemonized redis-server dies when the workflow restarts.
+- [API client codegen](api-client-codegen.md) — no orval codegen script exists; add hand-written hooks to `lib/api-client-react/src/copy-trading.ts` and re-export from `src/index.ts`.

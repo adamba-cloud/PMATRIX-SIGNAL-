@@ -10,6 +10,7 @@ import configRouter from "./config";
 import dashboardRouter from "./dashboard";
 import mt5Router from "./mt5";
 import metaApiWebhookRouter from "./metaapi-webhook";
+import copyTradingRouter from "./copy-trading";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(configRouter);
 router.use(dashboardRouter);
 router.use(mt5Router);
 router.use(metaApiWebhookRouter);
+router.use(copyTradingRouter);
 
 export default router;
