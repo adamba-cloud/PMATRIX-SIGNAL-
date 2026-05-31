@@ -152,6 +152,7 @@ export const GetMySubscriptionResponse = zod.object({
   "daysSelected": zod.number(),
   "totalAmount": zod.number(),
   "feePerDay": zod.number(),
+  "phoneNumber": zod.string().nullish(),
   "startDate": zod.string().nullish(),
   "endDate": zod.string().nullish(),
   "createdAt": zod.string()
@@ -162,7 +163,8 @@ export const GetMySubscriptionResponse = zod.object({
  * @summary Create a new subscription request
  */
 export const CreateSubscriptionBody = zod.object({
-  "daysSelected": zod.number()
+  "daysSelected": zod.number(),
+  "phoneNumber": zod.string().optional()
 })
 
 
@@ -176,6 +178,7 @@ export const ListSubscriptionsResponseItem = zod.object({
   "daysSelected": zod.number(),
   "totalAmount": zod.number(),
   "feePerDay": zod.number(),
+  "phoneNumber": zod.string().nullish(),
   "startDate": zod.string().nullish(),
   "endDate": zod.string().nullish(),
   "createdAt": zod.string()
@@ -191,10 +194,15 @@ export const GetMyPaymentsResponseItem = zod.object({
   "userId": zod.number(),
   "subscriptionId": zod.number().nullish(),
   "amount": zod.number(),
-  "status": zod.enum(['PENDING', 'COMPLETED', 'FAILED']),
+  "status": zod.enum(['PENDING', 'COMPLETED', 'FAILED', 'CANCELLED']),
   "method": zod.string(),
+  "phoneNumber": zod.string().nullish(),
+  "checkoutRequestId": zod.string().nullish(),
+  "mpesaReceiptNumber": zod.string().nullish(),
   "reference": zod.string().nullish(),
-  "createdAt": zod.string()
+  "failureReason": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "completedAt": zod.string().nullish()
 })
 export const GetMyPaymentsResponse = zod.array(GetMyPaymentsResponseItem)
 
@@ -207,12 +215,69 @@ export const ListPaymentsResponseItem = zod.object({
   "userId": zod.number(),
   "subscriptionId": zod.number().nullish(),
   "amount": zod.number(),
-  "status": zod.enum(['PENDING', 'COMPLETED', 'FAILED']),
+  "status": zod.enum(['PENDING', 'COMPLETED', 'FAILED', 'CANCELLED']),
   "method": zod.string(),
+  "phoneNumber": zod.string().nullish(),
+  "checkoutRequestId": zod.string().nullish(),
+  "mpesaReceiptNumber": zod.string().nullish(),
   "reference": zod.string().nullish(),
-  "createdAt": zod.string()
+  "failureReason": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "completedAt": zod.string().nullish()
 })
 export const ListPaymentsResponse = zod.array(ListPaymentsResponseItem)
+
+
+/**
+ * @summary Initiate M-Pesa STK Push payment
+ */
+export const InitiateStkPushBody = zod.object({
+  "phoneNumber": zod.string().describe('Safaricom phone number in format 2547XXXXXXXX'),
+  "daysSelected": zod.number().describe('Number of subscription days')
+})
+
+export const InitiateStkPushResponse = zod.object({
+  "checkoutRequestId": zod.string(),
+  "merchantRequestId": zod.string(),
+  "paymentId": zod.number(),
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Daraja STK Push callback (called by Safaricom)
+ */
+export const MpesaCallbackResponse = zod.object({
+  "ResultCode": zod.number(),
+  "ResultDesc": zod.string()
+})
+
+
+/**
+ * @summary Poll STK Push payment status
+ */
+export const GetPaymentStatusParams = zod.object({
+  "checkoutRequestId": zod.coerce.string()
+})
+
+export const GetPaymentStatusResponse = zod.object({
+  "status": zod.enum(['PENDING', 'COMPLETED', 'FAILED', 'CANCELLED']),
+  "paymentId": zod.number(),
+  "mpesaReceiptNumber": zod.string().nullish(),
+  "failureReason": zod.string().nullish(),
+  "subscription": zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "status": zod.enum(['ACTIVE', 'EXPIRED', 'PENDING', 'CANCELLED']),
+  "daysSelected": zod.number(),
+  "totalAmount": zod.number(),
+  "feePerDay": zod.number(),
+  "phoneNumber": zod.string().nullish(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "createdAt": zod.string()
+}).optional()
+})
 
 
 /**

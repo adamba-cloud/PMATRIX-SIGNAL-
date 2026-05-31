@@ -4,7 +4,7 @@ import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { subscriptionsTable } from "./subscriptions";
 
-export const paymentStatusEnum = pgEnum("payment_status", ["PENDING", "COMPLETED", "FAILED"]);
+export const paymentStatusEnum = pgEnum("payment_status", ["PENDING", "COMPLETED", "FAILED", "CANCELLED"]);
 
 export const paymentsTable = pgTable("payments", {
   id: serial("id").primaryKey(),
@@ -12,9 +12,15 @@ export const paymentsTable = pgTable("payments", {
   subscriptionId: integer("subscription_id").references(() => subscriptionsTable.id),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   status: paymentStatusEnum("status").notNull().default("PENDING"),
-  method: text("method").notNull().default("MANUAL"),
+  method: text("method").notNull().default("MPESA"),
+  phoneNumber: text("phone_number"),
+  checkoutRequestId: text("checkout_request_id"),
+  merchantRequestId: text("merchant_request_id"),
+  mpesaReceiptNumber: text("mpesa_receipt_number"),
   reference: text("reference"),
+  failureReason: text("failure_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
 });
 
 export const insertPaymentSchema = createInsertSchema(paymentsTable).omit({ id: true, createdAt: true });

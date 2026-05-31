@@ -16,6 +16,16 @@ export interface Payment {
   status: PaymentStatus;
   method: string;
   /** @nullable */
+  phoneNumber?: string | null;
+  /** @nullable */
+  checkoutRequestId?: string | null;
+  /** @nullable */
+  mpesaReceiptNumber?: string | null;
+  /** @nullable */
   reference?: string | null;
+  /** @nullable */
+  failureReason?: string | null;
   createdAt: string;
+  /** @nullable */
+  completedAt?: string | null;
 }

@@ -15,6 +15,8 @@ export interface Subscription {
   totalAmount: number;
   feePerDay: number;
   /** @nullable */
+  phoneNumber?: string | null;
+  /** @nullable */
   startDate?: string | null;
   /** @nullable */
   endDate?: string | null;

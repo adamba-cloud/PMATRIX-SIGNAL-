@@ -108,6 +108,8 @@ export interface Subscription {
   totalAmount: number;
   feePerDay: number;
   /** @nullable */
+  phoneNumber?: string | null;
+  /** @nullable */
   startDate?: string | null;
   /** @nullable */
   endDate?: string | null;
@@ -116,6 +118,7 @@ export interface Subscription {
 
 export interface SubscriptionInput {
   daysSelected: number;
+  phoneNumber?: string;
 }
 
 export type PaymentStatus = typeof PaymentStatus[keyof typeof PaymentStatus];
@@ -125,6 +128,7 @@ export const PaymentStatus = {
   PENDING: 'PENDING',
   COMPLETED: 'COMPLETED',
   FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
 } as const;
 
 export interface Payment {
@@ -136,8 +140,52 @@ export interface Payment {
   status: PaymentStatus;
   method: string;
   /** @nullable */
+  phoneNumber?: string | null;
+  /** @nullable */
+  checkoutRequestId?: string | null;
+  /** @nullable */
+  mpesaReceiptNumber?: string | null;
+  /** @nullable */
   reference?: string | null;
+  /** @nullable */
+  failureReason?: string | null;
   createdAt: string;
+  /** @nullable */
+  completedAt?: string | null;
+}
+
+export interface StkPushInput {
+  /** Safaricom phone number in format 2547XXXXXXXX */
+  phoneNumber: string;
+  /** Number of subscription days */
+  daysSelected: number;
+}
+
+export interface StkPushResponse {
+  checkoutRequestId: string;
+  merchantRequestId: string;
+  paymentId: number;
+  message: string;
+}
+
+export type PaymentStatusResponseStatus = typeof PaymentStatusResponseStatus[keyof typeof PaymentStatusResponseStatus];
+
+
+export const PaymentStatusResponseStatus = {
+  PENDING: 'PENDING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export interface PaymentStatusResponse {
+  status: PaymentStatusResponseStatus;
+  paymentId: number;
+  /** @nullable */
+  mpesaReceiptNumber?: string | null;
+  /** @nullable */
+  failureReason?: string | null;
+  subscription?: Subscription;
 }
 
 export interface SystemConfig {
@@ -163,6 +211,11 @@ export interface DashboardSummary {
   weeklySignalChange: number;
   winRateChange: number;
   performanceData: PerformancePoint[];
+}
+
+export interface CallbackAck {
+  ResultCode: number;
+  ResultDesc: string;
 }
 
 export interface AdminSummary {

@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface SubscriptionInput {
-  daysSelected: number;
-  phoneNumber?: string;
+export interface CallbackAck {
+  ResultCode: number;
+  ResultDesc: string;
 }

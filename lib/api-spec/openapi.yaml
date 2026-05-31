@@ -19,6 +19,8 @@ tags:
     description: Subscription management
   - name: payments
     description: Payment history
+  - name: mpesa
+    description: M-Pesa STK Push
   - name: config
     description: System configuration
   - name: dashboard
@@ -275,6 +277,69 @@ paths:
                 items:
                   $ref: "#/components/schemas/Payment"
 
+  /payments/mpesa/stk:
+    post:
+      operationId: initiateStkPush
+      tags: [mpesa]
+      summary: Initiate M-Pesa STK Push payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StkPushInput"
+      responses:
+        "200":
+          description: STK Push initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StkPushResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /payments/mpesa/callback:
+    post:
+      operationId: mpesaCallback
+      tags: [mpesa]
+      summary: Daraja STK Push callback (called by Safaricom)
+      responses:
+        "200":
+          description: Callback acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallbackAck"
+
+  /payments/mpesa/status/{checkoutRequestId}:
+    get:
+      operationId: getPaymentStatus
+      tags: [mpesa]
+      summary: Poll STK Push payment status
+      parameters:
+        - name: checkoutRequestId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payment status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentStatusResponse"
+        "404":
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /config:
     get:
       operationId: getConfig
@@ -464,6 +529,8 @@ components:
           type: number
         feePerDay:
           type: number
+        phoneNumber:
+          type: ["string", "null"]
         startDate:
           type: ["string", "null"]
         endDate:
@@ -477,6 +544,8 @@ components:
       properties:
         daysSelected:
           type: integer
+        phoneNumber:
+          type: string
 
     Payment:
       type: object
@@ -492,13 +561,63 @@ components:
           type: number
         status:
           type: string
-          enum: [PENDING, COMPLETED, FAILED]
+          enum: [PENDING, COMPLETED, FAILED, CANCELLED]
         method:
           type: string
+        phoneNumber:
+          type: ["string", "null"]
+        checkoutRequestId:
+          type: ["string", "null"]
+        mpesaReceiptNumber:
+          type: ["string", "null"]
         reference:
+          type: ["string", "null"]
+        failureReason:
           type: ["string", "null"]
         createdAt:
           type: string
+        completedAt:
+          type: ["string", "null"]
+
+    StkPushInput:
+      type: object
+      required: [phoneNumber, daysSelected]
+      properties:
+        phoneNumber:
+          type: string
+          description: Safaricom phone number in format 2547XXXXXXXX
+        daysSelected:
+          type: integer
+          description: Number of subscription days
+
+    StkPushResponse:
+      type: object
+      required: [checkoutRequestId, merchantRequestId, paymentId, message]
+      properties:
+        checkoutRequestId:
+          type: string
+        merchantRequestId:
+          type: string
+        paymentId:
+          type: integer
+        message:
+          type: string
+
+    PaymentStatusResponse:
+      type: object
+      required: [status, paymentId]
+      properties:
+        status:
+          type: string
+          enum: [PENDING, COMPLETED, FAILED, CANCELLED]
+        paymentId:
+          type: integer
+        mpesaReceiptNumber:
+          type: ["string", "null"]
+        failureReason:
+          type: ["string", "null"]
+        subscription:
+          $ref: "#/components/schemas/Subscription"
 
     SystemConfig:
       type: object
@@ -546,6 +665,15 @@ components:
           type: string
         value:
           type: number
+
+    CallbackAck:
+      type: object
+      required: [ResultCode, ResultDesc]
+      properties:
+        ResultCode:
+          type: integer
+        ResultDesc:
+          type: string
 
     AdminSummary:
       type: object

@@ -22,15 +22,19 @@ import type {
 import type {
   AdminSummary,
   AuthResponse,
+  CallbackAck,
   ChangePasswordInput,
   DashboardSummary,
   ErrorResponse,
   HealthStatus,
   LoginInput,
   Payment,
+  PaymentStatusResponse,
   RegisterInput,
   Signal,
   SignalSummary,
+  StkPushInput,
+  StkPushResponse,
   Subscription,
   SubscriptionInput,
   SystemConfig,
@@ -1092,6 +1096,224 @@ export function useListPayments<TData = Awaited<ReturnType<typeof listPayments>>
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListPaymentsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getInitiateStkPushUrl = () => {
+
+
+
+
+  return `/api/payments/mpesa/stk`
+}
+
+/**
+ * @summary Initiate M-Pesa STK Push payment
+ */
+export const initiateStkPush = async (stkPushInput: StkPushInput, options?: RequestInit): Promise<StkPushResponse> => {
+
+  return customFetch<StkPushResponse>(getInitiateStkPushUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      stkPushInput,)
+  }
+);}
+
+
+
+
+export const getInitiateStkPushMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof initiateStkPush>>, TError,{data: BodyType<StkPushInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof initiateStkPush>>, TError,{data: BodyType<StkPushInput>}, TContext> => {
+
+const mutationKey = ['initiateStkPush'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof initiateStkPush>>, {data: BodyType<StkPushInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  initiateStkPush(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InitiateStkPushMutationResult = NonNullable<Awaited<ReturnType<typeof initiateStkPush>>>
+    export type InitiateStkPushMutationBody = BodyType<StkPushInput>
+    export type InitiateStkPushMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Initiate M-Pesa STK Push payment
+ */
+export const useInitiateStkPush = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof initiateStkPush>>, TError,{data: BodyType<StkPushInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof initiateStkPush>>,
+        TError,
+        {data: BodyType<StkPushInput>},
+        TContext
+      > => {
+      return useMutation(getInitiateStkPushMutationOptions(options));
+    }
+
+export const getMpesaCallbackUrl = () => {
+
+
+
+
+  return `/api/payments/mpesa/callback`
+}
+
+/**
+ * @summary Daraja STK Push callback (called by Safaricom)
+ */
+export const mpesaCallback = async ( options?: RequestInit): Promise<CallbackAck> => {
+
+  return customFetch<CallbackAck>(getMpesaCallbackUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getMpesaCallbackMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mpesaCallback>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof mpesaCallback>>, TError,void, TContext> => {
+
+const mutationKey = ['mpesaCallback'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof mpesaCallback>>, void> = () => {
+
+
+          return  mpesaCallback(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MpesaCallbackMutationResult = NonNullable<Awaited<ReturnType<typeof mpesaCallback>>>
+
+    export type MpesaCallbackMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Daraja STK Push callback (called by Safaricom)
+ */
+export const useMpesaCallback = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mpesaCallback>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof mpesaCallback>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getMpesaCallbackMutationOptions(options));
+    }
+
+export const getGetPaymentStatusUrl = (checkoutRequestId: string,) => {
+
+
+
+
+  return `/api/payments/mpesa/status/${checkoutRequestId}`
+}
+
+/**
+ * @summary Poll STK Push payment status
+ */
+export const getPaymentStatus = async (checkoutRequestId: string, options?: RequestInit): Promise<PaymentStatusResponse> => {
+
+  return customFetch<PaymentStatusResponse>(getGetPaymentStatusUrl(checkoutRequestId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPaymentStatusQueryKey = (checkoutRequestId: string,) => {
+    return [
+    `/api/payments/mpesa/status/${checkoutRequestId}`
+    ] as const;
+    }
+
+
+export const getGetPaymentStatusQueryOptions = <TData = Awaited<ReturnType<typeof getPaymentStatus>>, TError = ErrorType<ErrorResponse>>(checkoutRequestId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaymentStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPaymentStatusQueryKey(checkoutRequestId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPaymentStatus>>> = ({ signal }) => getPaymentStatus(checkoutRequestId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(checkoutRequestId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPaymentStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPaymentStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getPaymentStatus>>>
+export type GetPaymentStatusQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Poll STK Push payment status
+ */
+
+export function useGetPaymentStatus<TData = Awaited<ReturnType<typeof getPaymentStatus>>, TError = ErrorType<ErrorResponse>>(
+ checkoutRequestId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPaymentStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPaymentStatusQueryOptions(checkoutRequestId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

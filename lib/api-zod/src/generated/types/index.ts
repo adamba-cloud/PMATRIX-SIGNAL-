@@ -8,6 +8,7 @@
 
 export * from './adminSummary';
 export * from './authResponse';
+export * from './callbackAck';
 export * from './changePasswordInput';
 export * from './dashboardSummary';
 export * from './errorResponse';
@@ -15,12 +16,16 @@ export * from './healthStatus';
 export * from './loginInput';
 export * from './payment';
 export * from './paymentStatus';
+export * from './paymentStatusResponse';
+export * from './paymentStatusResponseStatus';
 export * from './performancePoint';
 export * from './registerInput';
 export * from './signal';
 export * from './signalDirection';
 export * from './signalStatus';
 export * from './signalSummary';
+export * from './stkPushInput';
+export * from './stkPushResponse';
 export * from './subscription';
 export * from './subscriptionInput';
 export * from './subscriptionStatus';
