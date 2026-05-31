@@ -92,26 +92,41 @@ router.post("/mt5/accounts", requireAuth, async (req, res): Promise<void> => {
   // Fire-and-forget MetaApi provisioning after response is sent
   if (process.env.METAAPI_TOKEN) {
     setImmediate(async () => {
+      let metaApiId: string | undefined;
       try {
-        const { id: metaApiId } = await createMetaApiAccount({
+        // Step 1: Create the cloud account
+        const created = await createMetaApiAccount({
           login: mt5Login,
           password: mt5Password,
           server: brokerServer,
           name: `PESAMATRIX-${mt5Login}`,
         });
+        metaApiId = created.id;
 
         await db
           .update(slaveAccountsTable)
           .set({
             metaApiAccountId: metaApiId,
-            statusMessage: "Cloud terminal provisioned. Synchronizing account data — this usually takes 1–2 minutes.",
+            statusMessage: "Cloud terminal created. Deploying — synchronization usually takes 1–2 minutes.",
             updatedAt: new Date(),
           })
           .where(eq(slaveAccountsTable.id, account.id));
 
         logger.info({ accountId: account.id, metaApiId }, "MetaApi account created");
+
+        // Step 2: Explicitly deploy the cloud terminal
+        await deployMetaApiAccount(metaApiId);
+        logger.info({ accountId: account.id, metaApiId }, "MetaApi account deployed");
+
+        await db
+          .update(slaveAccountsTable)
+          .set({
+            statusMessage: "Cloud terminal deployed. Synchronizing account data — this usually takes 1–2 minutes.",
+            updatedAt: new Date(),
+          })
+          .where(eq(slaveAccountsTable.id, account.id));
       } catch (err) {
-        logger.error({ err, accountId: account.id }, "Failed to create MetaApi account");
+        logger.error({ err, accountId: account.id, metaApiId }, "Failed to provision MetaApi cloud terminal");
         await db
           .update(slaveAccountsTable)
           .set({
