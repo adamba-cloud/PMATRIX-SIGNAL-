@@ -11,7 +11,10 @@ function getCallbackUrl(req: import("express").Request): string {
   // 1. Explicit override — highest priority
   const base = process.env["DARAJA_CALLBACK_BASE_URL"];
   if (base) {
-    const url = `${base.replace(/\/$/, "")}/api/payments/mpesa/callback`;
+    // If the value already contains the callback path, use it as-is
+    const url = base.includes("/api/payments/mpesa/callback")
+      ? base.trim()
+      : `${base.replace(/\/+$/, "").replace(/\/api\/.*/,"")}/api/payments/mpesa/callback`;
     logger.info({ callbackUrl: url, source: "DARAJA_CALLBACK_BASE_URL" }, "Using callback URL");
     return url;
   }
