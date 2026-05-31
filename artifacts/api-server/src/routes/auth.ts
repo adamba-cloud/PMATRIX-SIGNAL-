@@ -43,11 +43,6 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
 
-  if (!user.emailVerified) {
-    res.status(403).json({ error: "EMAIL_NOT_VERIFIED", email: user.email });
-    return;
-  }
-
   const token = signToken({ userId: user.id, role: user.role });
   res.json({
     token,
@@ -95,9 +90,6 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     attempts++;
   }
 
-  const verificationToken = randomBytes(32).toString("hex");
-  const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
   const passwordHash = await hashPassword(password);
   const [user] = await db.insert(usersTable).values({
     email: email.toLowerCase(),
@@ -106,20 +98,24 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     role: "USER",
     mustChangePassword: false,
     referralCode: newCode,
-    emailVerified: false,
-    emailVerificationToken: verificationToken,
-    emailVerificationExpiry: verificationExpiry,
+    emailVerified: true,
   }).returning();
 
   if (referrer) {
     applyReferralReward(referrer.id, user.id).catch(() => {});
   }
 
-  sendVerificationEmail(user.email, user.name, verificationToken).catch(() => {});
-
+  const token = signToken({ userId: user.id, role: user.role });
   res.status(201).json({
-    requiresVerification: true,
-    email: user.email,
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      mustChangePassword: user.mustChangePassword,
+      createdAt: user.createdAt.toISOString(),
+    },
   });
 });
 
@@ -212,7 +208,7 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase()));
 
   // Always respond the same way to prevent email enumeration
-  if (!user || !user.emailVerified) {
+  if (!user) {
     res.json({ message: "If that email exists, a reset link has been sent." });
     return;
   }
