@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { db, signalsTable, usersTable, subscriptionsTable } from "@workspace/db";
-import { desc, eq, and, isNotNull, gt } from "drizzle-orm";
+import { db, signalsTable, usersTable, subscriptionsTable, pushSubscriptionsTable } from "@workspace/db";
+import { desc, eq, and, isNotNull, gt, inArray } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { requireSubscription } from "../lib/require-subscription";
 import { sendWhatsAppMessage, formatSignalMessage } from "../lib/whatsapp";
+import { broadcastPush } from "../lib/push";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -91,6 +92,21 @@ router.post("/admin/signals", requireAdmin, async (req, res): Promise<void> => {
     .returning();
 
   logger.info({ signalId: signal.id, pair, direction }, "Admin created signal");
+
+  // Auto-broadcast push notification to all subscribers
+  const allSubs = await db.select().from(pushSubscriptionsTable);
+  if (allSubs.length > 0) {
+    const { staleIds } = await broadcastPush(allSubs, {
+      title: `🎯 ${signal.pair} ${signal.direction}`,
+      body: `Entry: ${signal.entryPrice} · SL: ${signal.stopLoss} · TP: ${signal.takeProfit}`,
+      url: "/signals",
+    });
+    if (staleIds.length > 0) {
+      await db.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, staleIds));
+    }
+    logger.info({ signalId: signal.id, pushed: allSubs.length - staleIds.length }, "Push broadcast done");
+  }
+
   res.status(201).json(mapSignal(signal));
 });
 

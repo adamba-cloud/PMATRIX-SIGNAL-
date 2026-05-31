@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pesamatrix-v1';
+const CACHE_NAME = 'pesamatrix-v2';
 const STATIC_ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {
@@ -45,5 +45,43 @@ self.addEventListener('fetch', (event) => {
         return res;
       }).catch(() => caches.match('/'));
     })
+  );
+});
+
+/* ── Push Notifications ── */
+self.addEventListener('push', (event) => {
+  let data = { title: 'PESAMATRIX Signal', body: 'New trading signal available', url: '/signals' };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {}
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/favicon.svg',
+      badge: '/favicon.svg',
+      tag: 'pesamatrix-signal',
+      renotify: true,
+      data: { url: data.url },
+      vibrate: [200, 100, 200],
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/signals';
+  event.waitUntil(
+    clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windowClients) => {
+        for (const client of windowClients) {
+          if ('focus' in client) {
+            client.navigate(url);
+            return client.focus();
+          }
+        }
+        return clients.openWindow(url);
+      })
   );
 });

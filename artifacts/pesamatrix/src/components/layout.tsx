@@ -23,7 +23,11 @@ import {
   Sun,
   Moon,
   Radio,
+  Bell,
+  BellOff,
+  BellRing,
 } from "lucide-react";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { Button } from "./ui/button";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -32,6 +36,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     query: { queryKey: getGetMeQueryKey(), retry: false },
   });
   const { theme, toggleTheme } = useTheme();
+  const { state: pushState, subscribe: subscribePush, unsubscribe: unsubscribePush } = usePushNotifications();
 
   const isAuthPage = location === "/login" || location === "/register";
   const isLandingPage = location === "/";
@@ -143,13 +148,43 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <p className="text-sm font-medium truncate">{user.name}</p>
                 <p className="text-xs text-muted-foreground truncate">{user.email}</p>
               </div>
-              <button
-                onClick={toggleTheme}
-                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex-shrink-0 ml-2"
-                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              >
-                {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
+              <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                {pushState !== "unsupported" && (
+                  <button
+                    onClick={pushState === "subscribed" ? unsubscribePush : subscribePush}
+                    disabled={pushState === "loading"}
+                    className={`p-1.5 rounded-md transition-colors ${
+                      pushState === "subscribed"
+                        ? "text-green-500 hover:text-green-400 hover:bg-green-500/10"
+                        : pushState === "denied"
+                        ? "text-red-400 cursor-not-allowed opacity-50"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    }`}
+                    title={
+                      pushState === "subscribed"
+                        ? "Notifications on — click to disable"
+                        : pushState === "denied"
+                        ? "Notifications blocked in browser settings"
+                        : "Enable signal notifications"
+                    }
+                  >
+                    {pushState === "subscribed" ? (
+                      <BellRing className="w-4 h-4" />
+                    ) : pushState === "denied" ? (
+                      <BellOff className="w-4 h-4" />
+                    ) : (
+                      <Bell className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
+                <button
+                  onClick={toggleTheme}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                >
+                  {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <Button
               variant="outline"
