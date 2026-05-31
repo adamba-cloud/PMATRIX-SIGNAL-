@@ -10,7 +10,19 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  statement_timeout: 15_000,
+  application_name: "pesamatrix-api",
+});
+
+pool.on("error", (err) => {
+  console.error("[DB pool] idle client error", err.message);
+});
+
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";

@@ -6,3 +6,4 @@ export * from "./system_config";
 export * from "./slave_accounts";
 export * from "./copy_trade_links";
 export * from "./copy_trade_logs";
+export * from "./system_audit_logs";

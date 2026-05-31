@@ -6,6 +6,8 @@ import { startExpiryJob } from "./lib/expiry-job";
 import { startMetaApiSyncJob } from "./lib/metaapi-sync-job";
 import { startCopyTradeWorker } from "./lib/copy-trade-worker";
 import { startMasterPoller } from "./lib/master-poller";
+import { startConnectionWatchdog } from "./lib/connection-watchdog";
+import { startPaymentReconciler } from "./lib/payment-reconciler";
 
 const rawPort = process.env["PORT"];
 
@@ -27,6 +29,8 @@ startExpiryJob();
 startMetaApiSyncJob();
 startCopyTradeWorker();
 startMasterPoller();
+startConnectionWatchdog();
+startPaymentReconciler();
 
 server.listen(port, () => {
   logger.info({ port }, "Server listening");

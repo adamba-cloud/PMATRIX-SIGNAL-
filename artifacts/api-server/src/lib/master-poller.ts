@@ -8,6 +8,7 @@ import {
 import { getRedis } from "./redis";
 import { getCopyTradeQueue } from "./copy-trade-queue";
 import { getAccountPositions, type MetaApiPosition } from "./metaapi";
+import { updateMasterHeartbeat } from "./connection-watchdog";
 import { logger } from "./logger";
 
 const POLL_INTERVAL_MS = 5_000;
@@ -35,6 +36,8 @@ async function pollMaster(master: {
   let positions: MetaApiPosition[];
   try {
     positions = await getAccountPositions(master.metaApiId);
+    // Heartbeat: signal to the connection watchdog that this master is alive
+    await updateMasterHeartbeat(master.metaApiId);
   } catch (err) {
     logger.warn({ err, masterMetaApiId: master.metaApiId }, "Master poller: failed to fetch positions");
     return;

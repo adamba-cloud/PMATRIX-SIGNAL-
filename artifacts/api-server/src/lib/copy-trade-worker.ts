@@ -1,17 +1,19 @@
-import { Worker } from "bullmq";
+import { Worker, type Job } from "bullmq";
 import { db, copyTradeLogsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { getRedis } from "./redis";
 import { COPY_TRADE_QUEUE, type CopyTradeJobData } from "./copy-trade-queue";
 import { placeTrade } from "./metaapi";
+import { checkSpreadGuard } from "./spread-guard";
 import { logger } from "./logger";
 
 const CONCURRENCY = 10;
+const EMERGENCY_KEY = "watchdog:emergency:paused";
 
 export function startCopyTradeWorker(): Worker<CopyTradeJobData> {
   const worker = new Worker<CopyTradeJobData>(
     COPY_TRADE_QUEUE,
-    async (job) => {
+    async (job: Job<CopyTradeJobData>, token?: string) => {
       const { logId, slaveMetaApiId, trade } = job.data;
 
       logger.info(
@@ -19,6 +21,30 @@ export function startCopyTradeWorker(): Worker<CopyTradeJobData> {
         "Copy trade worker: processing job"
       );
 
+      // ── Kill switch: check emergency pause ─────────────────────────────────
+      const redis = getRedis();
+      const emergency = await redis.get(EMERGENCY_KEY);
+      if (emergency) {
+        logger.warn(
+          { logId, symbol: trade.symbol },
+          "Copy trade worker: emergency pause active — delaying job 30s"
+        );
+        await job.moveToDelayed(Date.now() + 30_000, token);
+        return;
+      }
+
+      // ── Spread protection ──────────────────────────────────────────────────
+      const spread = await checkSpreadGuard(slaveMetaApiId, trade.symbol);
+      if (spread.paused) {
+        logger.warn(
+          { logId, symbol: trade.symbol, reason: spread.reason },
+          "Copy trade worker: spread guard triggered — delaying job 15s"
+        );
+        await job.moveToDelayed(Date.now() + 15_000, token);
+        return;
+      }
+
+      // ── Execute trade ──────────────────────────────────────────────────────
       try {
         const result = await placeTrade(slaveMetaApiId, {
           actionType: trade.direction === "BUY" ? "ORDER_TYPE_BUY" : "ORDER_TYPE_SELL",
@@ -46,13 +72,12 @@ export function startCopyTradeWorker(): Worker<CopyTradeJobData> {
           .where(eq(copyTradeLogsTable.id, logId));
 
         logger.info(
-          { logId, slaveMetaApiId, slaveTicket: result.orderId },
+          { logId, slaveMetaApiId, slaveTicket: result.orderId, spread: spread.spread, spreadAvg: spread.avg },
           "Copy trade worker: trade executed successfully"
         );
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
 
-        // Log failure but don't block other accounts — BullMQ handles retries per-job
         await db
           .update(copyTradeLogsTable)
           .set({
