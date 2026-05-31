@@ -1,15 +1,69 @@
 import { useState } from "react";
-import { useLocation, Link } from "wouter";
-import { customFetch, getGetMeQueryKey, ApiError } from "@workspace/api-client-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { customFetch, ApiError } from "@workspace/api-client-react";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ActivitySquare, Loader2, Gift } from "lucide-react";
+import { ActivitySquare, Loader2, Gift, Mail, RefreshCw } from "lucide-react";
+
+function CheckEmailScreen({ email }: { email: string }) {
+  const [resent, setResent] = useState(false);
+  const [resending, setResending] = useState(false);
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      await customFetch("/api/auth/resend-verification", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      });
+      setResent(true);
+    } finally {
+      setResending(false);
+    }
+  };
+
+  return (
+    <div className="flex-1 flex items-center justify-center p-6 bg-slate-950">
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-xl shadow-black/50 text-center">
+        <div className="flex justify-center mb-6">
+          <div className="w-16 h-16 rounded-full bg-green-500/10 border border-green-500/30 flex items-center justify-center">
+            <Mail className="w-8 h-8 text-green-500" />
+          </div>
+        </div>
+        <h2 className="text-2xl font-bold text-white mb-2">Check your email</h2>
+        <p className="text-slate-400 text-sm mb-2">We sent a verification link to</p>
+        <p className="text-green-400 font-medium mb-6">{email}</p>
+        <p className="text-slate-500 text-xs mb-8">
+          Click the link in the email to activate your account. The link expires in 24 hours.
+        </p>
+
+        {resent ? (
+          <p className="text-green-400 text-sm mb-4">✓ A new verification email has been sent.</p>
+        ) : (
+          <Button
+            variant="outline"
+            className="border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 mb-4"
+            onClick={handleResend}
+            disabled={resending}
+          >
+            {resending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+            Resend verification email
+          </Button>
+        )}
+
+        <div className="text-center text-sm text-slate-500">
+          <Link href="/login" className="text-green-500 hover:text-green-400">
+            Back to login
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Register() {
-  const [, setLocation] = useLocation();
-  const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,10 +75,11 @@ export default function Register() {
     }
   });
   const [error, setError] = useState("");
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
 
   const registerMutation = useMutation({
     mutationFn: (data: { name: string; email: string; password: string; referralCode?: string }) =>
-      customFetch<{ token: string; user: { id: number; email: string; name: string; role: string } }>(
+      customFetch<{ requiresVerification: boolean; email: string }>(
         "/api/auth/register",
         {
           method: "POST",
@@ -32,9 +87,7 @@ export default function Register() {
         }
       ),
     onSuccess: (data) => {
-      localStorage.setItem("token", data.token);
-      queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
-      setLocation("/dashboard");
+      setRegisteredEmail(data.email);
     },
     onError: (err: unknown) => {
       if (err instanceof ApiError) {
@@ -44,6 +97,10 @@ export default function Register() {
       }
     },
   });
+
+  if (registeredEmail) {
+    return <CheckEmailScreen email={registeredEmail} />;
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

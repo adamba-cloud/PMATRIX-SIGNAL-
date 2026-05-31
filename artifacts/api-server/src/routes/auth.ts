@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { randomBytes } from "crypto";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import {
@@ -13,6 +14,7 @@ import {
   requireAuth,
 } from "../lib/auth";
 import { generateReferralCode, applyReferralReward } from "../lib/referrals";
+import { sendVerificationEmail } from "../lib/mailer";
 
 const router = Router();
 
@@ -38,6 +40,11 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 
   if (user.suspended) {
     res.status(403).json({ error: "Your account has been suspended. Please contact support." });
+    return;
+  }
+
+  if (!user.emailVerified) {
+    res.status(403).json({ error: "EMAIL_NOT_VERIFIED", email: user.email });
     return;
   }
 
@@ -70,7 +77,6 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     return;
   }
 
-  // Validate referral code if provided
   let referrer: { id: number } | null = null;
   if (referralCodeUsed) {
     const [found] = await db
@@ -80,7 +86,6 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     if (found) referrer = found;
   }
 
-  // Generate a unique referral code for the new user
   let newCode = generateReferralCode();
   let attempts = 0;
   while (attempts < 5) {
@@ -90,6 +95,9 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     attempts++;
   }
 
+  const verificationToken = randomBytes(32).toString("hex");
+  const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
   const passwordHash = await hashPassword(password);
   const [user] = await db.insert(usersTable).values({
     email: email.toLowerCase(),
@@ -98,26 +106,100 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     role: "USER",
     mustChangePassword: false,
     referralCode: newCode,
+    emailVerified: false,
+    emailVerificationToken: verificationToken,
+    emailVerificationExpiry: verificationExpiry,
   }).returning();
 
-  // Apply referral rewards asynchronously (don't block registration)
   if (referrer) {
     applyReferralReward(referrer.id, user.id).catch(() => {});
   }
 
-  const token = signToken({ userId: user.id, role: user.role });
+  sendVerificationEmail(user.email, user.name, verificationToken).catch(() => {});
+
   res.status(201).json({
-    token,
+    requiresVerification: true,
+    email: user.email,
+  });
+});
+
+router.get("/auth/verify-email", async (req, res): Promise<void> => {
+  const token = req.query.token as string | undefined;
+  if (!token) {
+    res.status(400).json({ error: "Missing token" });
+    return;
+  }
+
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.emailVerificationToken, token));
+
+  if (!user) {
+    res.status(400).json({ error: "Invalid or expired verification link" });
+    return;
+  }
+
+  if (user.emailVerified) {
+    const sessionToken = signToken({ userId: user.id, role: user.role });
+    res.json({ alreadyVerified: true, token: sessionToken, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+    return;
+  }
+
+  if (user.emailVerificationExpiry && user.emailVerificationExpiry < new Date()) {
+    res.status(400).json({ error: "Verification link has expired. Please request a new one." });
+    return;
+  }
+
+  const [updated] = await db
+    .update(usersTable)
+    .set({ emailVerified: true, emailVerificationToken: null, emailVerificationExpiry: null })
+    .where(eq(usersTable.id, user.id))
+    .returning();
+
+  const sessionToken = signToken({ userId: updated.id, role: updated.role });
+  res.json({
+    token: sessionToken,
     user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      mustChangePassword: user.mustChangePassword,
-      referralCode: user.referralCode,
-      createdAt: user.createdAt.toISOString(),
+      id: updated.id,
+      email: updated.email,
+      name: updated.name,
+      role: updated.role,
+      mustChangePassword: updated.mustChangePassword,
+      createdAt: updated.createdAt.toISOString(),
     },
   });
+});
+
+router.post("/auth/resend-verification", async (req, res): Promise<void> => {
+  const { email } = req.body as { email?: string };
+  if (!email) {
+    res.status(400).json({ error: "Email is required" });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase()));
+  if (!user) {
+    res.json({ message: "If that email exists, a new verification link has been sent." });
+    return;
+  }
+
+  if (user.emailVerified) {
+    res.json({ message: "Email already verified. You can log in." });
+    return;
+  }
+
+  const verificationToken = randomBytes(32).toString("hex");
+  const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await db
+    .update(usersTable)
+    .set({ emailVerificationToken: verificationToken, emailVerificationExpiry: verificationExpiry })
+    .where(eq(usersTable.id, user.id));
+
+  sendVerificationEmail(user.email, user.name, verificationToken).catch(() => {});
+
+  res.json({ message: "A new verification email has been sent." });
 });
 
 router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {

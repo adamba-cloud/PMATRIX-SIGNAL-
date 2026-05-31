@@ -9,6 +9,7 @@ import { AppLayout } from "@/components/layout";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import VerifyEmail from "@/pages/verify-email";
 import ChangePassword from "@/pages/change-password";
 import Dashboard from "@/pages/dashboard";
 import Signals from "@/pages/signals";
@@ -41,6 +42,7 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
+        <Route path="/verify-email" component={VerifyEmail} />
         <Route path="/change-password" component={ChangePassword} />
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/signals" component={Signals} />

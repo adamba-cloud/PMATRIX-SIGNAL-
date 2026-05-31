@@ -14,6 +14,9 @@ export const usersTable = pgTable("users", {
   suspended: boolean("suspended").notNull().default(false),
   whatsappNumber: text("whatsapp_number"),
   referralCode: text("referral_code").unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  emailVerificationToken: text("email_verification_token"),
+  emailVerificationExpiry: timestamp("email_verification_expiry"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

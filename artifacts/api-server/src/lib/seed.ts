@@ -16,12 +16,12 @@ export async function seedAdminUser(): Promise<void> {
       .limit(1);
 
     if (existing) {
-      if (existing.role !== "ADMIN") {
-        await db
-          .update(usersTable)
-          .set({ role: "ADMIN" })
-          .where(eq(usersTable.id, existing.id));
-        logger.info({ email: PRIMARY_ADMIN_EMAIL }, "Promoted existing user to ADMIN");
+      const updates: Record<string, unknown> = {};
+      if (existing.role !== "ADMIN") updates.role = "ADMIN";
+      if (!existing.emailVerified) updates.emailVerified = true;
+      if (Object.keys(updates).length > 0) {
+        await db.update(usersTable).set(updates as any).where(eq(usersTable.id, existing.id));
+        logger.info({ email: PRIMARY_ADMIN_EMAIL }, "Updated admin account");
       }
       return;
     }
@@ -33,6 +33,7 @@ export async function seedAdminUser(): Promise<void> {
       passwordHash,
       role: "ADMIN",
       mustChangePassword: true,
+      emailVerified: true,
     });
 
     logger.info(
