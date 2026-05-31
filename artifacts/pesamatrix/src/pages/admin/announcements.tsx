@@ -65,16 +65,15 @@ export default function AdminAnnouncements() {
 
   const { data: announcements = [], isLoading } = useQuery<Announcement[]>({
     queryKey: ["admin-announcements"],
-    queryFn: () => customFetch("/api/admin/announcements").then((r) => r.json()),
+    queryFn: () => customFetch<Announcement[]>("/api/admin/announcements"),
   });
 
   const createMutation = useMutation({
     mutationFn: (data: typeof form) =>
-      customFetch("/api/admin/announcements", {
+      customFetch<Announcement>("/api/admin/announcements", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, expiresAt: data.expiresAt || undefined }),
-      }).then((r) => r.json()),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-announcements"] });
       qc.invalidateQueries({ queryKey: ["announcements-active"] });
@@ -87,7 +86,7 @@ export default function AdminAnnouncements() {
 
   const toggleMutation = useMutation({
     mutationFn: (id: number) =>
-      customFetch(`/api/admin/announcements/${id}/toggle`, { method: "PATCH" }).then((r) => r.json()),
+      customFetch<Announcement>(`/api/admin/announcements/${id}/toggle`, { method: "PATCH" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-announcements"] });
       qc.invalidateQueries({ queryKey: ["announcements-active"] });
@@ -96,7 +95,7 @@ export default function AdminAnnouncements() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) =>
-      customFetch(`/api/admin/announcements/${id}`, { method: "DELETE" }).then((r) => r.json()),
+      customFetch<void>(`/api/admin/announcements/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-announcements"] });
       qc.invalidateQueries({ queryKey: ["announcements-active"] });

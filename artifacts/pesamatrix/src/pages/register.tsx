@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
-import { customFetch, getGetMeQueryKey } from "@workspace/api-client-react";
+import { customFetch, getGetMeQueryKey, ApiError } from "@workspace/api-client-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,23 +24,25 @@ export default function Register() {
 
   const registerMutation = useMutation({
     mutationFn: (data: { name: string; email: string; password: string; referralCode?: string }) =>
-      customFetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      }).then(async (r) => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({ error: "Registration failed" }));
-          throw new Error(body.error || "Registration failed");
+      customFetch<{ token: string; user: { id: number; email: string; name: string; role: string } }>(
+        "/api/auth/register",
+        {
+          method: "POST",
+          body: JSON.stringify(data),
         }
-        return r.json();
-      }),
+      ),
     onSuccess: (data) => {
       localStorage.setItem("token", data.token);
       queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
       setLocation("/dashboard");
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: unknown) => {
+      if (err instanceof ApiError) {
+        setError((err.data as any)?.error || err.message);
+      } else {
+        setError("Registration failed. Please try again.");
+      }
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {

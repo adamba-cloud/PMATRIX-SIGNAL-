@@ -68,16 +68,15 @@ export default function AdminSignals() {
 
   const { data: signals = [], isLoading } = useQuery<Signal[]>({
     queryKey: ["admin-signals"],
-    queryFn: () => customFetch("/api/admin/signals").then((r) => r.json()),
+    queryFn: () => customFetch<Signal[]>("/api/admin/signals"),
   });
 
   const createMutation = useMutation({
     mutationFn: (data: typeof form) =>
-      customFetch("/api/admin/signals", {
+      customFetch<Signal>("/api/admin/signals", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-      }).then((r) => r.json()),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-signals"] });
       setShowCreate(false);
@@ -89,11 +88,10 @@ export default function AdminSignals() {
 
   const closeMutation = useMutation({
     mutationFn: ({ id, pips }: { id: number; pips: string }) =>
-      customFetch(`/api/admin/signals/${id}`, {
+      customFetch<Signal>(`/api/admin/signals/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "CLOSED", pips }),
-      }).then((r) => r.json()),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-signals"] });
       setCloseSignal(null);
@@ -104,7 +102,7 @@ export default function AdminSignals() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) =>
-      customFetch(`/api/admin/signals/${id}`, { method: "DELETE" }).then((r) => r.json()),
+      customFetch<void>(`/api/admin/signals/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-signals"] });
       setDeleteId(null);
@@ -114,7 +112,7 @@ export default function AdminSignals() {
 
   const blastMutation = useMutation({
     mutationFn: (id: number) =>
-      customFetch(`/api/admin/signals/${id}/whatsapp-blast`, { method: "POST" }).then((r) => r.json()),
+      customFetch<{ sent: number; failed: number; total: number }>(`/api/admin/signals/${id}/whatsapp-blast`, { method: "POST" }),
     onSuccess: (data, id) => {
       setBlastId(null);
       toast({

@@ -34,7 +34,7 @@ export function AnnouncementBanner() {
 
   const { data: announcements = [] } = useQuery<Announcement[]>({
     queryKey: ["announcements-active"],
-    queryFn: () => customFetch("/api/announcements/active").then((r) => r.json()),
+    queryFn: () => customFetch<Announcement[]>("/api/announcements/active"),
     refetchInterval: 60_000,
     retry: false,
   });

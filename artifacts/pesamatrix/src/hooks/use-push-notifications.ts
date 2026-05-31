@@ -41,7 +41,7 @@ export function usePushNotifications() {
 
     setState("loading");
     try {
-      const { publicKey } = await customFetch("/api/push/vapid-public-key").then((r) => r.json());
+      const { publicKey } = await customFetch<{ publicKey: string }>("/api/push/vapid-public-key");
 
       const reg = await navigator.serviceWorker.ready;
 

@@ -19,7 +19,7 @@ type ReferralRow = {
 export default function AdminReferrals() {
   const { data: referrals = [], isLoading } = useQuery<ReferralRow[]>({
     queryKey: ["admin-referrals"],
-    queryFn: () => customFetch("/api/admin/referrals").then((r) => r.json()),
+    queryFn: () => customFetch<ReferralRow[]>("/api/admin/referrals"),
   });
 
   const totalBonusDaysGiven = referrals.reduce(

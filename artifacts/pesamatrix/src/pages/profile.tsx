@@ -31,7 +31,7 @@ export default function Profile() {
 
   const { data: referralStats } = useQuery<ReferralStats>({
     queryKey: ["referral-stats"],
-    queryFn: () => customFetch("/api/referral/stats").then((r) => r.json()),
+    queryFn: () => customFetch<ReferralStats>("/api/referral/stats"),
     enabled: !!user,
   });
 
@@ -39,9 +39,8 @@ export default function Profile() {
     mutationFn: (whatsappNumber: string) =>
       customFetch("/api/auth/me", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ whatsappNumber: whatsappNumber || null }),
-      }).then((r) => r.json()),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: getGetMeQueryKey() });
       setEditing(false);
