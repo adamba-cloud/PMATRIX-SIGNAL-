@@ -2,9 +2,13 @@ import { useGetDashboardSummary, getGetDashboardSummaryQueryKey } from "@workspa
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivitySquare, TrendingUp, ShieldCheck, Target, Loader2 } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { useForexPrices } from "@/hooks/useForexPrices";
+
+const MARKET_PAIRS = ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSDT"];
 
 export default function Dashboard() {
   const { data: summary, isLoading } = useGetDashboardSummary({ query: { queryKey: getGetDashboardSummaryQueryKey() } });
+  const { prices, connected } = useForexPrices();
 
   if (isLoading) {
     return (
@@ -93,28 +97,33 @@ export default function Dashboard() {
         </Card>
 
         <Card className="col-span-3 bg-slate-900 border-slate-800">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <CardTitle className="text-slate-50">Live Market Overview</CardTitle>
+            <span className={`flex items-center gap-1.5 text-xs font-medium ${connected ? "text-green-400" : "text-slate-500"}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-400 animate-pulse" : "bg-slate-500"}`} />
+              {connected ? "Live" : "Connecting…"}
+            </span>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[
-                { pair: "EUR/USD", price: "1.0845", change: "+0.12%", up: true },
-                { pair: "GBP/USD", price: "1.2673", change: "-0.05%", up: false },
-                { pair: "USD/JPY", price: "150.32", change: "+0.34%", up: true },
-                { pair: "XAU/USD", price: "2024.50", change: "+0.85%", up: true },
-                { pair: "BTC/USDT", price: "51245.00", change: "-1.2%", up: false },
-              ].map((item) => (
-                <div key={item.pair} className="flex items-center justify-between p-3 rounded-lg bg-slate-950 border border-slate-800">
-                  <div className="font-medium text-slate-200">{item.pair}</div>
-                  <div className="flex items-center gap-4">
-                    <span className="font-mono text-sm text-slate-300">{item.price}</span>
-                    <span className={`text-xs font-medium w-16 text-right ${item.up ? 'text-green-500' : 'text-red-500'}`}>
-                      {item.change}
-                    </span>
+            <div className="space-y-3">
+              {MARKET_PAIRS.map((key) => {
+                const p = prices[key];
+                const displayPair = key.replace("USDT", "/USDT").replace(/([A-Z]{3})([A-Z]{3})$/, "$1/$2");
+                const price = p ? p.price.toLocaleString("en-US", { maximumFractionDigits: 5 }) : "—";
+                const pct = p ? `${p.changePercent >= 0 ? "+" : ""}${p.changePercent.toFixed(2)}%` : "";
+                const up = p ? p.up : true;
+                return (
+                  <div key={key} className="flex items-center justify-between p-3 rounded-lg bg-slate-950 border border-slate-800 transition-colors duration-200">
+                    <div className="font-medium text-slate-200 text-sm">{displayPair}</div>
+                    <div className="flex items-center gap-4">
+                      <span className="font-mono text-sm text-slate-100 tabular-nums">{price}</span>
+                      <span className={`text-xs font-semibold w-16 text-right tabular-nums transition-colors duration-300 ${up ? "text-green-400" : "text-red-400"}`}>
+                        {pct}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>

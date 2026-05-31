@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useForexPrices } from "@/hooks/useForexPrices";
 
 const PAIRS = [
   "EURUSD",
@@ -12,50 +12,35 @@ const PAIRS = [
 ];
 
 export function Ticker() {
-  const [prices, setPrices] = useState<Record<string, { bid: string; ask: string; up: boolean }>>({});
+  const { prices, connected } = useForexPrices();
 
-  useEffect(() => {
-    // Mocking live price updates
-    const interval = setInterval(() => {
-      setPrices((prev) => {
-        const newPrices = { ...prev };
-        const pair = PAIRS[Math.floor(Math.random() * PAIRS.length)];
-        const base = Math.random() * 100 + 1;
-        newPrices[pair] = {
-          bid: base.toFixed(4),
-          ask: (base + 0.0005).toFixed(4),
-          up: Math.random() > 0.5,
-        };
-        return newPrices;
-      });
-    }, 2000);
-
-    // Initial populate
-    const initial: Record<string, { bid: string; ask: string; up: boolean }> = {};
-    PAIRS.forEach((p) => {
-      const base = Math.random() * 100 + 1;
-      initial[p] = {
-        bid: base.toFixed(4),
-        ask: (base + 0.0005).toFixed(4),
-        up: Math.random() > 0.5,
-      };
-    });
-    setPrices(initial);
-
-    return () => clearInterval(interval);
-  }, []);
+  const displayPairs = [...PAIRS, ...PAIRS, ...PAIRS];
 
   return (
     <div className="w-full bg-slate-950 border-b border-slate-900 overflow-hidden flex items-center h-10 text-xs font-mono font-medium relative z-50">
+      {connected && (
+        <span className="absolute left-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse z-10" />
+      )}
       <div className="flex animate-marquee whitespace-nowrap">
-        {[...PAIRS, ...PAIRS, ...PAIRS].map((pair, i) => (
-          <div key={i} className="flex items-center space-x-3 mx-6">
-            <span className="text-slate-400">{pair}</span>
-            <span className={prices[pair]?.up ? "text-green-500" : "text-red-500"}>
-              {prices[pair]?.bid || "0.0000"}
-            </span>
-          </div>
-        ))}
+        {displayPairs.map((pair, i) => {
+          const p = prices[pair];
+          const price = p ? p.price.toString() : "—";
+          const up = p ? p.up : true;
+          const pct = p ? (p.changePercent >= 0 ? "+" : "") + p.changePercent.toFixed(3) + "%" : "";
+          return (
+            <div key={i} className="flex items-center gap-2 mx-6">
+              <span className="text-slate-400">{pair}</span>
+              <span className={up ? "text-green-400" : "text-red-400"}>
+                {price}
+              </span>
+              {pct && (
+                <span className={`text-[10px] ${up ? "text-green-600" : "text-red-600"}`}>
+                  {pct}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes marquee {
@@ -63,7 +48,7 @@ export function Ticker() {
           100% { transform: translateX(-33.33%); }
         }
         .animate-marquee {
-          animation: marquee 20s linear infinite;
+          animation: marquee 30s linear infinite;
         }
       `}} />
     </div>
