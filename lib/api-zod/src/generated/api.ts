@@ -423,6 +423,41 @@ export const DeleteMt5AccountParams = zod.object({
 
 
 /**
+ * @summary Live-probe MetaApi status and return updated account with telemetry
+ */
+export const GetMt5AccountStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetMt5AccountStatusResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "mt5Login": zod.string(),
+  "brokerServer": zod.string(),
+  "status": zod.enum(['CONNECTED', 'SYNCING', 'DISCONNECTED', 'ERROR']),
+  "statusMessage": zod.string().nullable(),
+  "metaApiAccountId": zod.string().nullable(),
+  "lastSyncAt": zod.string().nullable(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}).and(zod.object({
+  "telemetry": zod.object({
+  "connectionStatus": zod.string().optional(),
+  "synchronizationStatus": zod.string().optional(),
+  "state": zod.string().optional(),
+  "balance": zod.number().nullish(),
+  "equity": zod.number().nullish(),
+  "margin": zod.number().nullish(),
+  "freeMargin": zod.number().nullish(),
+  "leverage": zod.number().nullish(),
+  "currency": zod.string().nullish(),
+  "broker": zod.string().nullish(),
+  "tradeAllowed": zod.boolean().nullish()
+}).optional()
+}))
+
+
+/**
  * @summary Trigger a reconnect attempt for an MT5 account
  */
 export const ReconnectMt5AccountParams = zod.object({

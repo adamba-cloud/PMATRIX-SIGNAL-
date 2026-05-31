@@ -2,7 +2,16 @@ import { Router } from "express";
 import { db, slaveAccountsTable, usersTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../lib/auth";
-import { encryptPassword } from "../lib/encryption";
+import { encryptPassword, decryptPassword } from "../lib/encryption";
+import {
+  createMetaApiAccount,
+  deployMetaApiAccount,
+  undeployMetaApiAccount,
+  deleteMetaApiAccount,
+  getMetaApiAccount,
+  mapMetaApiStatus,
+} from "../lib/metaapi";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -24,6 +33,8 @@ function formatAccount(a: typeof slaveAccountsTable.$inferSelect) {
     updatedAt: a.updatedAt.toISOString(),
   };
 }
+
+// ─── User endpoints ──────────────────────────────────────────────────────────
 
 router.get("/mt5/accounts", requireAuth, async (req, res): Promise<void> => {
   const accounts = await db
@@ -71,11 +82,47 @@ router.post("/mt5/accounts", requireAuth, async (req, res): Promise<void> => {
       encryptionIv: iv,
       encryptionTag: tag,
       brokerServer,
-      status: "DISCONNECTED",
+      status: "SYNCING",
+      statusMessage: "Provisioning Cloud Terminal…",
     })
     .returning();
 
   res.status(201).json(formatAccount(account));
+
+  // Fire-and-forget MetaApi provisioning after response is sent
+  if (process.env.METAAPI_TOKEN) {
+    setImmediate(async () => {
+      try {
+        const { id: metaApiId } = await createMetaApiAccount({
+          login: mt5Login,
+          password: mt5Password,
+          server: brokerServer,
+          name: `PESAMATRIX-${mt5Login}`,
+        });
+
+        await db
+          .update(slaveAccountsTable)
+          .set({
+            metaApiAccountId: metaApiId,
+            statusMessage: "Cloud terminal provisioned. Synchronizing account data — this usually takes 1–2 minutes.",
+            updatedAt: new Date(),
+          })
+          .where(eq(slaveAccountsTable.id, account.id));
+
+        logger.info({ accountId: account.id, metaApiId }, "MetaApi account created");
+      } catch (err) {
+        logger.error({ err, accountId: account.id }, "Failed to create MetaApi account");
+        await db
+          .update(slaveAccountsTable)
+          .set({
+            status: "ERROR",
+            statusMessage: err instanceof Error ? err.message : "Failed to provision cloud terminal.",
+            updatedAt: new Date(),
+          })
+          .where(eq(slaveAccountsTable.id, account.id));
+      }
+    });
+  }
 });
 
 router.get("/mt5/accounts/:id", requireAuth, async (req, res): Promise<void> => {
@@ -96,6 +143,66 @@ router.get("/mt5/accounts/:id", requireAuth, async (req, res): Promise<void> => 
   }
 
   res.json(formatAccount(account));
+});
+
+// Live status probe — syncs MetaApi state into DB and returns updated account
+router.get("/mt5/accounts/:id/status", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid account ID" });
+    return;
+  }
+
+  const [account] = await db
+    .select()
+    .from(slaveAccountsTable)
+    .where(and(eq(slaveAccountsTable.id, id), eq(slaveAccountsTable.userId, req.userId!)));
+
+  if (!account) {
+    res.status(404).json({ error: "Account not found" });
+    return;
+  }
+
+  if (!account.metaApiAccountId || !process.env.METAAPI_TOKEN) {
+    res.json(formatAccount(account));
+    return;
+  }
+
+  try {
+    const state = await getMetaApiAccount(account.metaApiAccountId);
+    const { status, message } = mapMetaApiStatus(state);
+
+    const [updated] = await db
+      .update(slaveAccountsTable)
+      .set({
+        status,
+        statusMessage: message,
+        lastSyncAt: status === "CONNECTED" ? new Date() : account.lastSyncAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(slaveAccountsTable.id, id))
+      .returning();
+
+    res.json({
+      ...formatAccount(updated),
+      telemetry: {
+        connectionStatus: state.connectionStatus,
+        synchronizationStatus: state.synchronizationStatus,
+        state: state.state,
+        balance: state.balance ?? null,
+        equity: state.equity ?? null,
+        margin: state.margin ?? null,
+        freeMargin: state.freeMargin ?? null,
+        leverage: state.leverage ?? null,
+        currency: state.currency ?? null,
+        broker: state.broker ?? null,
+        tradeAllowed: state.tradeAllowed ?? null,
+      },
+    });
+  } catch (err) {
+    logger.error({ err, accountId: id }, "MetaApi status fetch failed");
+    res.json(formatAccount(account));
+  }
 });
 
 router.patch("/mt5/accounts/:id", requireAuth, async (req, res): Promise<void> => {
@@ -122,9 +229,7 @@ router.patch("/mt5/accounts/:id", requireAuth, async (req, res): Promise<void> =
   const brokerServer = str(req.body.brokerServer);
   const mt5Password = str(req.body.mt5Password);
 
-  if (brokerServer) {
-    updateValues.brokerServer = brokerServer;
-  }
+  if (brokerServer) updateValues.brokerServer = brokerServer;
 
   if (mt5Password) {
     const { encrypted, iv, tag } = encryptPassword(mt5Password);
@@ -160,8 +265,19 @@ router.delete("/mt5/accounts/:id", requireAuth, async (req, res): Promise<void> 
   }
 
   await db.delete(slaveAccountsTable).where(eq(slaveAccountsTable.id, id));
-
   res.status(204).send();
+
+  // Clean up MetaApi account in background
+  if (existing.metaApiAccountId && process.env.METAAPI_TOKEN) {
+    setImmediate(async () => {
+      try {
+        await deleteMetaApiAccount(existing.metaApiAccountId!);
+        logger.info({ metaApiId: existing.metaApiAccountId }, "MetaApi account deleted");
+      } catch (err) {
+        logger.warn({ err, metaApiId: existing.metaApiAccountId }, "Failed to delete MetaApi account");
+      }
+    });
+  }
 });
 
 router.post("/mt5/accounts/:id/reconnect", requireAuth, async (req, res): Promise<void> => {
@@ -183,14 +299,30 @@ router.post("/mt5/accounts/:id/reconnect", requireAuth, async (req, res): Promis
 
   const [updated] = await db
     .update(slaveAccountsTable)
-    .set({ status: "SYNCING", statusMessage: "Attempting to reconnect…", updatedAt: new Date() })
+    .set({ status: "SYNCING", statusMessage: "Reconnecting to cloud terminal…", updatedAt: new Date() })
     .where(eq(slaveAccountsTable.id, id))
     .returning();
 
   res.json(formatAccount(updated));
+
+  // Fire-and-forget MetaApi re-deploy
+  if (existing.metaApiAccountId && process.env.METAAPI_TOKEN) {
+    setImmediate(async () => {
+      try {
+        await deployMetaApiAccount(existing.metaApiAccountId!);
+        logger.info({ metaApiId: existing.metaApiAccountId }, "MetaApi account redeployed");
+      } catch (err) {
+        logger.warn({ err, metaApiId: existing.metaApiAccountId }, "MetaApi redeploy failed");
+        await db
+          .update(slaveAccountsTable)
+          .set({ status: "ERROR", statusMessage: "Reconnect failed. Please try again.", updatedAt: new Date() })
+          .where(eq(slaveAccountsTable.id, id));
+      }
+    });
+  }
 });
 
-// ─── Admin endpoints ────────────────────────────────────────────────────────
+// ─── Admin endpoints ─────────────────────────────────────────────────────────
 
 router.get("/admin/mt5/accounts", requireAdmin, async (_req, res): Promise<void> => {
   const rows = await db
@@ -254,6 +386,20 @@ router.post("/admin/mt5/accounts/:id/reconnect", requireAdmin, async (req, res):
     .returning();
 
   res.json(formatAccount(updated));
+
+  if (existing.metaApiAccountId && process.env.METAAPI_TOKEN) {
+    setImmediate(async () => {
+      try {
+        await deployMetaApiAccount(existing.metaApiAccountId!);
+      } catch (err) {
+        logger.warn({ err, metaApiId: existing.metaApiAccountId }, "Admin reconnect: MetaApi deploy failed");
+        await db
+          .update(slaveAccountsTable)
+          .set({ status: "ERROR", statusMessage: "Admin reconnect failed.", updatedAt: new Date() })
+          .where(eq(slaveAccountsTable.id, id));
+      }
+    });
+  }
 });
 
 router.post("/admin/mt5/accounts/:id/disconnect", requireAdmin, async (req, res): Promise<void> => {
@@ -280,6 +426,16 @@ router.post("/admin/mt5/accounts/:id/disconnect", requireAdmin, async (req, res)
     .returning();
 
   res.json(formatAccount(updated));
+
+  if (existing.metaApiAccountId && process.env.METAAPI_TOKEN) {
+    setImmediate(async () => {
+      try {
+        await undeployMetaApiAccount(existing.metaApiAccountId!);
+      } catch (err) {
+        logger.warn({ err, metaApiId: existing.metaApiAccountId }, "Admin disconnect: MetaApi undeploy failed");
+      }
+    });
+  }
 });
 
 export default router;

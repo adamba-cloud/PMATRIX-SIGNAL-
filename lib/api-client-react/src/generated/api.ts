@@ -36,6 +36,7 @@ import type {
   Signal,
   SignalSummary,
   SlaveAccount,
+  SlaveAccountWithTelemetry,
   StkPushInput,
   StkPushResponse,
   Subscription,
@@ -1998,6 +1999,83 @@ export const useDeleteMt5Account = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getDeleteMt5AccountMutationOptions(options));
     }
+
+export const getGetMt5AccountStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/mt5/accounts/${id}/status`
+}
+
+/**
+ * @summary Live-probe MetaApi status and return updated account with telemetry
+ */
+export const getMt5AccountStatus = async (id: number, options?: RequestInit): Promise<SlaveAccountWithTelemetry> => {
+
+  return customFetch<SlaveAccountWithTelemetry>(getGetMt5AccountStatusUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMt5AccountStatusQueryKey = (id: number,) => {
+    return [
+    `/api/mt5/accounts/${id}/status`
+    ] as const;
+    }
+
+
+export const getGetMt5AccountStatusQueryOptions = <TData = Awaited<ReturnType<typeof getMt5AccountStatus>>, TError = ErrorType<ErrorResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMt5AccountStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMt5AccountStatusQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMt5AccountStatus>>> = ({ signal }) => getMt5AccountStatus(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMt5AccountStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMt5AccountStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getMt5AccountStatus>>>
+export type GetMt5AccountStatusQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Live-probe MetaApi status and return updated account with telemetry
+ */
+
+export function useGetMt5AccountStatus<TData = Awaited<ReturnType<typeof getMt5AccountStatus>>, TError = ErrorType<ErrorResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMt5AccountStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMt5AccountStatusQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getReconnectMt5AccountUrl = (id: number,) => {
 

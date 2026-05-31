@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   useGetMt5Accounts,
   useConnectMt5Account,
@@ -6,11 +6,13 @@ import {
   useReconnectMt5Account,
   getGetMt5AccountsQueryKey,
 } from "@workspace/api-client-react";
+import type { SlaveAccount } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -40,36 +42,57 @@ import {
   WifiOff,
   AlertTriangle,
   Activity,
+  Cloud,
+  TrendingUp,
+  DollarSign,
+  Shield,
 } from "lucide-react";
 
 type Mt5Status = "CONNECTED" | "SYNCING" | "DISCONNECTED" | "ERROR";
 
+interface Telemetry {
+  connectionStatus?: string;
+  synchronizationStatus?: string;
+  state?: string;
+  balance?: number | null;
+  equity?: number | null;
+  margin?: number | null;
+  freeMargin?: number | null;
+  leverage?: number | null;
+  currency?: string | null;
+  broker?: string | null;
+  tradeAllowed?: boolean | null;
+}
+
+interface AccountWithTelemetry extends SlaveAccount {
+  telemetry?: Telemetry;
+}
+
+const STATUS_MAP: Record<Mt5Status, { label: string; color: string; icon: React.ReactNode }> = {
+  CONNECTED: {
+    label: "Connected",
+    color: "text-green-400 bg-green-500/10 border-green-500/20",
+    icon: <Wifi className="w-3.5 h-3.5" />,
+  },
+  SYNCING: {
+    label: "Synchronizing",
+    color: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
+    icon: <Activity className="w-3.5 h-3.5 animate-pulse" />,
+  },
+  DISCONNECTED: {
+    label: "Disconnected",
+    color: "text-slate-400 bg-slate-500/10 border-slate-500/20",
+    icon: <WifiOff className="w-3.5 h-3.5" />,
+  },
+  ERROR: {
+    label: "Error",
+    color: "text-red-400 bg-red-500/10 border-red-500/20",
+    icon: <AlertTriangle className="w-3.5 h-3.5" />,
+  },
+};
+
 function StatusBadge({ status }: { status: Mt5Status }) {
-  const map: Record<Mt5Status, { label: string; color: string; icon: React.ReactNode }> = {
-    CONNECTED: {
-      label: "Connected",
-      color: "text-green-400 bg-green-500/10 border-green-500/20",
-      icon: <Wifi className="w-3.5 h-3.5" />,
-    },
-    SYNCING: {
-      label: "Syncing",
-      color: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20",
-      icon: <Activity className="w-3.5 h-3.5 animate-pulse" />,
-    },
-    DISCONNECTED: {
-      label: "Disconnected",
-      color: "text-slate-400 bg-slate-500/10 border-slate-500/20",
-      icon: <WifiOff className="w-3.5 h-3.5" />,
-    },
-    ERROR: {
-      label: "Error",
-      color: "text-red-400 bg-red-500/10 border-red-500/20",
-      icon: <AlertTriangle className="w-3.5 h-3.5" />,
-    },
-  };
-
-  const { label, color, icon } = map[status] ?? map.DISCONNECTED;
-
+  const { label, color, icon } = STATUS_MAP[status] ?? STATUS_MAP.DISCONNECTED;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${color}`}>
       {icon}
@@ -78,8 +101,235 @@ function StatusBadge({ status }: { status: Mt5Status }) {
   );
 }
 
+function ProvisioningBanner({ message }: { message: string }) {
+  const [progress, setProgress] = useState(5);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setProgress((p) => (p >= 90 ? 90 : p + 2));
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="relative">
+          <Cloud className="w-6 h-6 text-yellow-400" />
+          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-yellow-400 rounded-full animate-ping" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-yellow-300">Provisioning Cloud Terminal</p>
+          <p className="text-xs text-yellow-400/70 mt-0.5">
+            Please wait while synchronization completes — usually 1–2 minutes.
+          </p>
+        </div>
+      </div>
+      <Progress value={progress} className="h-1.5 bg-yellow-500/10 [&>div]:bg-yellow-400" />
+      {message && (
+        <p className="text-xs text-slate-400">{message}</p>
+      )}
+    </div>
+  );
+}
+
+function TelemetryGrid({ telemetry, currency }: { telemetry: Telemetry; currency?: string | null }) {
+  const fmt = (v: number | null | undefined, digits = 2) =>
+    v != null ? v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits }) : "—";
+
+  const cur = currency ?? telemetry.currency ?? "";
+
+  return (
+    <div className="grid grid-cols-2 gap-3 pt-1">
+      <div className="bg-slate-950/60 rounded-lg p-3 border border-slate-800">
+        <div className="flex items-center gap-1.5 mb-1">
+          <DollarSign className="w-3 h-3 text-green-500" />
+          <p className="text-xs text-slate-500 uppercase tracking-wide">Balance</p>
+        </div>
+        <p className="text-base font-semibold text-slate-100 tabular-nums">
+          {cur} {fmt(telemetry.balance)}
+        </p>
+      </div>
+      <div className="bg-slate-950/60 rounded-lg p-3 border border-slate-800">
+        <div className="flex items-center gap-1.5 mb-1">
+          <TrendingUp className="w-3 h-3 text-blue-400" />
+          <p className="text-xs text-slate-500 uppercase tracking-wide">Equity</p>
+        </div>
+        <p className="text-base font-semibold text-slate-100 tabular-nums">
+          {cur} {fmt(telemetry.equity)}
+        </p>
+      </div>
+      <div className="bg-slate-950/60 rounded-lg p-3 border border-slate-800">
+        <div className="flex items-center gap-1.5 mb-1">
+          <Activity className="w-3 h-3 text-purple-400" />
+          <p className="text-xs text-slate-500 uppercase tracking-wide">Free Margin</p>
+        </div>
+        <p className="text-base font-semibold text-slate-100 tabular-nums">
+          {cur} {fmt(telemetry.freeMargin)}
+        </p>
+      </div>
+      <div className="bg-slate-950/60 rounded-lg p-3 border border-slate-800">
+        <div className="flex items-center gap-1.5 mb-1">
+          <Shield className="w-3 h-3 text-orange-400" />
+          <p className="text-xs text-slate-500 uppercase tracking-wide">Leverage</p>
+        </div>
+        <p className="text-base font-semibold text-slate-100">
+          {telemetry.leverage != null ? `1:${telemetry.leverage}` : "—"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function AccountCard({
+  account,
+  onDelete,
+  onReconnect,
+  isDeleting,
+  isReconnecting,
+}: {
+  account: AccountWithTelemetry;
+  onDelete: (id: number) => void;
+  onReconnect: (id: number) => void;
+  isDeleting: boolean;
+  isReconnecting: boolean;
+}) {
+  const [telemetry, setTelemetry] = useState<Telemetry | undefined>(account.telemetry);
+  const status = account.status as Mt5Status;
+  const isSyncing = status === "SYNCING";
+  const isConnected = status === "CONNECTED";
+
+  // Poll /mt5/accounts/:id/status every 5 seconds while syncing or connected
+  useEffect(() => {
+    if (!isSyncing && !isConnected) return;
+    const interval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`/api/mt5/accounts/${account.id}/status`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const data = (await res.json()) as AccountWithTelemetry;
+          if (data.telemetry) setTelemetry(data.telemetry);
+        }
+      } catch {
+        // ignore
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [account.id, isSyncing, isConnected]);
+
+  return (
+    <Card className="bg-slate-900 border-slate-800">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="text-slate-50 text-lg font-mono">
+              #{account.mt5Login}
+            </CardTitle>
+            <CardDescription className="text-slate-500 mt-0.5">
+              {account.brokerServer}
+            </CardDescription>
+          </div>
+          <StatusBadge status={status} />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isSyncing && (
+          <ProvisioningBanner message={account.statusMessage ?? "Initialising cloud connection…"} />
+        )}
+
+        {status === "ERROR" && account.statusMessage && (
+          <div className="rounded-md bg-red-500/10 border border-red-500/20 px-3 py-2.5">
+            <p className="text-xs text-red-400">{account.statusMessage}</p>
+          </div>
+        )}
+
+        {status === "DISCONNECTED" && account.statusMessage && (
+          <div className="rounded-md bg-slate-800 border border-slate-700 px-3 py-2.5">
+            <p className="text-xs text-slate-400">{account.statusMessage}</p>
+          </div>
+        )}
+
+        {isConnected && telemetry && (
+          <TelemetryGrid telemetry={telemetry} currency={telemetry.currency} />
+        )}
+
+        {isConnected && !telemetry && (
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-slate-500 text-xs uppercase tracking-wide">Last Sync</p>
+              <p className="text-slate-300 mt-0.5">
+                {account.lastSyncAt ? new Date(account.lastSyncAt).toLocaleString() : "Never"}
+              </p>
+            </div>
+            <div>
+              <p className="text-slate-500 text-xs uppercase tracking-wide">MetaApi ID</p>
+              <p className="text-slate-300 mt-0.5 font-mono text-xs truncate" title={account.metaApiAccountId ?? ""}>
+                {account.metaApiAccountId ? account.metaApiAccountId.slice(0, 12) + "…" : "—"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 pt-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+            onClick={() => onReconnect(account.id)}
+            disabled={isReconnecting || isSyncing}
+          >
+            {isReconnecting ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+            )}
+            Reconnect
+          </Button>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-800/50 text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:border-red-700"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="bg-slate-900 border-slate-700">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-slate-50">Remove MT5 Account</AlertDialogTitle>
+                <AlertDialogDescription className="text-slate-400">
+                  This will permanently disconnect and remove MT5 account{" "}
+                  <span className="text-slate-200 font-mono">#{account.mt5Login}</span> from{" "}
+                  <span className="text-slate-200">{account.brokerServer}</span>. The MetaApi cloud
+                  terminal will also be deleted. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="border-slate-700 text-slate-300 hover:bg-slate-800">
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => onDelete(account.id)}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Remove Account
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ConnectAccountDialog({ onSuccess }: { onSuccess: () => void }) {
   const [open, setOpen] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
   const [form, setForm] = useState({ mt5Login: "", mt5Password: "", brokerServer: "" });
   const { toast } = useToast();
   const mutation = useConnectMt5Account();
@@ -95,10 +345,13 @@ function ConnectAccountDialog({ onSuccess }: { onSuccess: () => void }) {
       { data: { mt5Login: form.mt5Login, mt5Password: form.mt5Password, brokerServer: form.brokerServer } },
       {
         onSuccess: () => {
-          toast({ title: "MT5 account connected successfully" });
-          setForm({ mt5Login: "", mt5Password: "", brokerServer: "" });
-          setOpen(false);
-          onSuccess();
+          setProvisioning(true);
+          setTimeout(() => {
+            setProvisioning(false);
+            setForm({ mt5Login: "", mt5Password: "", brokerServer: "" });
+            setOpen(false);
+            onSuccess();
+          }, 2000);
         },
         onError: (err: unknown) => {
           const msg = (err as { data?: { error?: string } })?.data?.error ?? "Failed to connect account";
@@ -109,7 +362,7 @@ function ConnectAccountDialog({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { if (!provisioning) setOpen(v); }}>
       <DialogTrigger asChild>
         <Button className="bg-green-600 hover:bg-green-700 text-white">
           <Plus className="w-4 h-4 mr-2" />
@@ -120,63 +373,90 @@ function ConnectAccountDialog({ onSuccess }: { onSuccess: () => void }) {
         <DialogHeader>
           <DialogTitle className="text-slate-50">Connect MT5 Account</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div className="space-y-2">
-            <Label htmlFor="mt5Login" className="text-slate-300">MT5 Login (Account Number)</Label>
-            <Input
-              id="mt5Login"
-              placeholder="e.g. 123456789"
-              value={form.mt5Login}
-              onChange={(e) => setForm((f) => ({ ...f, mt5Login: e.target.value }))}
-              className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
-            />
+
+        {provisioning ? (
+          <div className="space-y-4 py-4">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="relative w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                <Cloud className="w-7 h-7 text-yellow-400" />
+                <span className="absolute inset-0 rounded-full border-2 border-yellow-400 animate-ping opacity-40" />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-100">Provisioning Cloud Terminal</p>
+                <p className="text-sm text-slate-400 mt-1">
+                  Please wait while synchronization completes.
+                  <br />
+                  <span className="text-xs text-slate-500">Expected: 1–2 minutes</span>
+                </p>
+              </div>
+              <Loader2 className="w-5 h-5 text-yellow-400 animate-spin" />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="mt5Password" className="text-slate-300">MT5 Password</Label>
-            <Input
-              id="mt5Password"
-              type="password"
-              placeholder="Your MT5 account password"
-              value={form.mt5Password}
-              onChange={(e) => setForm((f) => ({ ...f, mt5Password: e.target.value }))}
-              className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="brokerServer" className="text-slate-300">Broker Server</Label>
-            <Input
-              id="brokerServer"
-              placeholder="e.g. ICMarkets-Demo01"
-              value={form.brokerServer}
-              onChange={(e) => setForm((f) => ({ ...f, brokerServer: e.target.value }))}
-              className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
-            />
-          </div>
-          <div className="flex items-center gap-2 p-3 rounded-md bg-slate-800 border border-slate-700">
-            <Cpu className="w-4 h-4 text-green-500 flex-shrink-0" />
-            <p className="text-xs text-slate-400">
-              Your password is encrypted with AES-256-GCM and never stored in plain text.
-            </p>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1 border-slate-700 text-slate-300 hover:bg-slate-800"
-              onClick={() => setOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-              disabled={mutation.isPending}
-            >
-              {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Connect
-            </Button>
-          </div>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label htmlFor="mt5Login" className="text-slate-300">MT5 Login (Account Number)</Label>
+              <Input
+                id="mt5Login"
+                placeholder="e.g. 123456789"
+                value={form.mt5Login}
+                onChange={(e) => setForm((f) => ({ ...f, mt5Login: e.target.value }))}
+                className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mt5Password" className="text-slate-300">MT5 Password</Label>
+              <Input
+                id="mt5Password"
+                type="password"
+                placeholder="Your MT5 account password"
+                value={form.mt5Password}
+                onChange={(e) => setForm((f) => ({ ...f, mt5Password: e.target.value }))}
+                className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="brokerServer" className="text-slate-300">Broker Server</Label>
+              <Input
+                id="brokerServer"
+                placeholder="e.g. ICMarkets-Demo01"
+                value={form.brokerServer}
+                onChange={(e) => setForm((f) => ({ ...f, brokerServer: e.target.value }))}
+                className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
+              />
+            </div>
+
+            <div className="rounded-md bg-slate-800 border border-slate-700 p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Cloud className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                <p className="text-xs font-medium text-slate-300">Cloud-to-Cloud Architecture</p>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                No VPS or local MT5 terminal required. A MetaApi cloud terminal will be provisioned
+                automatically. Your password is encrypted with AES-256-GCM.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 border-slate-700 text-slate-300 hover:bg-slate-800"
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                disabled={mutation.isPending}
+              >
+                {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Connect & Provision
+              </Button>
+            </div>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -191,21 +471,25 @@ export default function Mt5Accounts() {
   const reconnectMutation = useReconnectMt5Account();
   const { toast } = useToast();
 
-  const invalidate = () => {
+  const hasSyncing = accounts.some((a) => a.status === "SYNCING");
+
+  const invalidate = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: getGetMt5AccountsQueryKey() });
-  };
+  }, [queryClient]);
+
+  // Auto-refresh account list every 8 seconds when any are syncing
+  useEffect(() => {
+    if (!hasSyncing) return;
+    const interval = setInterval(invalidate, 8000);
+    return () => clearInterval(interval);
+  }, [hasSyncing, invalidate]);
 
   const handleDelete = (id: number) => {
     deleteMutation.mutate(
       { id },
       {
-        onSuccess: () => {
-          toast({ title: "Account removed" });
-          invalidate();
-        },
-        onError: () => {
-          toast({ title: "Failed to remove account", variant: "destructive" });
-        },
+        onSuccess: () => { toast({ title: "Account removed" }); invalidate(); },
+        onError: () => toast({ title: "Failed to remove account", variant: "destructive" }),
       }
     );
   };
@@ -214,15 +498,17 @@ export default function Mt5Accounts() {
     reconnectMutation.mutate(
       { id },
       {
-        onSuccess: () => {
-          toast({ title: "Reconnecting…" });
-          invalidate();
-        },
-        onError: () => {
-          toast({ title: "Failed to initiate reconnect", variant: "destructive" });
-        },
+        onSuccess: () => { toast({ title: "Reconnecting…" }); invalidate(); },
+        onError: () => toast({ title: "Failed to reconnect", variant: "destructive" }),
       }
     );
+  };
+
+  const counts = {
+    connected: accounts.filter((a) => a.status === "CONNECTED").length,
+    syncing: accounts.filter((a) => a.status === "SYNCING").length,
+    disconnected: accounts.filter((a) => a.status === "DISCONNECTED").length,
+    error: accounts.filter((a) => a.status === "ERROR").length,
   };
 
   return (
@@ -230,10 +516,31 @@ export default function Mt5Accounts() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">MT5 Accounts</h2>
-          <p className="text-slate-400 mt-1">Manage your connected MetaTrader 5 accounts.</p>
+          <p className="text-slate-400 mt-1">Cloud-connected MetaTrader 5 accounts — no VPS required.</p>
         </div>
         <ConnectAccountDialog onSuccess={invalidate} />
       </div>
+
+      {accounts.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: "Connected", value: counts.connected, color: "text-green-400", icon: <Wifi className="w-4 h-4" /> },
+            { label: "Synchronizing", value: counts.syncing, color: "text-yellow-400", icon: <Activity className="w-4 h-4 animate-pulse" /> },
+            { label: "Disconnected", value: counts.disconnected, color: "text-slate-400", icon: <WifiOff className="w-4 h-4" /> },
+            { label: "Error", value: counts.error, color: "text-red-400", icon: <AlertTriangle className="w-4 h-4" /> },
+          ].map(({ label, value, color, icon }) => (
+            <Card key={label} className="bg-slate-900 border-slate-800">
+              <CardContent className="pt-4 pb-3 px-4">
+                <div className={`flex items-center gap-2 ${color} mb-1`}>
+                  {icon}
+                  <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+                </div>
+                <p className={`text-3xl font-bold ${color}`}>{value}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center h-48">
@@ -243,12 +550,12 @@ export default function Mt5Accounts() {
         <Card className="bg-slate-900 border-slate-800 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
             <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center">
-              <Cpu className="w-7 h-7 text-slate-500" />
+              <Cloud className="w-7 h-7 text-slate-500" />
             </div>
             <div className="text-center">
               <p className="text-slate-300 font-medium">No MT5 accounts connected</p>
               <p className="text-slate-500 text-sm mt-1">
-                Connect your first MT5 account to enable copy trading.
+                Connect your MT5 account — a cloud terminal will be provisioned automatically.
               </p>
             </div>
             <ConnectAccountDialog onSuccess={invalidate} />
@@ -257,122 +564,17 @@ export default function Mt5Accounts() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {accounts.map((account) => (
-            <Card key={account.id} className="bg-slate-900 border-slate-800">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-slate-50 text-lg font-mono">
-                      #{account.mt5Login}
-                    </CardTitle>
-                    <CardDescription className="text-slate-500 mt-0.5">
-                      {account.brokerServer}
-                    </CardDescription>
-                  </div>
-                  <StatusBadge status={account.status as Mt5Status} />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {account.statusMessage && (
-                  <p className="text-xs text-slate-400 bg-slate-800 rounded px-3 py-2 border border-slate-700">
-                    {account.statusMessage}
-                  </p>
-                )}
-
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-slate-500 text-xs uppercase tracking-wide">Last Sync</p>
-                    <p className="text-slate-300 mt-0.5">
-                      {account.lastSyncAt
-                        ? new Date(account.lastSyncAt).toLocaleString()
-                        : "Never"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-slate-500 text-xs uppercase tracking-wide">Connected</p>
-                    <p className="text-slate-300 mt-0.5">
-                      {new Date(account.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
-                    onClick={() => handleReconnect(account.id)}
-                    disabled={reconnectMutation.isPending || account.status === "SYNCING"}
-                  >
-                    {reconnectMutation.isPending ? (
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                    )}
-                    Reconnect
-                  </Button>
-
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-red-800/50 text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:border-red-700"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-slate-900 border-slate-700">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-slate-50">Remove MT5 Account</AlertDialogTitle>
-                        <AlertDialogDescription className="text-slate-400">
-                          This will permanently disconnect and remove MT5 account{" "}
-                          <span className="text-slate-200 font-mono">#{account.mt5Login}</span> from{" "}
-                          <span className="text-slate-200">{account.brokerServer}</span>. This action
-                          cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="border-slate-700 text-slate-300 hover:bg-slate-800">
-                          Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDelete(account.id)}
-                          className="bg-red-600 hover:bg-red-700 text-white"
-                        >
-                          Remove Account
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </CardContent>
-            </Card>
+            <AccountCard
+              key={account.id}
+              account={account as AccountWithTelemetry}
+              onDelete={handleDelete}
+              onReconnect={handleReconnect}
+              isDeleting={deleteMutation.isPending}
+              isReconnecting={reconnectMutation.isPending}
+            />
           ))}
         </div>
       )}
-
-      <Card className="bg-slate-900 border-slate-800">
-        <CardHeader>
-          <CardTitle className="text-slate-50 text-base flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-green-500" />
-            MetaApi Integration
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2 text-sm text-slate-400">
-            <p>
-              MT5 accounts are onboarded and stored securely. MetaApi integration will be activated
-              soon to enable:
-            </p>
-            <ul className="list-disc list-inside space-y-1 ml-2 text-slate-500">
-              <li>Automatic trade copying from PESAMATRIX signals</li>
-              <li>Real-time account balance and equity tracking</li>
-              <li>Position and trade history synchronisation</li>
-              <li>Risk management controls per account</li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

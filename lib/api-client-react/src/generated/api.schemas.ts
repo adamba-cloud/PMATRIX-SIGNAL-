@@ -263,6 +263,32 @@ export interface UpdateMt5Input {
   brokerServer?: string;
 }
 
+export interface Mt5Telemetry {
+  connectionStatus?: string;
+  synchronizationStatus?: string;
+  state?: string;
+  /** @nullable */
+  balance?: number | null;
+  /** @nullable */
+  equity?: number | null;
+  /** @nullable */
+  margin?: number | null;
+  /** @nullable */
+  freeMargin?: number | null;
+  /** @nullable */
+  leverage?: number | null;
+  /** @nullable */
+  currency?: string | null;
+  /** @nullable */
+  broker?: string | null;
+  /** @nullable */
+  tradeAllowed?: boolean | null;
+}
+
+export type SlaveAccountWithTelemetry = SlaveAccount & {
+  telemetry?: Mt5Telemetry;
+};
+
 export interface AdminSlaveAccount {
   id: number;
   userId: number;

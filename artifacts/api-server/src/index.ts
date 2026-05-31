@@ -3,6 +3,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { attachForexWebSocket } from "./lib/forex-ws";
 import { startExpiryJob } from "./lib/expiry-job";
+import { startMetaApiSyncJob } from "./lib/metaapi-sync-job";
 
 const rawPort = process.env["PORT"];
 
@@ -21,6 +22,7 @@ if (Number.isNaN(port) || port <= 0) {
 const server = createServer(app);
 attachForexWebSocket(server);
 startExpiryJob();
+startMetaApiSyncJob();
 
 server.listen(port, () => {
   logger.info({ port }, "Server listening");

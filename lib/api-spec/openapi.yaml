@@ -509,6 +509,31 @@ paths:
         "204":
           description: Deleted
 
+  /mt5/accounts/{id}/status:
+    get:
+      operationId: getMt5AccountStatus
+      tags: [mt5]
+      summary: Live-probe MetaApi status and return updated account with telemetry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Account with live telemetry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlaveAccountWithTelemetry"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /mt5/accounts/{id}/reconnect:
     post:
       operationId: reconnectMt5Account
@@ -942,6 +967,40 @@ components:
           type: string
         brokerServer:
           type: string
+
+    Mt5Telemetry:
+      type: object
+      properties:
+        connectionStatus:
+          type: string
+        synchronizationStatus:
+          type: string
+        state:
+          type: string
+        balance:
+          type: ["number", "null"]
+        equity:
+          type: ["number", "null"]
+        margin:
+          type: ["number", "null"]
+        freeMargin:
+          type: ["number", "null"]
+        leverage:
+          type: ["number", "null"]
+        currency:
+          type: ["string", "null"]
+        broker:
+          type: ["string", "null"]
+        tradeAllowed:
+          type: ["boolean", "null"]
+
+    SlaveAccountWithTelemetry:
+      allOf:
+        - $ref: "#/components/schemas/SlaveAccount"
+        - type: object
+          properties:
+            telemetry:
+              $ref: "#/components/schemas/Mt5Telemetry"
 
     AdminSlaveAccount:
       type: object
