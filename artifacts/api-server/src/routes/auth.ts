@@ -14,7 +14,7 @@ import {
   requireAuth,
 } from "../lib/auth";
 import { generateReferralCode, applyReferralReward } from "../lib/referrals";
-import { sendVerificationEmail } from "../lib/mailer";
+import { sendVerificationEmail, sendPasswordResetEmail } from "../lib/mailer";
 
 const router = Router();
 
@@ -200,6 +200,78 @@ router.post("/auth/resend-verification", async (req, res): Promise<void> => {
   sendVerificationEmail(user.email, user.name, verificationToken).catch(() => {});
 
   res.json({ message: "A new verification email has been sent." });
+});
+
+router.post("/auth/forgot-password", async (req, res): Promise<void> => {
+  const { email } = req.body as { email?: string };
+  if (!email) {
+    res.status(400).json({ error: "Email is required" });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase()));
+
+  // Always respond the same way to prevent email enumeration
+  if (!user || !user.emailVerified) {
+    res.json({ message: "If that email exists, a reset link has been sent." });
+    return;
+  }
+
+  const resetToken = randomBytes(32).toString("hex");
+  const resetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await db
+    .update(usersTable)
+    .set({ passwordResetToken: resetToken, passwordResetExpiry: resetExpiry })
+    .where(eq(usersTable.id, user.id));
+
+  sendPasswordResetEmail(user.email, user.name, resetToken).catch(() => {});
+
+  res.json({ message: "If that email exists, a reset link has been sent." });
+});
+
+router.post("/auth/reset-password", async (req, res): Promise<void> => {
+  const { token, password } = req.body as { token?: string; password?: string };
+  if (!token || !password) {
+    res.status(400).json({ error: "Token and new password are required" });
+    return;
+  }
+  if (password.length < 8) {
+    res.status(400).json({ error: "Password must be at least 8 characters" });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.passwordResetToken, token));
+
+  if (!user) {
+    res.status(400).json({ error: "Invalid or expired reset link. Please request a new one." });
+    return;
+  }
+
+  if (user.passwordResetExpiry && user.passwordResetExpiry < new Date()) {
+    res.status(400).json({ error: "This reset link has expired. Please request a new one." });
+    return;
+  }
+
+  const passwordHash = await hashPassword(password);
+  const [updated] = await db
+    .update(usersTable)
+    .set({ passwordHash, passwordResetToken: null, passwordResetExpiry: null, mustChangePassword: false })
+    .where(eq(usersTable.id, user.id))
+    .returning();
+
+  const sessionToken = signToken({ userId: updated.id, role: updated.role });
+  res.json({
+    token: sessionToken,
+    user: {
+      id: updated.id,
+      email: updated.email,
+      name: updated.name,
+      role: updated.role,
+      mustChangePassword: updated.mustChangePassword,
+      createdAt: updated.createdAt.toISOString(),
+    },
+  });
 });
 
 router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
