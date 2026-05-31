@@ -2,10 +2,10 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/contexts/theme";
 import NotFound from "@/pages/not-found";
 import { AppLayout } from "@/components/layout";
 
-// Pages
 import Home from "@/pages/home";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
@@ -21,7 +21,6 @@ import Gallery from "@/pages/gallery";
 import News from "@/pages/news";
 import Resources from "@/pages/resources";
 
-// Admin Pages
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
 import AdminSubscriptions from "@/pages/admin/subscriptions";
@@ -29,6 +28,8 @@ import AdminPayments from "@/pages/admin/payments";
 import AdminConfig from "@/pages/admin/config";
 import AdminMt5 from "@/pages/admin/mt5";
 import AdminContent from "@/pages/admin/content";
+import AdminAnnouncements from "@/pages/admin/announcements";
+import AdminSignals from "@/pages/admin/signals";
 
 const queryClient = new QueryClient();
 
@@ -50,8 +51,7 @@ function Router() {
         <Route path="/gallery" component={Gallery} />
         <Route path="/news" component={News} />
         <Route path="/resources" component={Resources} />
-        
-        {/* Admin Routes */}
+
         <Route path="/admin/dashboard" component={AdminDashboard} />
         <Route path="/admin/users" component={AdminUsers} />
         <Route path="/admin/subscriptions" component={AdminSubscriptions} />
@@ -59,7 +59,9 @@ function Router() {
         <Route path="/admin/config" component={AdminConfig} />
         <Route path="/admin/mt5" component={AdminMt5} />
         <Route path="/admin/content" component={AdminContent} />
-        
+        <Route path="/admin/announcements" component={AdminAnnouncements} />
+        <Route path="/admin/signals" component={AdminSignals} />
+
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
@@ -68,14 +70,16 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

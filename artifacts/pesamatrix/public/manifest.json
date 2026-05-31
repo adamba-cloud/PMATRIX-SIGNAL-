@@ -1,0 +1,21 @@
+{
+  "name": "PESAMATRIX SIGNAL",
+  "short_name": "PESAMATRIX",
+  "description": "Elite Forex trading signals and copy-trading platform",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#020817",
+  "theme_color": "#16a34a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["finance", "utilities"],
+  "screenshots": []
+}

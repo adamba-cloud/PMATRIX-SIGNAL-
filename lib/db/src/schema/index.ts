@@ -10,3 +10,4 @@ export * from "./system_audit_logs";
 export * from "./media";
 export * from "./news";
 export * from "./resource_links";
+export * from "./announcements";

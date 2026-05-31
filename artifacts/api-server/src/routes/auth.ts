@@ -107,6 +107,25 @@ router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
   });
 });
 
+router.patch("/auth/me", requireAuth, async (req, res): Promise<void> => {
+  const { whatsappNumber } = req.body as { whatsappNumber?: string | null };
+  const cleaned = whatsappNumber ? whatsappNumber.replace(/\D/g, "") : null;
+  const [updated] = await db
+    .update(usersTable)
+    .set({ whatsappNumber: cleaned || null })
+    .where(eq(usersTable.id, req.userId!))
+    .returning();
+  res.json({
+    id: updated.id,
+    email: updated.email,
+    name: updated.name,
+    role: updated.role,
+    whatsappNumber: updated.whatsappNumber,
+    mustChangePassword: updated.mustChangePassword,
+    createdAt: updated.createdAt.toISOString(),
+  });
+});
+
 router.post("/auth/change-password", requireAuth, async (req, res): Promise<void> => {
   const parsed = ChangePasswordBody.safeParse(req.body);
   if (!parsed.success) {

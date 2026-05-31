@@ -60,8 +60,64 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* ── Light Mode (default) ── */
 @layer base {
-  :root, .dark {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 222.2 47.4% 11.2%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+    --card-border: 220 13% 91%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+    --popover-border: 220 13% 91%;
+
+    --primary: 142.1 76.2% 36.3%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 220 14% 96%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 142.1 76.2% 36.3%;
+
+    --chart-1: 142.1 76.2% 36.3%;
+    --chart-2: 220 14% 96%;
+    --chart-3: 215.4 16.3% 46.9%;
+    --chart-4: 0 0% 98%;
+    --chart-5: 222.2 47.4% 11.2%;
+
+    --sidebar: 220 14% 94%;
+    --sidebar-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 220 13% 88%;
+    --sidebar-primary: 142.1 76.2% 36.3%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 220 13% 91%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-ring: 142.1 76.2% 36.3%;
+
+    --app-font-sans: 'Inter', sans-serif;
+    --app-font-serif: Georgia, serif;
+    --app-font-mono: Menlo, monospace;
+    --radius: 0.5rem;
+  }
+}
+
+/* ── Dark Mode ── */
+@layer base {
+  .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
 

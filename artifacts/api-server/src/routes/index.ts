@@ -14,6 +14,7 @@ import copyTradingRouter from "./copy-trading";
 import mediaRouter from "./media";
 import newsRouter from "./news";
 import resourcesRouter from "./resources";
+import announcementsRouter from "./announcements";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(copyTradingRouter);
 router.use(mediaRouter);
 router.use(newsRouter);
 router.use(resourcesRouter);
+router.use(announcementsRouter);
 
 export default router;

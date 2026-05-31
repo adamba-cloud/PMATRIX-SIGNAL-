@@ -12,6 +12,7 @@ export const usersTable = pgTable("users", {
   role: roleEnum("role").notNull().default("USER"),
   mustChangePassword: boolean("must_change_password").notNull().default(false),
   suspended: boolean("suspended").notNull().default(false),
+  whatsappNumber: text("whatsapp_number"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
