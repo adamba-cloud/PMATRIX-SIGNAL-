@@ -3,7 +3,7 @@ import {
   useGetMySubscription, getGetMySubscriptionQueryKey,
   useGetConfig, getGetConfigQueryKey,
   useGetMyPayments, getGetMyPaymentsQueryKey,
-  useInitiateStkPush, useGetPaymentStatus,
+  useInitiateStkPush, useGetPaymentStatus, getGetPaymentStatusQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -35,7 +35,7 @@ export default function Subscription() {
 
   const { data: paymentStatus, refetch: refetchStatus } = useGetPaymentStatus(
     checkoutRequestId ?? "",
-    { query: { enabled: false } }
+    { query: { enabled: false, queryKey: getGetPaymentStatusQueryKey(checkoutRequestId ?? "") } }
   );
 
   const minDays = config?.minDays ?? 7;

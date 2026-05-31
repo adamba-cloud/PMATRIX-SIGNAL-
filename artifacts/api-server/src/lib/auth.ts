@@ -27,11 +27,9 @@ export async function comparePassword(password: string, hash: string): Promise<b
   return bcrypt.compare(password, hash);
 }
 
-declare module "express" {
-  interface Request {
-    userId?: number;
-    userRole?: string;
-  }
+export interface AuthedRequest extends Request {
+  userId: number;
+  userRole: string;
 }
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {

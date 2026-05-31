@@ -20,6 +20,7 @@ import Profile from "@/pages/profile";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
 import AdminSubscriptions from "@/pages/admin/subscriptions";
+import AdminPayments from "@/pages/admin/payments";
 import AdminConfig from "@/pages/admin/config";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ function Router() {
         <Route path="/admin/dashboard" component={AdminDashboard} />
         <Route path="/admin/users" component={AdminUsers} />
         <Route path="/admin/subscriptions" component={AdminSubscriptions} />
+        <Route path="/admin/payments" component={AdminPayments} />
         <Route path="/admin/config" component={AdminConfig} />
         
         <Route component={NotFound} />
