@@ -8,16 +8,37 @@ import { logger } from "../lib/logger";
 const router = Router();
 
 function getCallbackUrl(req: import("express").Request): string {
+  // 1. Explicit override — highest priority
   const base = process.env["DARAJA_CALLBACK_BASE_URL"];
-  if (base) return `${base.replace(/\/$/, "")}/api/payments/mpesa/callback`;
+  if (base) {
+    const url = `${base.replace(/\/$/, "")}/api/payments/mpesa/callback`;
+    logger.info({ callbackUrl: url, source: "DARAJA_CALLBACK_BASE_URL" }, "Using callback URL");
+    return url;
+  }
+
+  // 2. Replit managed production domains
   const domains = process.env["REPLIT_DOMAINS"];
   if (domains) {
     const domain = domains.split(",")[0].trim();
-    return `https://${domain}/api/payments/mpesa/callback`;
+    const url = `https://${domain}/api/payments/mpesa/callback`;
+    logger.info({ callbackUrl: url, source: "REPLIT_DOMAINS" }, "Using callback URL");
+    return url;
   }
+
+  // 3. Replit dev domain
+  const devDomain = process.env["REPLIT_DEV_DOMAIN"];
+  if (devDomain) {
+    const url = `https://${devDomain}/api/payments/mpesa/callback`;
+    logger.info({ callbackUrl: url, source: "REPLIT_DEV_DOMAIN" }, "Using callback URL");
+    return url;
+  }
+
+  // 4. Derive from request headers (last resort)
   const host = req.get("host") ?? "localhost";
   const proto = req.get("x-forwarded-proto") ?? req.protocol;
-  return `${proto}://${host}/api/payments/mpesa/callback`;
+  const url = `${proto}://${host}/api/payments/mpesa/callback`;
+  logger.warn({ callbackUrl: url, source: "request-headers" }, "Using callback URL derived from headers — set DARAJA_CALLBACK_BASE_URL for reliability");
+  return url;
 }
 
 async function getSystemConfig(): Promise<{ feePerDay: number; minDays: number }> {

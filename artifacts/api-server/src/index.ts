@@ -28,9 +28,24 @@ const server = createServer(app);
 attachForexWebSocket(server);
 startExpiryJob();
 startMetaApiSyncJob();
-startCopyTradeWorker();
-startMasterPoller();
-startConnectionWatchdog();
+
+// Redis-dependent services — gracefully skip if Redis is unavailable (no REDIS_URL set)
+try {
+  startCopyTradeWorker();
+} catch (err) {
+  logger.warn({ err }, "Copy trade worker not started — Redis unavailable");
+}
+try {
+  startMasterPoller();
+} catch (err) {
+  logger.warn({ err }, "Master poller not started — Redis unavailable");
+}
+try {
+  startConnectionWatchdog();
+} catch (err) {
+  logger.warn({ err }, "Connection watchdog not started — Redis unavailable");
+}
+
 startPaymentReconciler();
 
 server.listen(port, () => {
