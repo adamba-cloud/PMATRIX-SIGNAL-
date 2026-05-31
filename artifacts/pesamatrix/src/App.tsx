@@ -17,6 +17,9 @@ import Subscription from "@/pages/subscription";
 import Profile from "@/pages/profile";
 import Mt5Accounts from "@/pages/mt5";
 import CopyTrading from "@/pages/copy-trading";
+import Gallery from "@/pages/gallery";
+import News from "@/pages/news";
+import Resources from "@/pages/resources";
 
 // Admin Pages
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -25,6 +28,7 @@ import AdminSubscriptions from "@/pages/admin/subscriptions";
 import AdminPayments from "@/pages/admin/payments";
 import AdminConfig from "@/pages/admin/config";
 import AdminMt5 from "@/pages/admin/mt5";
+import AdminContent from "@/pages/admin/content";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +47,9 @@ function Router() {
         <Route path="/profile" component={Profile} />
         <Route path="/mt5" component={Mt5Accounts} />
         <Route path="/copy-trading" component={CopyTrading} />
+        <Route path="/gallery" component={Gallery} />
+        <Route path="/news" component={News} />
+        <Route path="/resources" component={Resources} />
         
         {/* Admin Routes */}
         <Route path="/admin/dashboard" component={AdminDashboard} />
@@ -51,6 +58,7 @@ function Router() {
         <Route path="/admin/payments" component={AdminPayments} />
         <Route path="/admin/config" component={AdminConfig} />
         <Route path="/admin/mt5" component={AdminMt5} />
+        <Route path="/admin/content" component={AdminContent} />
         
         <Route component={NotFound} />
       </Switch>

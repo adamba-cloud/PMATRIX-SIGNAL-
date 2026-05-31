@@ -13,6 +13,10 @@ import {
   ShieldCheck,
   Cpu,
   GitFork,
+  ImageIcon,
+  Newspaper,
+  BookOpen,
+  FolderOpen,
 } from "lucide-react";
 import { Button } from "./ui/button";
 
@@ -92,6 +96,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/payments" icon={CreditCard}>Payments</SidebarLink>
                 <SidebarLink href="/mt5" icon={Cpu}>MT5 Accounts</SidebarLink>
                 <SidebarLink href="/copy-trading" icon={GitFork}>Copy Trading</SidebarLink>
+                <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 mt-4">
+                  Content
+                </div>
+                <SidebarLink href="/gallery" icon={ImageIcon}>Gallery</SidebarLink>
+                <SidebarLink href="/news" icon={Newspaper}>News</SidebarLink>
+                <SidebarLink href="/resources" icon={BookOpen}>Resources</SidebarLink>
+                <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 mt-4">
+                  Account
+                </div>
                 <SidebarLink href="/profile" icon={UserIcon}>Profile</SidebarLink>
               </>
             ) : (
@@ -105,6 +118,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/admin/payments" icon={CreditCard}>Payments</SidebarLink>
                 <SidebarLink href="/admin/config" icon={Settings}>System Config</SidebarLink>
                 <SidebarLink href="/admin/mt5" icon={Cpu}>MT5 Accounts</SidebarLink>
+                <SidebarLink href="/admin/content" icon={FolderOpen}>Content</SidebarLink>
                 <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 mt-4">
                   User View
                 </div>

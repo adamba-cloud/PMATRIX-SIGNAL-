@@ -1,0 +1,170 @@
+Implement Media Management and News Management modules.
+
+Requirements:
+
+ADMIN DASHBOARD
+
+Create a new Content Management section with the following features:
+
+1. Media Uploads
+
+Admin can upload:
+
+- Trading Images
+- Trading Videos
+- Educational Videos
+- Market Analysis Images
+
+Uploads must support files selected directly from a mobile phone gallery.
+
+Storage:
+
+public/uploads/media/
+
+Supported Formats:
+
+Images:
+
+- JPG
+- JPEG
+- PNG
+- WEBP
+
+Videos:
+
+- MP4
+- MOV
+- WEBM
+
+Configure Multer:
+
+- Maximum upload size: 100MB
+
+Configure Express:
+
+express.json({ limit: "100mb" })
+
+express.urlencoded({
+limit: "100mb",
+extended: true
+})
+
+2. Trading News Management
+
+Admin can:
+
+- Create News
+- Edit News
+- Delete News
+- Publish News
+
+Fields:
+
+- Title
+- Summary
+- Content
+- Featured Image
+- Publish Date
+
+3. External Training Links
+
+Admin can add:
+
+- YouTube Links
+- Website Links
+- Telegram Links
+- Educational Resources
+
+Fields:
+
+- Title
+- Description
+- URL
+
+DATABASE
+
+Create Prisma models:
+
+Media
+News
+ResourceLink
+
+Include:
+
+- id
+- title
+- description
+- fileUrl
+- createdAt
+- updatedAt
+
+USER DASHBOARD
+
+Add new menu items:
+
+1. Gallery
+
+Display all uploaded:
+
+- Images
+- Videos
+
+Features:
+
+- Grid Layout
+- Video Player
+- Image Preview
+- Mobile Responsive
+
+Latest uploads appear first.
+
+2. News
+
+Display all published trading news.
+
+Features:
+
+- News Cards
+- Featured Image
+- Full News View
+- Search News
+
+Latest news appears first.
+
+3. Resources
+
+Display all admin uploaded links.
+
+Features:
+
+- Open External Link
+- Resource Description
+- Mobile Friendly Layout
+
+API REQUIREMENTS
+
+Create REST APIs:
+
+/api/media
+/api/news
+/api/resources
+
+Support:
+
+- Create
+- Read
+- Update
+- Delete
+
+Security:
+
+- Only ADMIN can create, edit, or delete content.
+- USER role can only view published content.
+
+UI REQUIREMENTS
+
+Maintain existing premium dark-theme SaaS design.
+
+Media pages must be fully responsive and optimized for mobile users.
+
+Generate complete Prisma schema updates, backend APIs, file upload handlers, admin pages, and user dashboard pages.
