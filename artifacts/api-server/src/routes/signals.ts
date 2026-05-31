@@ -2,10 +2,11 @@ import { Router } from "express";
 import { db, signalsTable } from "@workspace/db";
 import { desc } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
+import { requireSubscription } from "../lib/require-subscription";
 
 const router = Router();
 
-router.get("/signals", requireAuth, async (_req, res): Promise<void> => {
+router.get("/signals", requireAuth, requireSubscription, async (_req, res): Promise<void> => {
   const signals = await db.select().from(signalsTable).orderBy(desc(signalsTable.createdAt)).limit(50);
   res.json(signals.map(s => ({
     id: s.id,
@@ -20,7 +21,7 @@ router.get("/signals", requireAuth, async (_req, res): Promise<void> => {
   })));
 });
 
-router.get("/signals/summary", requireAuth, async (_req, res): Promise<void> => {
+router.get("/signals/summary", requireAuth, requireSubscription, async (_req, res): Promise<void> => {
   const signals = await db.select().from(signalsTable).orderBy(desc(signalsTable.createdAt)).limit(100);
 
   const closed = signals.filter(s => s.status === "CLOSED");

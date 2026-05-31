@@ -1,0 +1,2 @@
+- [Express Request augmentation](express-augment.md) — must use global `Express.Request` namespace in a `.d.ts` file; not `declare module "express"` inside a TS module.
+- [Subscription expiry enforcement](subscription-expiry.md) — background job + middleware pattern for gating signal access behind active subscriptions.
