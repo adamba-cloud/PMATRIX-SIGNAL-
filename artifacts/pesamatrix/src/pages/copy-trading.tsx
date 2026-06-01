@@ -12,6 +12,7 @@ import {
   type CopyTradeLink,
   type CopyTradeLog,
   type CopyTradeStatus,
+  type LotSizeType,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -99,6 +100,7 @@ function AddLinkDialog({ onSuccess }: { onSuccess: () => void }) {
   const [open, setOpen] = useState(false);
   const [masterAccountId, setMasterAccountId] = useState("");
   const [slaveAccountId, setSlaveAccountId] = useState("");
+  const [lotSizeType, setLotSizeType] = useState<LotSizeType>("FIXED");
   const [volumeMultiplier, setVolumeMultiplier] = useState("1");
   const { toast } = useToast();
   const { data: accounts = [] } = useGetMt5Accounts();
@@ -119,6 +121,7 @@ function AddLinkDialog({ onSuccess }: { onSuccess: () => void }) {
         data: {
           masterAccountId: parseInt(masterAccountId, 10),
           slaveAccountId: parseInt(slaveAccountId, 10),
+          lotSizeType,
           volumeMultiplier: parseFloat(volumeMultiplier) || 1,
         },
       },
@@ -128,6 +131,7 @@ function AddLinkDialog({ onSuccess }: { onSuccess: () => void }) {
           setOpen(false);
           setMasterAccountId("");
           setSlaveAccountId("");
+          setLotSizeType("FIXED");
           setVolumeMultiplier("1");
           onSuccess();
         },
@@ -192,21 +196,66 @@ function AddLinkDialog({ onSuccess }: { onSuccess: () => void }) {
             </Select>
           </div>
 
+          {/* Lot Size Mode */}
           <div className="space-y-2">
-            <Label className="text-slate-300">Volume Multiplier</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0.01"
-              max="100"
-              value={volumeMultiplier}
-              onChange={(e) => setVolumeMultiplier(e.target.value)}
-              className="bg-slate-800 border-slate-700 text-slate-50"
-            />
-            <p className="text-xs text-slate-500">
-              1.0 = exact copy · 0.5 = half volume · 2.0 = double volume
-            </p>
+            <Label className="text-slate-300">Lot Size Mode</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setLotSizeType("FIXED")}
+                className={`rounded-md border px-3 py-2.5 text-sm font-medium transition-colors text-left ${
+                  lotSizeType === "FIXED"
+                    ? "border-green-500 bg-green-500/10 text-green-400"
+                    : "border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600"
+                }`}
+              >
+                <p className="font-semibold">Fixed Lots</p>
+                <p className="text-xs opacity-70 mt-0.5">Use volume multiplier</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLotSizeType("PROPORTIONAL")}
+                className={`rounded-md border px-3 py-2.5 text-sm font-medium transition-colors text-left ${
+                  lotSizeType === "PROPORTIONAL"
+                    ? "border-blue-500 bg-blue-500/10 text-blue-400"
+                    : "border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600"
+                }`}
+              >
+                <p className="font-semibold">Proportional</p>
+                <p className="text-xs opacity-70 mt-0.5">Scale by account balance</p>
+              </button>
+            </div>
           </div>
+
+          {/* Conditional fields */}
+          {lotSizeType === "FIXED" ? (
+            <div className="space-y-2">
+              <Label className="text-slate-300">Volume Multiplier</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max="100"
+                value={volumeMultiplier}
+                onChange={(e) => setVolumeMultiplier(e.target.value)}
+                className="bg-slate-800 border-slate-700 text-slate-50"
+              />
+              <p className="text-xs text-slate-500">
+                1.0 = exact copy · 0.5 = half volume · 2.0 = double volume
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-md bg-blue-500/5 border border-blue-500/20 p-3 space-y-1.5">
+              <p className="text-xs font-semibold text-blue-400">Proportional Risk Mode</p>
+              <p className="text-xs text-slate-400">
+                Lot size = Master Lots × (Slave Balance ÷ Master Balance)
+              </p>
+              <p className="text-xs text-slate-500">
+                Example: Master $10,000 trades 1.00 lot → Slave $1,000 gets 0.10 lot.
+                Minimum enforced: 0.01 lot.
+              </p>
+            </div>
+          )}
 
           <div className="rounded-md bg-slate-800 border border-slate-700 p-3 space-y-1">
             <p className="text-xs font-medium text-slate-300">Exact SL &amp; TP mapping</p>
@@ -290,8 +339,17 @@ function LinkCard({
               </div>
             </div>
 
-            <div className="mt-3 flex items-center gap-3 text-xs text-slate-500">
-              <span>Volume: <span className="text-slate-300 font-mono">×{link.volumeMultiplier}</span></span>
+            <div className="mt-3 flex items-center gap-3 flex-wrap text-xs text-slate-500">
+              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium border ${
+                link.lotSizeType === "PROPORTIONAL"
+                  ? "text-blue-400 bg-blue-500/10 border-blue-500/20"
+                  : "text-slate-300 bg-slate-700/50 border-slate-700"
+              }`}>
+                {link.lotSizeType === "PROPORTIONAL" ? "Proportional" : "Fixed"}
+              </span>
+              {link.lotSizeType === "FIXED" && (
+                <span>×<span className="text-slate-300 font-mono">{link.volumeMultiplier}</span></span>
+              )}
               <span>·</span>
               <span className={link.isActive ? "text-green-400" : "text-slate-500"}>
                 {link.isActive ? "Active" : "Paused"}
@@ -409,7 +467,7 @@ function AuditLogTable({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-900/60">
-                  {["Time", "Master", "Slave", "Symbol", "Dir", "Volume", "SL", "TP", "Status", "Error"].map((h) => (
+                  {["Time", "Master", "Slave", "Symbol", "Dir", "Master Lots", "Exec Lots", "Master Bal", "Slave Bal", "SL", "TP", "Status", "Result"].map((h) => (
                     <th key={h} className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap">
                       {h}
                     </th>
@@ -458,7 +516,8 @@ function AuditLogTable({
 
 function LogRow({ log, loginFor }: { log: CopyTradeLog; loginFor: (id: number) => string }) {
   const fmt = (v: string | null) => (v ? parseFloat(v).toFixed(5) : "—");
-  const fmtVol = (v: string) => parseFloat(v).toFixed(2);
+  const fmtVol = (v: string | null) => (v ? parseFloat(v).toFixed(2) : "—");
+  const fmtBal = (v: string | null) => (v ? `$${parseFloat(v).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "—");
   const time = new Date(log.createdAt).toLocaleString(undefined, {
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
@@ -474,7 +533,10 @@ function LogRow({ log, loginFor }: { log: CopyTradeLog; loginFor: (id: number) =
           {log.direction}
         </span>
       </td>
-      <td className="px-3 py-2 font-mono text-slate-300">{fmtVol(log.volume)}</td>
+      <td className="px-3 py-2 font-mono text-slate-400 text-xs">{fmtVol(log.masterLots)}</td>
+      <td className="px-3 py-2 font-mono text-slate-100 text-xs font-semibold">{fmtVol(log.calculatedLots ?? log.volume)}</td>
+      <td className="px-3 py-2 font-mono text-slate-400 text-xs">{fmtBal(log.masterBalance)}</td>
+      <td className="px-3 py-2 font-mono text-slate-400 text-xs">{fmtBal(log.slaveBalance)}</td>
       <td className="px-3 py-2 font-mono text-slate-400 text-xs">{fmt(log.stopLoss)}</td>
       <td className="px-3 py-2 font-mono text-slate-400 text-xs">{fmt(log.takeProfit)}</td>
       <td className="px-3 py-2">

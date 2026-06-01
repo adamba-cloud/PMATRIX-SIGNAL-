@@ -1,6 +1,8 @@
-import { pgTable, serial, integer, boolean, numeric, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, boolean, numeric, timestamp, unique, pgEnum } from "drizzle-orm/pg-core";
 import { slaveAccountsTable } from "./slave_accounts";
 import { usersTable } from "./users";
+
+export const lotSizeTypeEnum = pgEnum("lot_size_type", ["FIXED", "PROPORTIONAL"]);
 
 export const copyTradeLinksTable = pgTable(
   "copy_trade_links",
@@ -18,6 +20,7 @@ export const copyTradeLinksTable = pgTable(
     volumeMultiplier: numeric("volume_multiplier", { precision: 10, scale: 4 })
       .notNull()
       .default("1"),
+    lotSizeType: lotSizeTypeEnum("lot_size_type").notNull().default("FIXED"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),

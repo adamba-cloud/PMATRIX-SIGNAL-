@@ -160,6 +160,11 @@ export interface MetaApiTradeResult {
   orderId?: string;
 }
 
+export async function getAccountBalance(metaApiId: string): Promise<number | null> {
+  const account = await getMetaApiAccount(metaApiId);
+  return account.balance ?? null;
+}
+
 export async function getAccountPositions(metaApiId: string): Promise<MetaApiPosition[]> {
   const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}/positions`, {
     headers: headers(),

@@ -11,9 +11,16 @@ import { logger } from "../lib/logger";
 
 const router = Router();
 
+type LotSizeType = "FIXED" | "PROPORTIONAL";
+
 function num(v: unknown): number | undefined {
   const n = Number(v);
   return isNaN(n) || v === "" || v == null ? undefined : n;
+}
+
+function parseLotSizeType(v: unknown): LotSizeType | undefined {
+  if (v === "FIXED" || v === "PROPORTIONAL") return v;
+  return undefined;
 }
 
 function formatLink(l: typeof copyTradeLinksTable.$inferSelect) {
@@ -22,6 +29,7 @@ function formatLink(l: typeof copyTradeLinksTable.$inferSelect) {
     masterAccountId: l.masterAccountId,
     slaveAccountId: l.slaveAccountId,
     volumeMultiplier: l.volumeMultiplier,
+    lotSizeType: l.lotSizeType,
     isActive: l.isActive,
     createdAt: l.createdAt.toISOString(),
     updatedAt: l.updatedAt.toISOString(),
@@ -42,6 +50,10 @@ function formatLog(l: typeof copyTradeLogsTable.$inferSelect) {
     entryPrice: l.entryPrice ?? null,
     stopLoss: l.stopLoss ?? null,
     takeProfit: l.takeProfit ?? null,
+    masterBalance: l.masterBalance ?? null,
+    slaveBalance: l.slaveBalance ?? null,
+    masterLots: l.masterLots ?? null,
+    calculatedLots: l.calculatedLots ?? null,
     status: l.status,
     errorMessage: l.errorMessage ?? null,
     executedAt: l.executedAt?.toISOString() ?? null,
@@ -83,6 +95,7 @@ router.post("/copy-trading/links", requireAuth, async (req, res): Promise<void> 
   const masterAccountId = num(req.body.masterAccountId);
   const slaveAccountId = num(req.body.slaveAccountId);
   const volumeMultiplier = String(parseFloat(req.body.volumeMultiplier ?? "1") || 1);
+  const lotSizeType: LotSizeType = parseLotSizeType(req.body.lotSizeType) ?? "FIXED";
 
   if (!masterAccountId || !slaveAccountId) {
     res.status(400).json({ error: "masterAccountId and slaveAccountId are required" });
@@ -107,14 +120,14 @@ router.post("/copy-trading/links", requireAuth, async (req, res): Promise<void> 
   try {
     const [link] = await db
       .insert(copyTradeLinksTable)
-      .values({ masterAccountId, slaveAccountId, userId: req.userId!, volumeMultiplier, isActive: true })
+      .values({ masterAccountId, slaveAccountId, userId: req.userId!, volumeMultiplier, lotSizeType, isActive: true })
       .onConflictDoUpdate({
         target: [copyTradeLinksTable.masterAccountId, copyTradeLinksTable.slaveAccountId],
-        set: { isActive: true, volumeMultiplier, updatedAt: new Date() },
+        set: { isActive: true, volumeMultiplier, lotSizeType, updatedAt: new Date() },
       })
       .returning();
 
-    logger.info({ linkId: link.id, masterAccountId, slaveAccountId }, "Copy trade link created");
+    logger.info({ linkId: link.id, masterAccountId, slaveAccountId, lotSizeType }, "Copy trade link created");
     res.status(201).json(formatLink(link));
   } catch (err) {
     logger.error({ err }, "Failed to create copy trade link");
@@ -140,6 +153,8 @@ router.patch("/copy-trading/links/:id", requireAuth, async (req, res): Promise<v
   if (req.body.volumeMultiplier !== undefined) {
     updates.volumeMultiplier = String(parseFloat(req.body.volumeMultiplier) || 1);
   }
+  const newLotSizeType = parseLotSizeType(req.body.lotSizeType);
+  if (newLotSizeType !== undefined) updates.lotSizeType = newLotSizeType;
 
   const [updated] = await db
     .update(copyTradeLinksTable)

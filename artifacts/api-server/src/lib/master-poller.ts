@@ -7,15 +7,75 @@ import {
 } from "@workspace/db";
 import { getRedis } from "./redis";
 import { getCopyTradeQueue } from "./copy-trade-queue";
-import { getAccountPositions, type MetaApiPosition } from "./metaapi";
+import { getAccountPositions, getAccountBalance, type MetaApiPosition } from "./metaapi";
 import { updateMasterHeartbeat } from "./connection-watchdog";
 import { logger } from "./logger";
 
 const POLL_INTERVAL_MS = 5_000;
 const POSITION_KEY = (metaApiId: string) => `master:positions:${metaApiId}`;
+const MIN_LOT_SIZE = 0.01;
 
 function positionDirection(type: MetaApiPosition["type"]): "BUY" | "SELL" {
   return type === "POSITION_TYPE_BUY" ? "BUY" : "SELL";
+}
+
+function applyLotProtection(raw: number): number {
+  return Math.max(MIN_LOT_SIZE, parseFloat(raw.toFixed(2)));
+}
+
+async function calculateVolume(
+  masterLots: number,
+  slave: {
+    lotSizeType: "FIXED" | "PROPORTIONAL";
+    volumeMultiplier: number;
+    metaApiId: string;
+  },
+  masterMetaApiId: string
+): Promise<{
+  volume: number;
+  masterBalance: number | null;
+  slaveBalance: number | null;
+}> {
+  if (slave.lotSizeType === "PROPORTIONAL") {
+    try {
+      const [masterBalance, slaveBalance] = await Promise.all([
+        getAccountBalance(masterMetaApiId),
+        getAccountBalance(slave.metaApiId),
+      ]);
+
+      if (masterBalance != null && masterBalance > 0 && slaveBalance != null) {
+        const riskMultiplier = slaveBalance / masterBalance;
+        const volume = applyLotProtection(masterLots * riskMultiplier);
+        return { volume, masterBalance, slaveBalance };
+      }
+
+      logger.warn(
+        { masterMetaApiId, slaveMetaApiId: slave.metaApiId, masterBalance, slaveBalance },
+        "Master poller: balance unavailable for PROPORTIONAL — falling back to FIXED"
+      );
+      return {
+        volume: applyLotProtection(masterLots * slave.volumeMultiplier),
+        masterBalance,
+        slaveBalance,
+      };
+    } catch (err) {
+      logger.warn(
+        { err, masterMetaApiId, slaveMetaApiId: slave.metaApiId },
+        "Master poller: failed to fetch balances for PROPORTIONAL — falling back to FIXED"
+      );
+      return {
+        volume: applyLotProtection(masterLots * slave.volumeMultiplier),
+        masterBalance: null,
+        slaveBalance: null,
+      };
+    }
+  }
+
+  return {
+    volume: applyLotProtection(masterLots * slave.volumeMultiplier),
+    masterBalance: null,
+    slaveBalance: null,
+  };
 }
 
 async function pollMaster(master: {
@@ -26,6 +86,7 @@ async function pollMaster(master: {
     accountId: number;
     metaApiId: string;
     volumeMultiplier: number;
+    lotSizeType: "FIXED" | "PROPORTIONAL";
     userId: number;
   }>;
 }): Promise<void> {
@@ -36,7 +97,6 @@ async function pollMaster(master: {
   let positions: MetaApiPosition[];
   try {
     positions = await getAccountPositions(master.metaApiId);
-    // Heartbeat: signal to the connection watchdog that this master is alive
     await updateMasterHeartbeat(master.metaApiId);
   } catch (err) {
     logger.warn({ err, masterMetaApiId: master.metaApiId }, "Master poller: failed to fetch positions");
@@ -44,15 +104,10 @@ async function pollMaster(master: {
   }
 
   const currentIds = new Set(positions.map((p) => p.id));
-
-  // Load last known position IDs from Redis
   const stored = await redis.smembers(posKey);
   const knownIds = new Set(stored);
-
-  // Detect new positions (opened since last poll)
   const newPositions = positions.filter((p) => !knownIds.has(p.id));
 
-  // Update Redis with current position set
   if (currentIds.size > 0) {
     await redis.del(posKey);
     await redis.sadd(posKey, ...Array.from(currentIds));
@@ -67,17 +122,31 @@ async function pollMaster(master: {
     "Master poller: new positions detected"
   );
 
-  // Fan out to all active slaves using Promise.allSettled (one failure ≠ stop others)
   await Promise.allSettled(
     newPositions.flatMap((position) =>
       master.slaves.map(async (slave) => {
         try {
           const direction = positionDirection(position.type);
-          const volume = parseFloat(
-            (position.volume * slave.volumeMultiplier).toFixed(2)
+          const masterLots = position.volume;
+
+          const { volume, masterBalance, slaveBalance } = await calculateVolume(
+            masterLots,
+            slave,
+            master.metaApiId
           );
 
-          // Create audit log entry (PENDING)
+          logger.info(
+            {
+              mode: slave.lotSizeType,
+              masterLots,
+              calculatedLots: volume,
+              masterBalance,
+              slaveBalance,
+              slaveAccountId: slave.accountId,
+            },
+            "Master poller: lot size calculated"
+          );
+
           const [log] = await db
             .insert(copyTradeLogsTable)
             .values({
@@ -91,10 +160,13 @@ async function pollMaster(master: {
               stopLoss: position.stopLoss != null ? String(position.stopLoss) : null,
               takeProfit: position.takeProfit != null ? String(position.takeProfit) : null,
               status: "PENDING",
+              masterBalance: masterBalance != null ? String(masterBalance) : null,
+              slaveBalance: slaveBalance != null ? String(slaveBalance) : null,
+              masterLots: String(masterLots),
+              calculatedLots: String(volume),
             })
             .returning();
 
-          // Queue the copy job
           const job = await queue.add(
             `copy:${position.id}:${slave.accountId}`,
             {
@@ -114,14 +186,13 @@ async function pollMaster(master: {
             }
           );
 
-          // Save BullMQ job ID back into the log row
           await db
             .update(copyTradeLogsTable)
             .set({ jobId: job.id ?? null, updatedAt: new Date() })
             .where(eq(copyTradeLogsTable.id, log.id));
 
           logger.info(
-            { logId: log.id, jobId: job.id, slave: slave.accountId },
+            { logId: log.id, jobId: job.id, slaveAccountId: slave.accountId },
             "Master poller: copy job queued"
           );
         } catch (err) {
@@ -138,7 +209,6 @@ async function pollMaster(master: {
 async function runPollCycle(): Promise<void> {
   if (!process.env.METAAPI_TOKEN) return;
 
-  // Fetch all active copy links with connected master accounts
   const links = await db
     .select({
       linkId: copyTradeLinksTable.id,
@@ -146,6 +216,7 @@ async function runPollCycle(): Promise<void> {
       masterMetaApiId: slaveAccountsTable.metaApiAccountId,
       slaveAccountId: copyTradeLinksTable.slaveAccountId,
       volumeMultiplier: copyTradeLinksTable.volumeMultiplier,
+      lotSizeType: copyTradeLinksTable.lotSizeType,
       userId: copyTradeLinksTable.userId,
     })
     .from(copyTradeLinksTable)
@@ -161,8 +232,6 @@ async function runPollCycle(): Promise<void> {
 
   if (links.length === 0) return;
 
-  // Fetch slave MetaApi IDs separately
-  const slaveIds = [...new Set(links.map((l) => l.slaveAccountId))];
   const slaveAccounts = await db
     .select({ id: slaveAccountsTable.id, metaApiAccountId: slaveAccountsTable.metaApiAccountId })
     .from(slaveAccountsTable)
@@ -177,7 +246,6 @@ async function runPollCycle(): Promise<void> {
     slaveAccounts.map((s) => [s.id, s.metaApiAccountId!])
   );
 
-  // Group links by master account
   const masterMap = new Map<
     number,
     {
@@ -188,6 +256,7 @@ async function runPollCycle(): Promise<void> {
         accountId: number;
         metaApiId: string;
         volumeMultiplier: number;
+        lotSizeType: "FIXED" | "PROPORTIONAL";
         userId: number;
       }>;
     }
@@ -196,7 +265,7 @@ async function runPollCycle(): Promise<void> {
   for (const link of links) {
     if (!link.masterMetaApiId) continue;
     const slaveMetaApi = slaveMetaApiMap.get(link.slaveAccountId);
-    if (!slaveMetaApi) continue; // slave not connected, skip
+    if (!slaveMetaApi) continue;
 
     if (!masterMap.has(link.masterAccountId)) {
       masterMap.set(link.masterAccountId, {
@@ -211,11 +280,11 @@ async function runPollCycle(): Promise<void> {
       accountId: link.slaveAccountId,
       metaApiId: slaveMetaApi,
       volumeMultiplier: parseFloat(link.volumeMultiplier ?? "1"),
+      lotSizeType: (link.lotSizeType ?? "FIXED") as "FIXED" | "PROPORTIONAL",
       userId: link.userId,
     });
   }
 
-  // Poll all masters concurrently — failures are isolated per master
   await Promise.allSettled(
     Array.from(masterMap.values()).map((master) =>
       pollMaster(master).catch((err) =>

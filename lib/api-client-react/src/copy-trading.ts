@@ -16,11 +16,14 @@ import type { ErrorType } from "./custom-fetch";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type LotSizeType = "FIXED" | "PROPORTIONAL";
+
 export interface CopyTradeLink {
   id: number;
   masterAccountId: number;
   slaveAccountId: number;
   volumeMultiplier: string;
+  lotSizeType: LotSizeType;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -30,11 +33,13 @@ export interface CreateCopyTradeLinkInput {
   masterAccountId: number;
   slaveAccountId: number;
   volumeMultiplier?: number;
+  lotSizeType?: LotSizeType;
 }
 
 export interface UpdateCopyTradeLinkInput {
   isActive?: boolean;
   volumeMultiplier?: number;
+  lotSizeType?: LotSizeType;
 }
 
 export type CopyTradeStatus = "PENDING" | "SUCCESS" | "FAILED" | "SKIPPED";
@@ -52,6 +57,10 @@ export interface CopyTradeLog {
   entryPrice: string | null;
   stopLoss: string | null;
   takeProfit: string | null;
+  masterBalance: string | null;
+  slaveBalance: string | null;
+  masterLots: string | null;
+  calculatedLots: string | null;
   status: CopyTradeStatus;
   errorMessage: string | null;
   executedAt: string | null;
