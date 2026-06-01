@@ -1,3 +1,4 @@
+import { Component, type ReactNode } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -5,6 +6,35 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/theme";
 import NotFound from "@/pages/not-found";
 import { AppLayout } from "@/components/layout";
+
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      const err = this.state.error as Error;
+      return (
+        <div style={{ padding: 32, background: "#0f172a", minHeight: "100vh", color: "#f1f5f9", fontFamily: "monospace" }}>
+          <div style={{ maxWidth: 720, margin: "0 auto" }}>
+            <h1 style={{ color: "#ef4444", fontSize: 20, marginBottom: 8 }}>Application Error</h1>
+            <p style={{ color: "#94a3b8", marginBottom: 16 }}>Something crashed on startup. Please report this error:</p>
+            <pre style={{ background: "#1e293b", padding: 16, borderRadius: 8, overflowX: "auto", fontSize: 13, color: "#fca5a5" }}>
+              {err.name}: {err.message}
+              {"\n\n"}
+              {err.stack}
+            </pre>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 import Home from "@/pages/home";
 import Login from "@/pages/login";
@@ -82,16 +112,18 @@ function Router() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, "") || ""}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
