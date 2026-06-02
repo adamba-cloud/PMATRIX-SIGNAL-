@@ -6,6 +6,9 @@ import { db, advertisementsTable, advertisementSettingsTable } from "@workspace/
 import { eq, and, desc, lte, gte, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import type { AuthedRequest } from "../lib/auth";
+import { initiateStkPush, formatPhone } from "../lib/daraja";
+import { paymentsTable } from "@workspace/db";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -178,6 +181,111 @@ router.post(
     }
   }
 );
+
+// ─── Pay for Advertisement (M-Pesa STK Push) ─────────────────────────────────
+
+function getCallbackUrl(req: import("express").Request): string {
+  const base = process.env["DARAJA_CALLBACK_BASE_URL"];
+  if (base) {
+    return base.includes("/api/payments/mpesa/callback")
+      ? base.trim()
+      : `${base.replace(/\/+$/, "").replace(/\/api\/.*/,"")}/api/payments/mpesa/callback`;
+  }
+  const domains = process.env["REPLIT_DOMAINS"];
+  if (domains) return `https://${domains.split(",")[0].trim()}/api/payments/mpesa/callback`;
+  const devDomain = process.env["REPLIT_DEV_DOMAIN"];
+  if (devDomain) return `https://${devDomain}/api/payments/mpesa/callback`;
+  const host = req.get("host") ?? "localhost";
+  const proto = req.get("x-forwarded-proto") ?? req.protocol;
+  return `${proto}://${host}/api/payments/mpesa/callback`;
+}
+
+router.post("/advertisements/:id/pay", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const user = (req as AuthedRequest).user;
+    const adId = parseInt(req.params.id, 10);
+    const { phoneNumber } = req.body as { phoneNumber?: string };
+
+    if (!phoneNumber) {
+      res.status(400).json({ error: "phoneNumber is required" });
+      return;
+    }
+
+    const [ad] = await db
+      .select()
+      .from(advertisementsTable)
+      .where(and(eq(advertisementsTable.id, adId), eq(advertisementsTable.userId, user.id)));
+
+    if (!ad) {
+      res.status(404).json({ error: "Advertisement not found" });
+      return;
+    }
+    if (ad.isPaid) {
+      res.status(400).json({ error: "Advertisement already paid" });
+      return;
+    }
+
+    let formattedPhone: string;
+    try {
+      formattedPhone = formatPhone(phoneNumber);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Invalid phone number";
+      res.status(400).json({ error: msg });
+      return;
+    }
+
+    const totalAmount = parseFloat(ad.totalAmount);
+
+    const [payment] = await db
+      .insert(paymentsTable)
+      .values({
+        userId: user.id,
+        advertisementId: adId,
+        amount: ad.totalAmount,
+        status: "PENDING",
+        method: "MPESA",
+        phoneNumber: formattedPhone,
+      })
+      .returning();
+
+    let stkResult: Awaited<ReturnType<typeof initiateStkPush>>;
+    try {
+      stkResult = await initiateStkPush({
+        phoneNumber: formattedPhone,
+        amount: totalAmount,
+        accountReference: `AD-${adId}`,
+        transactionDesc: `PESAMATRIX Ad: ${ad.title.substring(0, 20)}`,
+        callbackUrl: getCallbackUrl(req),
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "STK Push failed";
+      logger.error({ err, paymentId: payment.id }, "Ad STK Push failed");
+      await db
+        .update(paymentsTable)
+        .set({ status: "FAILED", failureReason: msg })
+        .where(eq(paymentsTable.id, payment.id));
+      res.status(502).json({ error: msg });
+      return;
+    }
+
+    await db
+      .update(paymentsTable)
+      .set({
+        checkoutRequestId: stkResult.CheckoutRequestID,
+        merchantRequestId: stkResult.MerchantRequestID,
+      })
+      .where(eq(paymentsTable.id, payment.id));
+
+    res.json({
+      checkoutRequestId: stkResult.CheckoutRequestID,
+      merchantRequestId: stkResult.MerchantRequestID,
+      paymentId: payment.id,
+      message: stkResult.CustomerMessage,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to initiate payment" });
+  }
+});
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 

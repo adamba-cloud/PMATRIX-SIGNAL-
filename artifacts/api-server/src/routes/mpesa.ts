@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, paymentsTable, subscriptionsTable, systemConfigTable } from "@workspace/db";
+import { db, paymentsTable, subscriptionsTable, systemConfigTable, advertisementsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { initiateStkPush, parseCallback, formatPhone, type DarajaCallbackBody } from "../lib/daraja";
 import { requireAuth } from "../lib/auth";
@@ -193,6 +193,14 @@ router.post("/payments/mpesa/callback", async (req, res): Promise<void> => {
             .set({ status: "ACTIVE", startDate: now, endDate })
             .where(eq(subscriptionsTable.id, payment.subscriptionId));
         }
+      }
+
+      if (payment.advertisementId) {
+        await db
+          .update(advertisementsTable)
+          .set({ isPaid: true, updatedAt: new Date() })
+          .where(eq(advertisementsTable.id, payment.advertisementId));
+        logger.info({ advertisementId: payment.advertisementId }, "Advertisement marked as paid");
       }
 
       logger.info({ paymentId: payment.id, receipt: parsed.mpesaReceiptNumber }, "Payment completed");

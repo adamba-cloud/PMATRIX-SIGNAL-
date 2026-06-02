@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, numeric, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, numeric, timestamp, pgEnum, boolean } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 
 export const adStatusEnum = pgEnum("ad_status", ["PENDING", "APPROVED", "REJECTED", "EXPIRED", "PAUSED"]);
@@ -17,6 +17,7 @@ export const advertisementsTable = pgTable("advertisements", {
   totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
+  isPaid: boolean("is_paid").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -29,8 +29,16 @@ export interface Advertisement {
   totalAmount: string;
   startDate: string | null;
   endDate: string | null;
+  isPaid: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdPaymentResponse {
+  checkoutRequestId: string;
+  merchantRequestId: string;
+  paymentId: number;
+  message: string;
 }
 
 export interface AdvertisementSettings {
@@ -90,6 +98,21 @@ export const useGetMyAdvertisements = <
     queryFn: () => customFetch<Advertisement[]>("/api/advertisements/mine", { method: "GET" }),
     ...options?.query,
   } as UseQueryOptions<Advertisement[], TError, TData>);
+
+// ─── Initiate Ad Payment (M-Pesa STK Push) ───────────────────────────────────
+
+export const useInitiateAdPayment = <TError = ErrorType<unknown>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<AdPaymentResponse, TError, { id: number; phoneNumber: string }, TContext>;
+  }
+): UseMutationResult<AdPaymentResponse, TError, { id: number; phoneNumber: string }, TContext> => {
+  const mutationFn: MutationFunction<AdPaymentResponse, { id: number; phoneNumber: string }> = ({ id, phoneNumber }) =>
+    customFetch<AdPaymentResponse>(`/api/advertisements/${id}/pay`, {
+      method: "POST",
+      body: JSON.stringify({ phoneNumber }),
+    });
+  return useMutation({ mutationFn, ...options?.mutation });
+};
 
 // ─── Create Ad (user) ─────────────────────────────────────────────────────────
 
