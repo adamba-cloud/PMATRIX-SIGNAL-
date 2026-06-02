@@ -182,6 +182,36 @@ router.post(
   }
 );
 
+// ─── My Ad Payments ───────────────────────────────────────────────────────────
+
+router.get("/advertisements/payments/mine", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const user = (req as AuthedRequest).user;
+    const payments = await db
+      .select({
+        id: paymentsTable.id,
+        advertisementId: paymentsTable.advertisementId,
+        amount: paymentsTable.amount,
+        status: paymentsTable.status,
+        method: paymentsTable.method,
+        phoneNumber: paymentsTable.phoneNumber,
+        mpesaReceiptNumber: paymentsTable.mpesaReceiptNumber,
+        failureReason: paymentsTable.failureReason,
+        createdAt: paymentsTable.createdAt,
+        completedAt: paymentsTable.completedAt,
+        adTitle: advertisementsTable.title,
+        adMediaType: advertisementsTable.mediaType,
+      })
+      .from(paymentsTable)
+      .innerJoin(advertisementsTable, eq(paymentsTable.advertisementId, advertisementsTable.id))
+      .where(eq(paymentsTable.userId, user.id))
+      .orderBy(desc(paymentsTable.createdAt));
+    res.json(payments);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load payment history" });
+  }
+});
+
 // ─── Pay for Advertisement (M-Pesa STK Push) ─────────────────────────────────
 
 function getCallbackUrl(req: import("express").Request): string {

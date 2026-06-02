@@ -6,11 +6,13 @@ import {
   useGetAdvertisementSettings,
   useInitiateAdPayment,
   useGetPaymentStatus,
+  useGetMyAdPayments,
   getGetPaymentStatusQueryKey,
   getMyAdsQueryKey,
   type AdStatus,
   type AdMediaType,
   type Advertisement,
+  type AdPayment,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +37,9 @@ import {
   ArrowLeft,
   BadgeCheck,
   AlertCircle,
+  Receipt,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 // ─── Status config ─────────────────────────────────────────────────────────────
@@ -245,6 +250,97 @@ function PaymentStep({
               Pay KES {totalAmount.toLocaleString()} via M-Pesa
             </Button>
           </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Payment history ───────────────────────────────────────────────────────────
+
+const PAY_STATUS_CONFIG = {
+  COMPLETED: { label: "Paid", color: "text-green-400 bg-green-500/10 border-green-500/20", icon: <CheckCircle2 className="w-3 h-3" /> },
+  PENDING: { label: "Pending", color: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20", icon: <Clock className="w-3 h-3" /> },
+  FAILED: { label: "Failed", color: "text-red-400 bg-red-500/10 border-red-500/20", icon: <XCircle className="w-3 h-3" /> },
+  CANCELLED: { label: "Cancelled", color: "text-slate-400 bg-slate-500/10 border-slate-500/20", icon: <XCircle className="w-3 h-3" /> },
+} as const;
+
+function PaymentRow({ payment }: { payment: AdPayment }) {
+  const cfg = PAY_STATUS_CONFIG[payment.status] ?? PAY_STATUS_CONFIG.PENDING;
+  return (
+    <div className="flex items-center gap-3 py-3 border-b border-slate-800 last:border-0">
+      <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0">
+        <Receipt className="w-4 h-4 text-slate-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <p className="text-sm font-medium text-slate-200 truncate">{payment.adTitle}</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {new Date(payment.createdAt).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              {payment.phoneNumber && ` · ${payment.phoneNumber}`}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-sm font-semibold text-slate-100">KES {parseFloat(payment.amount).toLocaleString()}</span>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.color}`}>
+              {cfg.icon} {cfg.label}
+            </span>
+          </div>
+        </div>
+        {payment.mpesaReceiptNumber && (
+          <div className="flex items-center gap-1.5 mt-1">
+            <BadgeCheck className="w-3 h-3 text-green-500 flex-shrink-0" />
+            <span className="text-xs font-mono text-green-400">{payment.mpesaReceiptNumber}</span>
+          </div>
+        )}
+        {payment.failureReason && (
+          <p className="text-xs text-red-400 mt-1">{payment.failureReason}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PaymentHistorySection() {
+  const { data: payments = [], isLoading } = useGetMyAdPayments();
+  const [expanded, setExpanded] = useState(false);
+
+  if (isLoading) return null;
+  if (payments.length === 0) return null;
+
+  const visible = expanded ? payments : payments.slice(0, 3);
+  const total = payments.filter((p) => p.status === "COMPLETED").reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+  return (
+    <Card className="bg-slate-900/50 border-slate-800">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Receipt className="w-4 h-4 text-slate-400" />
+            <CardTitle className="text-lg text-slate-100">Payment History</CardTitle>
+            <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{payments.length}</span>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-slate-500">Total paid</p>
+            <p className="text-sm font-bold text-green-400">KES {total.toLocaleString()}</p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="divide-y divide-slate-800">
+          {visible.map((p) => <PaymentRow key={p.id} payment={p} />)}
+        </div>
+        {payments.length > 3 && (
+          <button
+            onClick={() => setExpanded((x) => !x)}
+            className="mt-3 w-full flex items-center justify-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors py-1.5"
+          >
+            {expanded
+              ? <><ChevronUp className="w-3.5 h-3.5" /> Show less</>
+              : <><ChevronDown className="w-3.5 h-3.5" /> Show {payments.length - 3} more</>
+            }
+          </button>
         )}
       </CardContent>
     </Card>
@@ -586,6 +682,9 @@ export default function Advertisements() {
           </>
         )
       )}
+
+      {/* Payment history — always visible on list step */}
+      {step === "list" && <PaymentHistorySection />}
     </div>
   );
 }

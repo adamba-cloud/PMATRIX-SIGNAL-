@@ -54,8 +54,38 @@ export interface AdvertisementSettings {
 export const getActiveAdsQueryKey = () => ["/api/advertisements/active"] as const;
 export const getAdSettingsQueryKey = () => ["/api/advertisements/settings"] as const;
 export const getMyAdsQueryKey = () => ["/api/advertisements/mine"] as const;
+export const getMyAdPaymentsQueryKey = () => ["/api/advertisements/payments/mine"] as const;
+
+export interface AdPayment {
+  id: number;
+  advertisementId: number | null;
+  amount: string;
+  status: "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED";
+  method: string;
+  phoneNumber: string | null;
+  mpesaReceiptNumber: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  adTitle: string;
+  adMediaType: AdMediaType;
+}
 export const getAdminAdsQueryKey = () => ["/api/admin/advertisements"] as const;
 export const getAdminAdSettingsQueryKey = () => ["/api/admin/advertisements/settings"] as const;
+
+// ─── My Ad Payments ───────────────────────────────────────────────────────────
+
+export const useGetMyAdPayments = <
+  TData = AdPayment[],
+  TError = ErrorType<unknown>,
+>(
+  options?: { query?: UseQueryOptions<AdPayment[], TError, TData> }
+): UseQueryResult<TData, TError> =>
+  useQuery({
+    queryKey: getMyAdPaymentsQueryKey(),
+    queryFn: () => customFetch<AdPayment[]>("/api/advertisements/payments/mine", { method: "GET" }),
+    ...options?.query,
+  } as UseQueryOptions<AdPayment[], TError, TData>);
 
 // ─── Active Ads (public carousel) ────────────────────────────────────────────
 
