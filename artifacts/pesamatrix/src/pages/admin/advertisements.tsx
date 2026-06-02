@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetAdminAdvertisements,
@@ -104,18 +104,20 @@ export default function AdminAdvertisements() {
   const [feePerDay, setFeePerDay] = useState("");
   const [minDays, setMinDays] = useState("");
   const [maxDays, setMaxDays] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsDirty, setSettingsDirty] = useState(false);
+
+  // Sync local state when settings load
+  const prevSettings = useRef<typeof settings | null>(null);
+  if (settings && settings !== prevSettings.current && !settingsDirty) {
+    prevSettings.current = settings;
+    setFeePerDay(settings.feePerDay);
+    setMinDays(String(settings.minDays));
+    setMaxDays(String(settings.maxDays));
+  }
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: getAdminAdsQueryKey() });
     queryClient.invalidateQueries({ queryKey: getAdminAdSettingsQueryKey() });
-  };
-
-  const handleOpenSettings = () => {
-    setFeePerDay(settings?.feePerDay ?? "100");
-    setMinDays(String(settings?.minDays ?? 1));
-    setMaxDays(String(settings?.maxDays ?? 90));
-    setSettingsOpen(true);
   };
 
   const handleSaveSettings = (e: React.FormEvent) => {
@@ -123,7 +125,7 @@ export default function AdminAdvertisements() {
     settingsMutation.mutate(
       { data: { feePerDay: parseFloat(feePerDay), minDays: parseInt(minDays), maxDays: parseInt(maxDays) } },
       {
-        onSuccess: () => { toast({ title: "Settings saved" }); invalidate(); setSettingsOpen(false); },
+        onSuccess: () => { toast({ title: "Settings saved" }); invalidate(); setSettingsDirty(false); },
         onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
       }
     );
@@ -142,56 +144,70 @@ export default function AdminAdvertisements() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Advertisements</h2>
-          <p className="text-slate-400 mt-1">Review, approve, and manage all platform advertisements.</p>
-        </div>
-        <Button variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800" onClick={handleOpenSettings}>
-          <Settings className="w-4 h-4 mr-2" /> Ad Settings
-        </Button>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">Advertisements</h2>
+        <p className="text-slate-400 mt-1">Review, approve, and manage all platform advertisements.</p>
       </div>
 
-      {/* Settings Inline Panel */}
-      {settingsOpen && (
-        <Card className="bg-slate-900 border-green-500/30">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-slate-100 text-base">Advertisement Settings</CardTitle>
-            <CardDescription className="text-slate-500">Configure pricing and duration limits.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSaveSettings} className="flex flex-wrap items-end gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-slate-400 text-xs">Fee Per Day (KES)</Label>
-                <Input value={feePerDay} onChange={(e) => setFeePerDay(e.target.value)} type="number" min="1" step="1"
-                  className="bg-slate-800 border-slate-700 text-slate-100 w-36" required />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-slate-400 text-xs">Min Days</Label>
-                <Input value={minDays} onChange={(e) => setMinDays(e.target.value)} type="number" min="1"
-                  className="bg-slate-800 border-slate-700 text-slate-100 w-24" required />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-slate-400 text-xs">Max Days</Label>
-                <Input value={maxDays} onChange={(e) => setMaxDays(e.target.value)} type="number" min="1"
-                  className="bg-slate-800 border-slate-700 text-slate-100 w-24" required />
-              </div>
-              <div className="flex gap-2">
-                <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white" disabled={settingsMutation.isPending}>
-                  {settingsMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                  Save
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => setSettingsOpen(false)} className="text-slate-400">Cancel</Button>
-              </div>
-            </form>
-            {settings && (
-              <p className="text-xs text-slate-600 mt-3">
-                Current: KES {parseFloat(settings.feePerDay).toLocaleString()}/day · {settings.minDays}–{settings.maxDays} days
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {/* Settings — always visible */}
+      <Card className="bg-slate-900 border-slate-700">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <Settings className="w-4 h-4 text-green-500" />
+            <CardTitle className="text-slate-100 text-base">Advertisement Pricing Settings</CardTitle>
+          </div>
+          <CardDescription className="text-slate-500">Set the daily rate and allowed campaign duration.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSaveSettings} className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-slate-400 text-xs uppercase tracking-wide">Fee Per Day (KES)</Label>
+              <Input
+                value={feePerDay}
+                onChange={(e) => { setFeePerDay(e.target.value); setSettingsDirty(true); }}
+                type="number" min="1" step="1"
+                className="bg-slate-800 border-slate-700 text-slate-100 w-40"
+                placeholder="e.g. 500"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-slate-400 text-xs uppercase tracking-wide">Min Days</Label>
+              <Input
+                value={minDays}
+                onChange={(e) => { setMinDays(e.target.value); setSettingsDirty(true); }}
+                type="number" min="1"
+                className="bg-slate-800 border-slate-700 text-slate-100 w-24"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-slate-400 text-xs uppercase tracking-wide">Max Days</Label>
+              <Input
+                value={maxDays}
+                onChange={(e) => { setMaxDays(e.target.value); setSettingsDirty(true); }}
+                type="number" min="1"
+                className="bg-slate-800 border-slate-700 text-slate-100 w-24"
+                required
+              />
+            </div>
+            <Button
+              type="submit"
+              className="bg-green-600 hover:bg-green-700 text-white"
+              disabled={settingsMutation.isPending || !settingsDirty}
+            >
+              {settingsMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Save Settings
+            </Button>
+          </form>
+          {settings && (
+            <p className="text-xs text-slate-600 mt-3">
+              Current rate: <span className="text-slate-400">KES {parseFloat(settings.feePerDay).toLocaleString()}/day</span>
+              {" · "}Campaign length: <span className="text-slate-400">{settings.minDays}–{settings.maxDays} days</span>
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Stats */}
       {ads.length > 0 && (

@@ -75,14 +75,16 @@ function PaymentStep({
   ad,
   onSuccess,
   onBack,
+  initialPhone = "",
 }: {
   ad: Advertisement;
   onSuccess: () => void;
   onBack: () => void;
+  initialPhone?: string;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(initialPhone);
   const [stage, setStage] = useState<PayStage>("idle");
   const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null);
   const [pollCount, setPollCount] = useState(0);
@@ -417,6 +419,7 @@ export default function Advertisements() {
 
   const [step, setStep] = useState<Step>("list");
   const [pendingPayAd, setPendingPayAd] = useState<Advertisement | null>(null);
+  const [pendingPhone, setPendingPhone] = useState("");
 
   // Form state
   const [mediaType, setMediaType] = useState<AdMediaType>("IMAGE");
@@ -424,6 +427,7 @@ export default function Advertisements() {
   const [description, setDescription] = useState("");
   const [externalLink, setExternalLink] = useState("");
   const [totalDays, setTotalDays] = useState(7);
+  const [phone, setPhone] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -441,7 +445,7 @@ export default function Advertisements() {
 
   const resetForm = () => {
     setTitle(""); setDescription(""); setExternalLink(""); setTotalDays(7);
-    setFile(null); setPreview(null); setMediaType("IMAGE");
+    setPhone(""); setFile(null); setPreview(null); setMediaType("IMAGE");
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -466,6 +470,7 @@ export default function Advertisements() {
     createMutation.mutate({ data: fd }, {
       onSuccess: (newAd) => {
         queryClient.invalidateQueries({ queryKey: getMyAdsQueryKey() });
+        setPendingPhone(phone);
         resetForm();
         setPendingPayAd(newAd);
         setStep("pay");
@@ -533,7 +538,8 @@ export default function Advertisements() {
         <PaymentStep
           ad={pendingPayAd}
           onSuccess={handlePaySuccess}
-          onBack={() => { setPendingPayAd(null); setStep("list"); }}
+          onBack={() => { setPendingPayAd(null); setPendingPhone(""); setStep("list"); }}
+          initialPhone={pendingPhone}
         />
       )}
 
@@ -625,6 +631,23 @@ export default function Advertisements() {
                   </div>
                 </div>
                 <p className="text-xs text-slate-500">KES {feePerDay.toLocaleString()} × {totalDays} days = KES {totalCost.toLocaleString()}</p>
+              </div>
+
+              {/* M-Pesa phone number */}
+              <div className="space-y-2">
+                <Label htmlFor="ad-phone" className="text-slate-300 flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5" /> Safaricom M-Pesa Number *
+                </Label>
+                <Input
+                  id="ad-phone"
+                  type="tel"
+                  placeholder="07XXXXXXXX or 2547XXXXXXXX"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="bg-slate-800 border-slate-700 text-slate-100 placeholder:text-slate-600 focus:border-green-500 focus-visible:ring-green-500/30"
+                  required
+                />
+                <p className="text-xs text-slate-500">The Safaricom number that will receive the M-Pesa payment prompt.</p>
               </div>
 
               <div className="flex gap-3 pt-2">
