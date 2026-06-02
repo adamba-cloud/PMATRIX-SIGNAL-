@@ -57,6 +57,7 @@ import {
   ChevronRight,
   ToggleLeft,
   ToggleRight,
+  ArrowLeftRight,
 } from "lucide-react";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
@@ -295,15 +296,19 @@ function LinkCard({
   accounts,
   onToggle,
   onDelete,
+  onLotModeToggle,
   isToggling,
   isDeleting,
+  isTogglingLotMode,
 }: {
   link: CopyTradeLink;
   accounts: Array<{ id: number; mt5Login: string; brokerServer: string; status: string }>;
   onToggle: (id: number, isActive: boolean) => void;
   onDelete: (id: number) => void;
+  onLotModeToggle: (id: number, currentType: LotSizeType) => void;
   isToggling: boolean;
   isDeleting: boolean;
+  isTogglingLotMode: boolean;
 }) {
   const master = accounts.find((a) => a.id === link.masterAccountId);
   const slave = accounts.find((a) => a.id === link.slaveAccountId);
@@ -340,13 +345,23 @@ function LinkCard({
             </div>
 
             <div className="mt-3 flex items-center gap-3 flex-wrap text-xs text-slate-500">
-              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium border ${
-                link.lotSizeType === "PROPORTIONAL"
-                  ? "text-blue-400 bg-blue-500/10 border-blue-500/20"
-                  : "text-slate-300 bg-slate-700/50 border-slate-700"
-              }`}>
+              <button
+                onClick={() => onLotModeToggle(link.id, link.lotSizeType)}
+                disabled={isTogglingLotMode || isToggling}
+                title={`Switch to ${link.lotSizeType === "FIXED" ? "Proportional" : "Fixed Lots"}`}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium border transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                  link.lotSizeType === "PROPORTIONAL"
+                    ? "text-blue-400 bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/25 hover:border-blue-500/40"
+                    : "text-slate-300 bg-slate-700/50 border-slate-700 hover:bg-slate-700 hover:border-slate-600"
+                }`}
+              >
+                {isTogglingLotMode ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <ArrowLeftRight className="w-3 h-3 opacity-60" />
+                )}
                 {link.lotSizeType === "PROPORTIONAL" ? "Proportional" : "Fixed"}
-              </span>
+              </button>
               {link.lotSizeType === "FIXED" && (
                 <span>×<span className="text-slate-300 font-mono">{link.volumeMultiplier}</span></span>
               )}
@@ -566,7 +581,10 @@ export default function CopyTrading() {
   });
 
   const updateMutation = useUpdateCopyTradeLink();
+  const lotModeMutation = useUpdateCopyTradeLink();
   const deleteMutation = useDeleteCopyTradeLink();
+
+  const [togglingLotModeId, setTogglingLotModeId] = useState<number | null>(null);
 
   const invalidateLinks = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: getGetCopyTradeLinksQueryKey() });
@@ -581,6 +599,25 @@ export default function CopyTrading() {
           invalidateLinks();
         },
         onError: () => toast({ title: "Failed to update link", variant: "destructive" }),
+      }
+    );
+  };
+
+  const handleLotModeToggle = (id: number, currentType: LotSizeType) => {
+    const newType: LotSizeType = currentType === "FIXED" ? "PROPORTIONAL" : "FIXED";
+    setTogglingLotModeId(id);
+    lotModeMutation.mutate(
+      { id, data: { lotSizeType: newType } },
+      {
+        onSuccess: () => {
+          toast({ title: `Switched to ${newType === "FIXED" ? "Fixed Lots" : "Proportional"}` });
+          invalidateLinks();
+          setTogglingLotModeId(null);
+        },
+        onError: () => {
+          toast({ title: "Failed to update lot mode", variant: "destructive" });
+          setTogglingLotModeId(null);
+        },
       }
     );
   };
@@ -668,8 +705,10 @@ export default function CopyTrading() {
                   accounts={accounts as Array<{ id: number; mt5Login: string; brokerServer: string; status: string }>}
                   onToggle={handleToggle}
                   onDelete={handleDelete}
+                  onLotModeToggle={handleLotModeToggle}
                   isToggling={updateMutation.isPending}
                   isDeleting={deleteMutation.isPending}
+                  isTogglingLotMode={togglingLotModeId === link.id}
                 />
               ))}
             </div>
