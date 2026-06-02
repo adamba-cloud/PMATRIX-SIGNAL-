@@ -18,6 +18,7 @@ import announcementsRouter from "./announcements";
 import pushRouter from "./push";
 import referralsRouter from "./referrals";
 import journalRouter from "./journal";
+import advertisementsRouter from "./advertisements";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use(announcementsRouter);
 router.use(pushRouter);
 router.use(referralsRouter);
 router.use(journalRouter);
+router.use(advertisementsRouter);
 
 export default router;

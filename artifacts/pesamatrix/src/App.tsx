@@ -55,6 +55,7 @@ import News from "@/pages/news";
 import Resources from "@/pages/resources";
 import TradingCalculator from "@/pages/trading-calculator";
 import TradeJournal from "@/pages/trade-journal";
+import Advertisements from "@/pages/advertisements";
 
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminUsers from "@/pages/admin/users";
@@ -66,6 +67,7 @@ import AdminContent from "@/pages/admin/content";
 import AdminAnnouncements from "@/pages/admin/announcements";
 import AdminSignals from "@/pages/admin/signals";
 import AdminReferrals from "@/pages/admin/referrals";
+import AdminAdvertisements from "@/pages/admin/advertisements";
 
 const queryClient = new QueryClient();
 
@@ -92,6 +94,7 @@ function Router() {
         <Route path="/resources" component={Resources} />
         <Route path="/trading-calculator" component={TradingCalculator} />
         <Route path="/trade-journal" component={TradeJournal} />
+        <Route path="/advertisements" component={Advertisements} />
 
         <Route path="/admin/dashboard" component={AdminDashboard} />
         <Route path="/admin/users" component={AdminUsers} />
@@ -103,6 +106,7 @@ function Router() {
         <Route path="/admin/announcements" component={AdminAnnouncements} />
         <Route path="/admin/signals" component={AdminSignals} />
         <Route path="/admin/referrals" component={AdminReferrals} />
+        <Route path="/admin/advertisements" component={AdminAdvertisements} />
 
         <Route component={NotFound} />
       </Switch>

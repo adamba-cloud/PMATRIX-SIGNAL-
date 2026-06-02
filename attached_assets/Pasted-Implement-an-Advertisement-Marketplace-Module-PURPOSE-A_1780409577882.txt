@@ -1,0 +1,176 @@
+Implement an Advertisement Marketplace Module.
+
+PURPOSE
+
+Allow users, traders, businesses, and subscribers to advertise their products and services on PESAMATRIX SIGNAL for a fee.
+
+ADVERTISEMENT DISPLAY
+
+Create a scrolling advertisement section directly below the forex pairs ticker banner.
+
+Order:
+
+1. Forex Pairs Ticker (existing)
+2. Sponsored Advertisements (new)
+3. Main Dashboard Content
+
+Advertisements should rotate automatically.
+
+ADMIN FEATURES
+
+Create Advertisement Management in Admin Dashboard.
+
+Admin can:
+
+- Set Advertisement Fee Per Day
+- Set Minimum Advertisement Days
+- Set Maximum Advertisement Days
+- Approve Advertisements
+- Reject Advertisements
+- Pause Advertisements
+- Delete Advertisements
+
+Admin can select advertisement placement duration.
+
+Example:
+
+Fee Per Day = KES 100
+
+User selects:
+
+30 Days
+
+Total Cost:
+
+KES 3,000
+
+ADVERTISEMENT TYPES
+
+1. Image Advertisement
+
+- Single Image
+- Banner Image
+
+2. Video Advertisement
+
+- MP4
+- MOV
+- WEBM
+
+3. External Link Advertisement
+
+Examples:
+
+- Trading Services
+- Forex Brokers
+- Businesses
+- Online Stores
+- Educational Services
+
+USER FEATURES
+
+Create "Advertise With Us" page.
+
+Users can:
+
+- Upload Images
+- Upload Videos
+- Add Advertisement Title
+- Add Description
+- Add External Link
+- Select Number of Advertisement Days
+
+System automatically calculates total advertisement cost.
+
+WORKFLOW
+
+Step 1:
+User submits advertisement.
+
+Step 2:
+Advertisement status = PENDING
+
+Step 3:
+Admin reviews advertisement.
+
+Step 4:
+Admin approves or rejects.
+
+Step 5:
+Approved advertisement becomes visible.
+
+ADVERTISEMENT STATUS
+
+- PENDING
+- APPROVED
+- REJECTED
+- EXPIRED
+- PAUSED
+
+AUTO EXPIRY
+
+Create background worker.
+
+Runs daily.
+
+Checks advertisement expiry date.
+
+Expired advertisements:
+
+- Automatically hidden
+- Status changed to EXPIRED
+
+DATABASE
+
+Create Prisma models:
+
+Advertisement
+AdvertisementPayment
+
+Advertisement Fields:
+
+- id
+- userId
+- title
+- description
+- mediaType
+- mediaUrl
+- externalLink
+- status
+- startDate
+- endDate
+- totalAmount
+- createdAt
+
+AdvertisementPayment Fields:
+
+- id
+- advertisementId
+- amount
+- status
+- createdAt
+
+USER DASHBOARD
+
+Add menu item:
+
+Advertisements
+
+User can:
+
+- Create Advertisement
+- View Active Advertisements
+- View Pending Advertisements
+- View Expired Advertisements
+- View Advertisement Payments
+
+UI REQUIREMENTS
+
+- Premium Dark Theme
+- Mobile Responsive
+- Smooth Auto-Sliding Advertisement Carousel
+- Image Preview
+- Video Preview
+- Clickable External Links
+
+Generate complete Prisma schema updates, APIs, Admin Dashboard pages, User Dashboard pages, and advertisement display components.

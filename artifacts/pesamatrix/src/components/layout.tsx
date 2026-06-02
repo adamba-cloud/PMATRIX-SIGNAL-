@@ -4,6 +4,7 @@ import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
 import { Ticker } from "./ticker";
 import { AnnouncementBanner } from "./announcement-banner";
 import { useTheme } from "@/contexts/theme";
+import { AdCarousel } from "./ad-carousel";
 import {
   LayoutDashboard,
   ActivitySquare,
@@ -28,6 +29,7 @@ import {
   BellRing,
   Gift,
   Calculator,
+  Megaphone as MegaphoneIcon,
 } from "lucide-react";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { Button } from "./ui/button";
@@ -93,6 +95,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col overflow-hidden">
       <Ticker />
+      <AdCarousel />
       <AnnouncementBanner />
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
@@ -118,6 +121,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/copy-trading" icon={GitFork}>Copy Trading</SidebarLink>
                 <SidebarLink href="/trading-calculator" icon={Calculator}>Growth Calculator</SidebarLink>
                 <SidebarLink href="/trade-journal" icon={BookOpen}>Trade Journal</SidebarLink>
+                <SidebarLink href="/advertisements" icon={MegaphoneIcon}>Advertise</SidebarLink>
                 <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 mt-4">
                   Content
                 </div>
@@ -144,6 +148,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/admin/signals" icon={Radio}>Signals</SidebarLink>
                 <SidebarLink href="/admin/announcements" icon={Megaphone}>Announcements</SidebarLink>
                 <SidebarLink href="/admin/referrals" icon={Gift}>Referrals</SidebarLink>
+                <SidebarLink href="/admin/advertisements" icon={MegaphoneIcon}>Advertisements</SidebarLink>
                 <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 mt-4">
                   User View
                 </div>

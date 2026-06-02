@@ -9,6 +9,7 @@ import { startMasterPoller } from "./lib/master-poller";
 import { startConnectionWatchdog } from "./lib/connection-watchdog";
 import { startPaymentReconciler } from "./lib/payment-reconciler";
 import { seedAdminUser } from "./lib/seed";
+import { startAdvertisementExpiryJob } from "./lib/advertisement-expiry-job";
 
 const rawPort = process.env["PORT"];
 
@@ -27,6 +28,7 @@ if (Number.isNaN(port) || port <= 0) {
 const server = createServer(app);
 attachForexWebSocket(server);
 startExpiryJob();
+startAdvertisementExpiryJob();
 startMetaApiSyncJob();
 
 // Redis-dependent services — gracefully skip if Redis is unavailable (no REDIS_URL set)
