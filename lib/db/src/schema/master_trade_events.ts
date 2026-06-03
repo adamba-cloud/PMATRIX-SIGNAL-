@@ -22,6 +22,8 @@ export const masterTradeEventsTable = pgTable("master_trade_events", {
   comment: text("comment"),
   changedFields: text("changed_fields"),
   rawPayload: text("raw_payload"),
+  jobId: text("job_id"),
+  jobStatus: text("job_status"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

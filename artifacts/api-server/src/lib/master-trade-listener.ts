@@ -1,6 +1,8 @@
 import { db, masterTradeEventsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { getAccountPositions, type MetaApiPosition } from "./metaapi";
 import { broadcastMasterTradeEvent } from "./forex-ws";
+import { getMasterTradeExecutionQueue } from "./master-trade-execution-queue";
 import { logger } from "./logger";
 
 const POLL_INTERVAL_MS = 10_000;
@@ -21,6 +23,7 @@ async function insertEvent(
   position: MetaApiPosition,
   changedFields?: string
 ): Promise<void> {
+  // ── 1. Save event to database ─────────────────────────────────────────────
   const row = {
     metaApiAccountId: accountId,
     eventType,
@@ -36,10 +39,72 @@ async function insertEvent(
     comment: position.comment ?? null,
     changedFields: changedFields ?? null,
     rawPayload: JSON.stringify(position),
+    jobStatus: "PENDING" as const,
   };
 
-  await db.insert(masterTradeEventsTable).values(row);
+  const [inserted] = await db
+    .insert(masterTradeEventsTable)
+    .values(row)
+    .returning({ id: masterTradeEventsTable.id });
 
+  logger.info(
+    { eventId: inserted.id, eventType, positionId: position.id, symbol: position.symbol },
+    "[MasterTradeListener] Event saved to database"
+  );
+
+  // ── 2. Create & enqueue execution job ─────────────────────────────────────
+  try {
+    const queue = getMasterTradeExecutionQueue();
+    const jobName = `master-trade:${eventType}:${position.id}:${inserted.id}`;
+
+    const jobData = {
+      eventId: inserted.id,
+      eventType,
+      metaApiAccountId: accountId,
+      positionId: position.id,
+      symbol: position.symbol,
+      direction: row.direction,
+      volume: position.volume ?? null,
+      openPrice: position.openPrice ?? null,
+      stopLoss: position.stopLoss ?? null,
+      takeProfit: position.takeProfit ?? null,
+      changedFields: changedFields ?? null,
+    };
+
+    // Log: Job Created
+    logger.info(
+      { eventId: inserted.id, eventType, positionId: position.id, symbol: position.symbol },
+      "[MasterTradeListener] Job Created"
+    );
+
+    const job = await queue.add(jobName, jobData);
+
+    // Persist job ID and mark as QUEUED
+    await db
+      .update(masterTradeEventsTable)
+      .set({ jobId: job.id ?? null, jobStatus: "QUEUED" })
+      .where(eq(masterTradeEventsTable.id, inserted.id));
+
+    // Log: Queue Added
+    logger.info(
+      {
+        jobId: job.id,
+        jobName,
+        eventId: inserted.id,
+        eventType,
+        symbol: position.symbol,
+        direction: row.direction,
+      },
+      "[MasterTradeListener] Queue Added"
+    );
+  } catch (queueErr) {
+    logger.warn(
+      { queueErr, eventId: inserted.id, eventType, symbol: position.symbol },
+      "[MasterTradeListener] Failed to enqueue job — Redis may be unavailable"
+    );
+  }
+
+  // ── 3. Broadcast via WebSocket ────────────────────────────────────────────
   broadcastMasterTradeEvent({
     eventType,
     positionId: position.id,
@@ -69,25 +134,24 @@ async function poll(): Promise<void> {
   try {
     positions = await getAccountPositions(accountId);
   } catch (err) {
-    logger.warn({ err, accountId }, "[MasterTradeListener] Failed to fetch positions");
+    logger.warn({ err, accountId }, "[MasterTradeListener] Failed to fetch positions — will retry");
     return;
   }
 
   const currentSnapshot: PositionSnapshot = new Map(positions.map((p) => [p.id, p]));
-
   const events: Promise<void>[] = [];
 
   for (const [id, curr] of currentSnapshot) {
     const prev = previousSnapshot.get(id);
     if (!prev) {
-      logger.info({ positionId: id, symbol: curr.symbol }, "[MasterTradeListener] POSITION_OPENED");
+      logger.info({ positionId: id, symbol: curr.symbol }, "[MasterTradeListener] POSITION_OPENED detected");
       events.push(insertEvent(accountId, "POSITION_OPENED", curr));
     } else {
       const changed = detectChanges(prev, curr);
       if (changed.length > 0) {
         logger.info(
           { positionId: id, symbol: curr.symbol, changed },
-          "[MasterTradeListener] POSITION_MODIFIED"
+          "[MasterTradeListener] POSITION_MODIFIED detected"
         );
         events.push(insertEvent(accountId, "POSITION_MODIFIED", curr, changed.join(",")));
       }
@@ -96,7 +160,7 @@ async function poll(): Promise<void> {
 
   for (const [id, prev] of previousSnapshot) {
     if (!currentSnapshot.has(id)) {
-      logger.info({ positionId: id, symbol: prev.symbol }, "[MasterTradeListener] POSITION_CLOSED");
+      logger.info({ positionId: id, symbol: prev.symbol }, "[MasterTradeListener] POSITION_CLOSED detected");
       events.push(insertEvent(accountId, "POSITION_CLOSED", prev));
     }
   }

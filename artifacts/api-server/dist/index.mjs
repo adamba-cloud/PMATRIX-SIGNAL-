@@ -25883,7 +25883,7 @@ var require_thread_stream = __commonJS({
     "use strict";
     var { version: version3 } = require_package();
     var { EventEmitter } = __require("events");
-    var { Worker: Worker2 } = __require("worker_threads");
+    var { Worker: Worker3 } = __require("worker_threads");
     var { join } = __require("path");
     var { pathToFileURL } = __require("url");
     var { wait } = require_wait();
@@ -25921,7 +25921,7 @@ var require_thread_stream = __commonJS({
       const { filename, workerData } = opts;
       const bundlerOverrides = "__bundlerPathsOverrides" in globalThis ? globalThis.__bundlerPathsOverrides : {};
       const toExecute = bundlerOverrides["thread-stream-worker"] || join(__dirname, "lib", "worker.js");
-      const worker = new Worker2(toExecute, {
+      const worker = new Worker3(toExecute, {
         ...opts.workerOpts,
         trackUnmanagedFds: false,
         workerData: {
@@ -112941,7 +112941,7 @@ var require_queue = __commonJS({
     var job_scheduler_1 = require_job_scheduler();
     var version_1 = require_version();
     var utils_1 = require_utils10();
-    var Queue2 = class extends queue_getters_1.QueueGetters {
+    var Queue3 = class extends queue_getters_1.QueueGetters {
       constructor(name, opts, Connection2) {
         var _a;
         super(name, Object.assign({}, opts), Connection2);
@@ -113633,7 +113633,7 @@ var require_queue = __commonJS({
         return totalRemoved;
       }
     };
-    exports.Queue = Queue2;
+    exports.Queue = Queue3;
   }
 });
 
@@ -113813,7 +113813,7 @@ var require_worker = __commonJS({
     var job_scheduler_1 = require_job_scheduler();
     var lock_manager_1 = require_lock_manager();
     var maximumBlockTimeout = 10;
-    var Worker2 = class extends queue_base_1.QueueBase {
+    var Worker3 = class extends queue_base_1.QueueBase {
       static RateLimitError() {
         return new errors_1.RateLimitError();
       }
@@ -114601,7 +114601,7 @@ var require_worker = __commonJS({
         return job.moveToWait(token2);
       }
     };
-    exports.Worker = Worker2;
+    exports.Worker = Worker3;
   }
 });
 
@@ -138153,6 +138153,8 @@ var masterTradeEventsTable = pgTable("master_trade_events", {
   comment: text("comment"),
   changedFields: text("changed_fields"),
   rawPayload: text("raw_payload"),
+  jobId: text("job_id"),
+  jobStatus: text("job_status"),
   createdAt: timestamp("created_at").notNull().defaultNow()
 });
 
@@ -144966,6 +144968,25 @@ function startMt5SubscriptionExpiryJob() {
   logger.info({ intervalMs: INTERVAL_MS4 }, "MT5 subscription expiry job started");
 }
 
+// src/lib/master-trade-execution-queue.ts
+var import_bullmq3 = __toESM(require_cjs(), 1);
+var MASTER_TRADE_EXECUTION_QUEUE = "master-trade-execution";
+var _queue2 = null;
+function getMasterTradeExecutionQueue() {
+  if (!_queue2) {
+    _queue2 = new import_bullmq3.Queue(MASTER_TRADE_EXECUTION_QUEUE, {
+      connection: getRedis(),
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2e3 },
+        removeOnComplete: { count: 500 },
+        removeOnFail: { count: 200 }
+      }
+    });
+  }
+  return _queue2;
+}
+
 // src/lib/master-trade-listener.ts
 var POLL_INTERVAL_MS2 = 1e4;
 var DEFAULT_MASTER_ID2 = "99a2b763-0528-4b0e-91ea-79c0be291d5b";
@@ -144989,9 +145010,53 @@ async function insertEvent(accountId, eventType, position, changedFields) {
     profit: position.profit != null ? String(position.profit) : null,
     comment: position.comment ?? null,
     changedFields: changedFields ?? null,
-    rawPayload: JSON.stringify(position)
+    rawPayload: JSON.stringify(position),
+    jobStatus: "PENDING"
   };
-  await db.insert(masterTradeEventsTable).values(row);
+  const [inserted] = await db.insert(masterTradeEventsTable).values(row).returning({ id: masterTradeEventsTable.id });
+  logger.info(
+    { eventId: inserted.id, eventType, positionId: position.id, symbol: position.symbol },
+    "[MasterTradeListener] Event saved to database"
+  );
+  try {
+    const queue = getMasterTradeExecutionQueue();
+    const jobName = `master-trade:${eventType}:${position.id}:${inserted.id}`;
+    const jobData = {
+      eventId: inserted.id,
+      eventType,
+      metaApiAccountId: accountId,
+      positionId: position.id,
+      symbol: position.symbol,
+      direction: row.direction,
+      volume: position.volume ?? null,
+      openPrice: position.openPrice ?? null,
+      stopLoss: position.stopLoss ?? null,
+      takeProfit: position.takeProfit ?? null,
+      changedFields: changedFields ?? null
+    };
+    logger.info(
+      { eventId: inserted.id, eventType, positionId: position.id, symbol: position.symbol },
+      "[MasterTradeListener] Job Created"
+    );
+    const job = await queue.add(jobName, jobData);
+    await db.update(masterTradeEventsTable).set({ jobId: job.id ?? null, jobStatus: "QUEUED" }).where(eq(masterTradeEventsTable.id, inserted.id));
+    logger.info(
+      {
+        jobId: job.id,
+        jobName,
+        eventId: inserted.id,
+        eventType,
+        symbol: position.symbol,
+        direction: row.direction
+      },
+      "[MasterTradeListener] Queue Added"
+    );
+  } catch (queueErr) {
+    logger.warn(
+      { queueErr, eventId: inserted.id, eventType, symbol: position.symbol },
+      "[MasterTradeListener] Failed to enqueue job \u2014 Redis may be unavailable"
+    );
+  }
   broadcastMasterTradeEvent({
     eventType,
     positionId: position.id,
@@ -145017,7 +145082,7 @@ async function poll() {
   try {
     positions = await getAccountPositions(accountId);
   } catch (err) {
-    logger.warn({ err, accountId }, "[MasterTradeListener] Failed to fetch positions");
+    logger.warn({ err, accountId }, "[MasterTradeListener] Failed to fetch positions \u2014 will retry");
     return;
   }
   const currentSnapshot = new Map(positions.map((p) => [p.id, p]));
@@ -145025,14 +145090,14 @@ async function poll() {
   for (const [id, curr] of currentSnapshot) {
     const prev = previousSnapshot.get(id);
     if (!prev) {
-      logger.info({ positionId: id, symbol: curr.symbol }, "[MasterTradeListener] POSITION_OPENED");
+      logger.info({ positionId: id, symbol: curr.symbol }, "[MasterTradeListener] POSITION_OPENED detected");
       events.push(insertEvent(accountId, "POSITION_OPENED", curr));
     } else {
       const changed = detectChanges(prev, curr);
       if (changed.length > 0) {
         logger.info(
           { positionId: id, symbol: curr.symbol, changed },
-          "[MasterTradeListener] POSITION_MODIFIED"
+          "[MasterTradeListener] POSITION_MODIFIED detected"
         );
         events.push(insertEvent(accountId, "POSITION_MODIFIED", curr, changed.join(",")));
       }
@@ -145040,7 +145105,7 @@ async function poll() {
   }
   for (const [id, prev] of previousSnapshot) {
     if (!currentSnapshot.has(id)) {
-      logger.info({ positionId: id, symbol: prev.symbol }, "[MasterTradeListener] POSITION_CLOSED");
+      logger.info({ positionId: id, symbol: prev.symbol }, "[MasterTradeListener] POSITION_CLOSED detected");
       events.push(insertEvent(accountId, "POSITION_CLOSED", prev));
     }
   }
@@ -145057,6 +145122,48 @@ function startMasterTradeListener() {
   poll();
   setInterval(poll, POLL_INTERVAL_MS2);
   logger.info({ intervalMs: POLL_INTERVAL_MS2, accountId: getAccountId() }, "[MasterTradeListener] Started");
+}
+
+// src/lib/master-trade-execution-worker.ts
+var import_bullmq4 = __toESM(require_cjs(), 1);
+var CONCURRENCY2 = 5;
+function startMasterTradeExecutionWorker() {
+  const worker = new import_bullmq4.Worker(
+    MASTER_TRADE_EXECUTION_QUEUE,
+    async (job) => {
+      const { eventId, eventType, positionId, symbol: symbol2, direction, volume, changedFields } = job.data;
+      logger.info(
+        {
+          jobId: job.id,
+          eventId,
+          eventType,
+          positionId,
+          symbol: symbol2,
+          direction,
+          volume,
+          changedFields: changedFields ?? void 0
+        },
+        "[MasterTradeExecution] Queue Processed"
+      );
+      await db.update(masterTradeEventsTable).set({ jobStatus: "PROCESSED" }).where(eq(masterTradeEventsTable.id, eventId));
+    },
+    {
+      connection: getRedis(),
+      concurrency: CONCURRENCY2
+    }
+  );
+  worker.on("failed", (job, err) => {
+    logger.error(
+      { jobId: job?.id, eventId: job?.data.eventId, err: err.message },
+      "[MasterTradeExecution] Job permanently failed after all retries"
+    );
+    if (job?.data.eventId) {
+      db.update(masterTradeEventsTable).set({ jobStatus: "FAILED" }).where(eq(masterTradeEventsTable.id, job.data.eventId)).catch(() => {
+      });
+    }
+  });
+  logger.info({ concurrency: CONCURRENCY2 }, "[MasterTradeExecution] Worker started");
+  return worker;
 }
 
 // src/index.ts
@@ -145093,6 +145200,11 @@ try {
 }
 startPaymentReconciler();
 startMasterTradeListener();
+try {
+  startMasterTradeExecutionWorker();
+} catch (err) {
+  logger.warn({ err }, "Master trade execution worker not started \u2014 Redis unavailable");
+}
 server.listen(port, () => {
   logger.info({ port }, "Server listening");
   seedAdminUser();
