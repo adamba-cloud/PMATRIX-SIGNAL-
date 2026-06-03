@@ -5,7 +5,6 @@ import fs from "fs";
 import { db, advertisementsTable, advertisementSettingsTable } from "@workspace/db";
 import { eq, and, desc, lte, gte, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../lib/auth";
-import type { AuthedRequest } from "../lib/auth";
 import { initiateStkPush, formatPhone } from "../lib/daraja";
 import { paymentsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
@@ -94,11 +93,10 @@ router.get("/advertisements/active", async (_req, res): Promise<void> => {
 
 router.get("/advertisements/mine", requireAuth, async (req, res): Promise<void> => {
   try {
-    const user = (req as AuthedRequest).user;
     const ads = await db
       .select()
       .from(advertisementsTable)
-      .where(eq(advertisementsTable.userId, user.id))
+      .where(eq(advertisementsTable.userId, req.userId!))
       .orderBy(desc(advertisementsTable.createdAt));
     res.json(ads);
   } catch (err) {
@@ -112,7 +110,6 @@ router.post(
   upload.single("file"),
   async (req, res): Promise<void> => {
     try {
-      const user = (req as AuthedRequest).user;
       const { title, description, mediaType, externalLink, totalDays } = req.body as {
         title?: string;
         description?: string;
@@ -163,7 +160,7 @@ router.post(
       const [ad] = await db
         .insert(advertisementsTable)
         .values({
-          userId: user.id,
+          userId: req.userId!,
           title,
           description: description || null,
           mediaType: mediaType as "IMAGE" | "VIDEO" | "LINK",
@@ -186,7 +183,6 @@ router.post(
 
 router.get("/advertisements/payments/mine", requireAuth, async (req, res): Promise<void> => {
   try {
-    const user = (req as AuthedRequest).user;
     const payments = await db
       .select({
         id: paymentsTable.id,
@@ -204,7 +200,7 @@ router.get("/advertisements/payments/mine", requireAuth, async (req, res): Promi
       })
       .from(paymentsTable)
       .innerJoin(advertisementsTable, eq(paymentsTable.advertisementId, advertisementsTable.id))
-      .where(eq(paymentsTable.userId, user.id))
+      .where(eq(paymentsTable.userId, req.userId!))
       .orderBy(desc(paymentsTable.createdAt));
     res.json(payments);
   } catch (err) {
@@ -232,7 +228,6 @@ function getCallbackUrl(req: import("express").Request): string {
 
 router.post("/advertisements/:id/pay", requireAuth, async (req, res): Promise<void> => {
   try {
-    const user = (req as AuthedRequest).user;
     const adId = parseInt(req.params.id, 10);
     const { phoneNumber } = req.body as { phoneNumber?: string };
 
@@ -244,7 +239,7 @@ router.post("/advertisements/:id/pay", requireAuth, async (req, res): Promise<vo
     const [ad] = await db
       .select()
       .from(advertisementsTable)
-      .where(and(eq(advertisementsTable.id, adId), eq(advertisementsTable.userId, user.id)));
+      .where(and(eq(advertisementsTable.id, adId), eq(advertisementsTable.userId, req.userId!)));
 
     if (!ad) {
       res.status(404).json({ error: "Advertisement not found" });
@@ -269,7 +264,7 @@ router.post("/advertisements/:id/pay", requireAuth, async (req, res): Promise<vo
     const [payment] = await db
       .insert(paymentsTable)
       .values({
-        userId: user.id,
+        userId: req.userId!,
         advertisementId: adId,
         amount: ad.totalAmount,
         status: "PENDING",
