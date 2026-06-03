@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { broadcastAdminEvent } from "../lib/forex-ws";
 import { randomBytes } from "crypto";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -106,6 +107,13 @@ router.post("/auth/register", async (req, res): Promise<void> => {
   }
 
   const token = signToken({ userId: user.id, role: user.role });
+
+  broadcastAdminEvent("new_user", {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+  });
+
   res.status(201).json({
     token,
     user: {

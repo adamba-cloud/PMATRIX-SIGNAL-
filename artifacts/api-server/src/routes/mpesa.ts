@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { broadcastAdminEvent } from "../lib/forex-ws";
 import { db, paymentsTable, subscriptionsTable, systemConfigTable, advertisementsTable, mt5AccountSubscriptionsTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { initiateStkPush, parseCallback, formatPhone, type DarajaCallbackBody } from "../lib/daraja";
@@ -218,6 +219,27 @@ router.post("/payments/mpesa/callback", async (req, res): Promise<void> => {
             .where(eq(mt5AccountSubscriptionsTable.id, sub.id));
         }
         logger.info({ paymentId: payment.id, count: pendingMt5Subs.length }, "MT5 subscriptions activated via callback");
+      }
+
+      broadcastAdminEvent("payment_completed", {
+        paymentId: payment.id,
+        amount: payment.amount,
+        receipt: parsed.mpesaReceiptNumber ?? null,
+      });
+
+      if (payment.subscriptionId) {
+        const activatedSub = await db
+          .select()
+          .from(subscriptionsTable)
+          .where(eq(subscriptionsTable.id, payment.subscriptionId))
+          .then((r) => r[0]);
+        if (activatedSub && activatedSub.status === "ACTIVE") {
+          broadcastAdminEvent("subscription_activated", {
+            userId: payment.userId,
+            days: activatedSub.daysSelected,
+            amount: activatedSub.totalAmount,
+          });
+        }
       }
 
       logger.info({ paymentId: payment.id, receipt: parsed.mpesaReceiptNumber }, "Payment completed");

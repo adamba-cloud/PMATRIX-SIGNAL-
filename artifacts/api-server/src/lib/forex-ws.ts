@@ -86,6 +86,21 @@ export function broadcastMt5Status(payload: object): void {
   }
 }
 
+export type AdminEventType = "new_user" | "payment_completed" | "subscription_activated";
+
+export function broadcastAdminEvent(eventType: AdminEventType, data: Record<string, unknown>): void {
+  if (!_wss) return;
+  const msg = JSON.stringify({
+    type: "admin_event",
+    data: { eventType, ...data, ts: Date.now() },
+  });
+  for (const client of _wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(msg);
+    }
+  }
+}
+
 export function attachForexWebSocket(server: Server): void {
   const wss = new WebSocketServer({ server, path: "/api/ws" });
   _wss = wss;

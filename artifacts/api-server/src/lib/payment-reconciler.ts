@@ -16,6 +16,7 @@ import { db, paymentsTable, subscriptionsTable } from "@workspace/db";
 import { getDarajaToken, generateTimestamp, generatePassword } from "./daraja";
 import { writeAuditLog } from "./audit";
 import { logger } from "./logger";
+import { broadcastAdminEvent } from "./forex-ws";
 
 const RECONCILE_INTERVAL_MS = 5 * 60 * 1_000;
 const STALE_AFTER_MS = 2 * 60 * 1_000;
@@ -103,6 +104,12 @@ async function reconcilePayment(payment: typeof paymentsTable.$inferSelect): Pro
             .where(eq(subscriptionsTable.id, payment.subscriptionId));
         }
       }
+    });
+
+    broadcastAdminEvent("payment_completed", {
+      paymentId: payment.id,
+      amount: payment.amount,
+      receipt: null,
     });
 
     logger.info({ paymentId: payment.id }, "Reconciler: payment reconciled as COMPLETED");

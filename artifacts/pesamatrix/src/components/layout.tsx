@@ -33,6 +33,7 @@ import {
   Megaphone as MegaphoneIcon,
 } from "lucide-react";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
+import { AdminNotificationBell } from "./admin-notification-bell";
 import { Button } from "./ui/button";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -181,6 +182,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <p className="text-xs text-muted-foreground truncate">{user.email}</p>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                {isAdmin && <AdminNotificationBell />}
                 {pushState !== "unsupported" && (
                   <button
                     onClick={pushState === "subscribed" ? unsubscribePush : subscribePush}
