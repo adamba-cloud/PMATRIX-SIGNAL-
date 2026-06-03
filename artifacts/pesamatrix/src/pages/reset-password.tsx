@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { customFetch, getGetMeQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,11 @@ import { ActivitySquare, Loader2, CheckCircle, XCircle } from "lucide-react";
 export default function ResetPassword() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { data: logoData } = useQuery<{ url: string | null }>({
+    queryKey: ["logo"],
+    queryFn: () => customFetch<{ url: string | null }>("/api/logo"),
+    staleTime: 5 * 60 * 1000,
+  });
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -103,10 +108,18 @@ export default function ResetPassword() {
     <div className="flex-1 flex items-center justify-center p-6 bg-slate-950">
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-xl shadow-black/50">
         <div className="flex justify-center mb-8">
-          <div className="flex items-center gap-2 text-green-500">
-            <ActivitySquare className="w-8 h-8" />
-            <span className="font-bold text-2xl tracking-tight text-white">PESAMATRIX</span>
-          </div>
+          {logoData?.url ? (
+            <img
+              src={logoData.url}
+              alt="PESAMATRIX"
+              className="h-12 w-auto max-w-[200px] object-contain"
+            />
+          ) : (
+            <div className="flex items-center gap-2 text-green-500">
+              <ActivitySquare className="w-8 h-8" />
+              <span className="font-bold text-2xl tracking-tight text-white">PESAMATRIX</span>
+            </div>
+          )}
         </div>
 
         <h2 className="text-2xl font-bold text-white mb-2 text-center">Set New Password</h2>
