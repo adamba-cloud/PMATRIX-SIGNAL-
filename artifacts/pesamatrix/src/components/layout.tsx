@@ -53,6 +53,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isLandingPage = location === "/";
   const isChangePassword = location === "/change-password";
 
+  // Must be declared before any conditional returns to follow Rules of Hooks
+  const { data: logoData } = useQuery<{ url: string | null }>({
+    queryKey: ["logo"],
+    queryFn: () => customFetch<{ url: string | null }>("/api/logo"),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!user && !isAuthPage && !isLandingPage && !isChangePassword,
+  });
+
   useEffect(() => {
     if (isLoading) return;
     if (!user && !isAuthPage && !isLandingPage && !isChangePassword) {
@@ -93,12 +101,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   const isAdmin = user.role === "ADMIN";
-
-  const { data: logoData } = useQuery<{ url: string | null }>({
-    queryKey: ["logo"],
-    queryFn: () => customFetch<{ url: string | null }>("/api/logo"),
-    staleTime: 5 * 60 * 1000,
-  });
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col overflow-hidden">
