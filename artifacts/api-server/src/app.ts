@@ -39,8 +39,21 @@ app.use("/api", router);
 if (process.env.NODE_ENV === "production") {
   const frontendDist = path.resolve("artifacts/pesamatrix/dist/public");
   if (fs.existsSync(frontendDist)) {
-    app.use(express.static(frontendDist));
+    // Hashed assets (JS/CSS) can be cached long-term; index.html must never be cached
+    // so browsers always get the latest bundle references after a new deployment.
+    app.use(express.static(frontendDist, {
+      setHeaders(res, filePath) {
+        if (filePath.endsWith("index.html")) {
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          res.setHeader("Pragma", "no-cache");
+          res.setHeader("Expires", "0");
+        }
+      },
+    }));
     app.get("/{*splat}", (_req, res) => {
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       res.sendFile(path.join(frontendDist, "index.html"));
     });
   }
