@@ -29,9 +29,9 @@ export default function Profile() {
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
-  const { data: referralStats } = useQuery<ReferralStats>({
+  const { data: referralStats } = useQuery<ReferralStats & { refereeBonusDays?: number; referrerBonusDays?: number }>({
     queryKey: ["referral-stats"],
-    queryFn: () => customFetch<ReferralStats>("/api/referral/stats"),
+    queryFn: () => customFetch<ReferralStats & { refereeBonusDays?: number; referrerBonusDays?: number }>("/api/referral/stats"),
     enabled: !!user,
   });
 
@@ -211,8 +211,9 @@ export default function Profile() {
             Referral Program
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Invite friends — they get <strong className="text-foreground">3 free days</strong>, you earn{" "}
-            <strong className="text-foreground">7 bonus days</strong> per referral.
+            Invite friends — they get{" "}
+            <strong className="text-foreground">{referralStats?.refereeBonusDays ?? "…"} free days</strong>, you earn{" "}
+            <strong className="text-foreground">{referralStats?.referrerBonusDays ?? "…"} bonus days</strong> per referral.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">

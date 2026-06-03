@@ -76,10 +76,22 @@ export default function Home() {
       </section>
 
       <footer className="border-t border-slate-800 py-8 px-6 text-center text-slate-500 text-sm bg-slate-950">
-        <div className="flex justify-center items-center gap-6 mb-4">
-          <span>Phone: +254781585319</span>
+        <div className="flex justify-center items-center gap-6 mb-4 flex-wrap">
+          <a
+            href="tel:+254781585319"
+            className="hover:text-green-400 transition-colors"
+          >
+            Phone: +254781585319
+          </a>
           <span>•</span>
-          <span>Support/WhatsApp: +254717434943</span>
+          <a
+            href="https://wa.me/254717434943"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-green-400 transition-colors"
+          >
+            WhatsApp: +254717434943
+          </a>
         </div>
         <p>© {new Date().getFullYear()} PESAMATRIX SIGNAL. All rights reserved.</p>
       </footer>

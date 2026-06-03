@@ -1,9 +1,9 @@
-import { db, usersTable, referralsTable, subscriptionsTable } from "@workspace/db";
+import { db, usersTable, referralsTable, subscriptionsTable, systemConfigTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { logger } from "./logger";
 
-const REFEREE_BONUS_DAYS = 3;
-const REFERRER_BONUS_DAYS = 7;
+const DEFAULT_REFEREE_BONUS_DAYS = 3;
+const DEFAULT_REFERRER_BONUS_DAYS = 7;
 
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -18,7 +18,6 @@ export async function ensureReferralCode(userId: number): Promise<string> {
   const [user] = await db.select({ referralCode: usersTable.referralCode }).from(usersTable).where(eq(usersTable.id, userId));
   if (user?.referralCode) return user.referralCode;
 
-  // Lazily generate for existing users
   let code = generateReferralCode();
   let attempts = 0;
   while (attempts < 5) {
@@ -29,6 +28,46 @@ export async function ensureReferralCode(userId: number): Promise<string> {
   }
   await db.update(usersTable).set({ referralCode: code }).where(eq(usersTable.id, userId));
   return code;
+}
+
+export async function getReferralSettings(): Promise<{ refereeBonusDays: number; referrerBonusDays: number }> {
+  const rows = await db
+    .select({ key: systemConfigTable.key, value: systemConfigTable.value })
+    .from(systemConfigTable)
+    .where(eq(systemConfigTable.key, "referral_referee_bonus_days"));
+
+  const rows2 = await db
+    .select({ key: systemConfigTable.key, value: systemConfigTable.value })
+    .from(systemConfigTable)
+    .where(eq(systemConfigTable.key, "referral_referrer_bonus_days"));
+
+  const refereeBonusDays = rows[0] ? parseInt(rows[0].value, 10) : DEFAULT_REFEREE_BONUS_DAYS;
+  const referrerBonusDays = rows2[0] ? parseInt(rows2[0].value, 10) : DEFAULT_REFERRER_BONUS_DAYS;
+
+  return {
+    refereeBonusDays: isNaN(refereeBonusDays) ? DEFAULT_REFEREE_BONUS_DAYS : refereeBonusDays,
+    referrerBonusDays: isNaN(referrerBonusDays) ? DEFAULT_REFERRER_BONUS_DAYS : referrerBonusDays,
+  };
+}
+
+export async function setReferralSettings(refereeBonusDays?: number, referrerBonusDays?: number): Promise<void> {
+  const now = new Date();
+  if (refereeBonusDays != null) {
+    const existing = await db.select().from(systemConfigTable).where(eq(systemConfigTable.key, "referral_referee_bonus_days"));
+    if (existing.length) {
+      await db.update(systemConfigTable).set({ value: String(refereeBonusDays), updatedAt: now }).where(eq(systemConfigTable.key, "referral_referee_bonus_days"));
+    } else {
+      await db.insert(systemConfigTable).values({ key: "referral_referee_bonus_days", value: String(refereeBonusDays) });
+    }
+  }
+  if (referrerBonusDays != null) {
+    const existing = await db.select().from(systemConfigTable).where(eq(systemConfigTable.key, "referral_referrer_bonus_days"));
+    if (existing.length) {
+      await db.update(systemConfigTable).set({ value: String(referrerBonusDays), updatedAt: now }).where(eq(systemConfigTable.key, "referral_referrer_bonus_days"));
+    } else {
+      await db.insert(systemConfigTable).values({ key: "referral_referrer_bonus_days", value: String(referrerBonusDays) });
+    }
+  }
 }
 
 async function extendOrCreateSubscription(userId: number, bonusDays: number): Promise<void> {
@@ -62,24 +101,21 @@ async function extendOrCreateSubscription(userId: number, bonusDays: number): Pr
 export async function applyReferralReward(referrerId: number, refereeId: number): Promise<void> {
   try {
     const now = new Date();
+    const { refereeBonusDays, referrerBonusDays } = await getReferralSettings();
 
-    // Give referee their free trial days
-    await extendOrCreateSubscription(refereeId, REFEREE_BONUS_DAYS);
+    await extendOrCreateSubscription(refereeId, refereeBonusDays);
+    await extendOrCreateSubscription(referrerId, referrerBonusDays);
 
-    // Give referrer their bonus days
-    await extendOrCreateSubscription(referrerId, REFERRER_BONUS_DAYS);
-
-    // Record the referral
     await db.insert(referralsTable).values({
       referrerId,
       refereeId,
-      refereeBonusDays: REFEREE_BONUS_DAYS,
-      referrerBonusDays: REFERRER_BONUS_DAYS,
+      refereeBonusDays,
+      referrerBonusDays,
       status: "REWARDED",
       rewardedAt: now,
     });
 
-    logger.info({ referrerId, refereeId, REFEREE_BONUS_DAYS, REFERRER_BONUS_DAYS }, "Referral reward applied");
+    logger.info({ referrerId, refereeId, refereeBonusDays, referrerBonusDays }, "Referral reward applied");
   } catch (err) {
     logger.error({ err, referrerId, refereeId }, "Referral reward failed");
   }

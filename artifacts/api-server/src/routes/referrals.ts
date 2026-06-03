@@ -2,12 +2,13 @@ import { Router } from "express";
 import { db, usersTable, referralsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../lib/auth";
-import { ensureReferralCode } from "../lib/referrals";
+import { ensureReferralCode, getReferralSettings, setReferralSettings } from "../lib/referrals";
 
 const router = Router();
 
 router.get("/referral/stats", requireAuth, async (req, res): Promise<void> => {
   const code = await ensureReferralCode(req.userId!);
+  const settings = await getReferralSettings();
 
   const referrals = await db
     .select({
@@ -28,6 +29,8 @@ router.get("/referral/stats", requireAuth, async (req, res): Promise<void> => {
     totalReferrals: referrals.length,
     rewardedCount: referrals.filter((r) => r.status === "REWARDED").length,
     totalBonusDays,
+    refereeBonusDays: settings.refereeBonusDays,
+    referrerBonusDays: settings.referrerBonusDays,
     referrals: referrals.map((r) => ({
       id: r.id,
       status: r.status,
@@ -35,6 +38,15 @@ router.get("/referral/stats", requireAuth, async (req, res): Promise<void> => {
       createdAt: r.createdAt.toISOString(),
     })),
   });
+});
+
+router.get("/referral/settings", async (_req, res): Promise<void> => {
+  try {
+    const settings = await getReferralSettings();
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load referral settings" });
+  }
 });
 
 router.get("/referral/validate/:code", async (req, res): Promise<void> => {
@@ -51,6 +63,8 @@ router.get("/referral/validate/:code", async (req, res): Promise<void> => {
 });
 
 router.get("/admin/referrals", requireAdmin, async (_req, res): Promise<void> => {
+  const settings = await getReferralSettings();
+
   const referrals = await db
     .select({
       id: referralsTable.id,
@@ -74,8 +88,9 @@ router.get("/admin/referrals", requireAdmin, async (_req, res): Promise<void> =>
 
   const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
 
-  res.json(
-    referrals.map((r) => ({
+  res.json({
+    settings,
+    referrals: referrals.map((r) => ({
       id: r.id,
       status: r.status,
       referrer: userMap[r.referrerId] ?? { id: r.referrerId, name: "Unknown", email: "" },
@@ -84,8 +99,32 @@ router.get("/admin/referrals", requireAdmin, async (_req, res): Promise<void> =>
       referrerBonusDays: r.referrerBonusDays,
       createdAt: r.createdAt.toISOString(),
       rewardedAt: r.rewardedAt?.toISOString() ?? null,
-    }))
-  );
+    })),
+  });
+});
+
+router.patch("/admin/referral/settings", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { refereeBonusDays, referrerBonusDays } = req.body as {
+      refereeBonusDays?: number;
+      referrerBonusDays?: number;
+    };
+
+    if (refereeBonusDays != null && (refereeBonusDays < 1 || refereeBonusDays > 365)) {
+      res.status(400).json({ error: "refereeBonusDays must be between 1 and 365" });
+      return;
+    }
+    if (referrerBonusDays != null && (referrerBonusDays < 1 || referrerBonusDays > 365)) {
+      res.status(400).json({ error: "referrerBonusDays must be between 1 and 365" });
+      return;
+    }
+
+    await setReferralSettings(refereeBonusDays, referrerBonusDays);
+    const settings = await getReferralSettings();
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update referral settings" });
+  }
 });
 
 export default router;
