@@ -5,8 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Loader2, Settings, ImageIcon, Trash2, Upload } from "lucide-react";
+import { Loader2, Settings, ImageIcon, Trash2, Upload, Mail, Send, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+interface SmtpSettings {
+  host: string;
+  port: string;
+  user: string;
+  hasPassword: boolean;
+  from: string;
+  appUrl: string;
+}
 
 export default function AdminConfig() {
   const queryClient = useQueryClient();
@@ -58,8 +67,7 @@ export default function AdminConfig() {
   });
 
   const removeLogoMutation = useMutation({
-    mutationFn: () =>
-      customFetch("/api/admin/logo", { method: "DELETE" }),
+    mutationFn: () => customFetch("/api/admin/logo", { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["logo"] });
       toast({ title: "Logo removed" });
@@ -92,9 +100,68 @@ export default function AdminConfig() {
     );
   };
 
-  const currentLogoUrl = logoData?.url
-    ? `${logoData.url}?t=${Date.now()}`
-    : null;
+  const currentLogoUrl = logoData?.url ? `${logoData.url}?t=${Date.now()}` : null;
+
+  const { data: smtpData, isLoading: smtpLoading } = useQuery<SmtpSettings>({
+    queryKey: ["admin-smtp"],
+    queryFn: () => customFetch<SmtpSettings>("/api/admin/smtp"),
+  });
+
+  const smtpInitialized = useRef(false);
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("587");
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPass, setSmtpPass] = useState("");
+  const [smtpFrom, setSmtpFrom] = useState("");
+  const [appUrl, setAppUrl] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+
+  useEffect(() => {
+    if (smtpData && !smtpInitialized.current) {
+      setSmtpHost(smtpData.host);
+      setSmtpPort(smtpData.port);
+      setSmtpUser(smtpData.user);
+      setSmtpPass(smtpData.hasPassword ? "••••••••" : "");
+      setSmtpFrom(smtpData.from);
+      setAppUrl(smtpData.appUrl);
+      smtpInitialized.current = true;
+    }
+  }, [smtpData]);
+
+  const saveSmtpMutation = useMutation({
+    mutationFn: () =>
+      customFetch("/api/admin/smtp", {
+        method: "POST",
+        body: JSON.stringify({
+          host: smtpHost,
+          port: smtpPort,
+          user: smtpUser,
+          password: smtpPass,
+          from: smtpFrom,
+          appUrl,
+        }),
+      }),
+    onSuccess: () => {
+      smtpInitialized.current = false;
+      queryClient.invalidateQueries({ queryKey: ["admin-smtp"] });
+      toast({ title: "SMTP settings saved" });
+    },
+    onError: (err: any) =>
+      toast({ title: "Failed to save SMTP settings", description: err?.message, variant: "destructive" }),
+  });
+
+  const testSmtpMutation = useMutation({
+    mutationFn: () =>
+      customFetch("/api/admin/smtp/test", {
+        method: "POST",
+        body: JSON.stringify({ email: testEmail }),
+      }),
+    onSuccess: () =>
+      toast({ title: "Test email sent!", description: `Check the inbox at ${testEmail}.` }),
+    onError: (err: any) =>
+      toast({ title: "Test failed", description: err?.data?.error ?? err?.message, variant: "destructive" }),
+  });
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -111,11 +178,10 @@ export default function AdminConfig() {
             Platform Logo
           </CardTitle>
           <CardDescription>
-            Upload a logo to display in the sidebar. PNG, JPG, WebP or SVG, max 5 MB.
+            Upload a logo to display in the sidebar and auth screens. PNG, JPG, WebP or SVG, max 5 MB.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Current / preview */}
           <div className="flex items-center gap-6">
             <div className="w-32 h-16 rounded-lg border border-border bg-background flex items-center justify-center overflow-hidden flex-shrink-0">
               {logoLoading ? (
@@ -134,7 +200,7 @@ export default function AdminConfig() {
             <div className="space-y-2 flex-1">
               <p className="text-sm text-muted-foreground">
                 {currentLogoUrl && !logoPreview
-                  ? "Logo is currently active in the sidebar."
+                  ? "Logo is currently active in the sidebar and auth screens."
                   : logoPreview
                   ? "Preview — click Save to apply."
                   : "No logo set. Upload one to replace the text branding."}
@@ -176,7 +242,6 @@ export default function AdminConfig() {
             </div>
           </div>
 
-          {/* Save / cancel for new file */}
           {logoFile && (
             <div className="flex gap-2 pt-1">
               <Button
@@ -199,6 +264,142 @@ export default function AdminConfig() {
               >
                 Cancel
               </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SMTP Email Settings */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Mail className="w-4 h-4 text-green-500" />
+            Email (SMTP)
+          </CardTitle>
+          <CardDescription>
+            Configure outgoing email for password resets and account verification. Changes take effect immediately.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {smtpLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-green-500" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2 col-span-2 sm:col-span-1">
+                  <Label htmlFor="smtp-host">SMTP Host</Label>
+                  <Input
+                    id="smtp-host"
+                    value={smtpHost}
+                    onChange={(e) => setSmtpHost(e.target.value)}
+                    placeholder="smtp.gmail.com"
+                  />
+                </div>
+                <div className="space-y-2 col-span-2 sm:col-span-1">
+                  <Label htmlFor="smtp-port">Port</Label>
+                  <Input
+                    id="smtp-port"
+                    value={smtpPort}
+                    onChange={(e) => setSmtpPort(e.target.value)}
+                    placeholder="587"
+                    type="number"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="smtp-user">Username / Email</Label>
+                <Input
+                  id="smtp-user"
+                  value={smtpUser}
+                  onChange={(e) => setSmtpUser(e.target.value)}
+                  placeholder="you@gmail.com"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="smtp-pass">Password / App Password</Label>
+                <div className="relative">
+                  <Input
+                    id="smtp-pass"
+                    type={showPass ? "text" : "password"}
+                    value={smtpPass}
+                    onChange={(e) => setSmtpPass(e.target.value)}
+                    onFocus={() => { if (smtpPass === "••••••••") setSmtpPass(""); }}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass((p) => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">For Gmail, use an App Password (not your account password).</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="smtp-from">From Address</Label>
+                <Input
+                  id="smtp-from"
+                  value={smtpFrom}
+                  onChange={(e) => setSmtpFrom(e.target.value)}
+                  placeholder="PESAMATRIX <noreply@yourdomain.com>"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="app-url">App URL</Label>
+                <Input
+                  id="app-url"
+                  value={appUrl}
+                  onChange={(e) => setAppUrl(e.target.value)}
+                  placeholder="https://yourapp.replit.app"
+                />
+                <p className="text-xs text-muted-foreground">Used to build links inside emails (e.g. reset password link).</p>
+              </div>
+
+              <Button
+                className="bg-green-600 hover:bg-green-500 text-white border-0"
+                onClick={() => saveSmtpMutation.mutate()}
+                disabled={saveSmtpMutation.isPending}
+              >
+                {saveSmtpMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save SMTP Settings
+              </Button>
+
+              <div className="border-t border-border pt-4 space-y-3">
+                <p className="text-sm font-medium">Send a test email</p>
+                <p className="text-xs text-muted-foreground">Save your settings above first, then send a test to verify delivery.</p>
+                <div className="flex gap-2">
+                  <Input
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    type="email"
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    className="gap-1.5 shrink-0"
+                    onClick={() => testSmtpMutation.mutate()}
+                    disabled={testSmtpMutation.isPending || !testEmail}
+                  >
+                    {testSmtpMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    Send Test
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>

@@ -1,30 +1,63 @@
 import nodemailer from "nodemailer";
+import { db, systemConfigTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
-const {
-  SMTP_HOST,
-  SMTP_PORT,
-  SMTP_USER,
-  SMTP_PASS,
-  SMTP_FROM,
-  APP_URL,
-} = process.env;
+async function getDbValue(key: string): Promise<string | null> {
+  try {
+    const [row] = await db
+      .select({ value: systemConfigTable.value })
+      .from(systemConfigTable)
+      .where(eq(systemConfigTable.key, key));
+    return row?.value ?? null;
+  } catch {
+    return null;
+  }
+}
 
-function createTransport() {
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  from: string;
+  appUrl: string;
+}
+
+export async function getSmtpConfig(): Promise<SmtpConfig> {
+  const [host, port, user, pass, from, appUrl] = await Promise.all([
+    getDbValue("smtp_host"),
+    getDbValue("smtp_port"),
+    getDbValue("smtp_user"),
+    getDbValue("smtp_pass"),
+    getDbValue("smtp_from"),
+    getDbValue("app_url"),
+  ]);
+
+  return {
+    host: host || process.env.SMTP_HOST || "",
+    port: Number(port || process.env.SMTP_PORT || 587),
+    user: user || process.env.SMTP_USER || "",
+    pass: pass || process.env.SMTP_PASS || "",
+    from: from || process.env.SMTP_FROM || "PESAMATRIX <noreply@pesamatrix.com>",
+    appUrl: appUrl || process.env.APP_URL || "https://pesamatrix.replit.app",
+  };
+}
+
+async function createTransport() {
+  const cfg = await getSmtpConfig();
+  if (!cfg.host || !cfg.user || !cfg.pass) return null;
   return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: Number(SMTP_PORT ?? 587),
-    secure: Number(SMTP_PORT ?? 587) === 465,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.port === 465,
+    auth: { user: cfg.user, pass: cfg.pass },
   });
 }
 
-const from = SMTP_FROM ?? `PESAMATRIX <noreply@pesamatrix.com>`;
-const baseUrl = APP_URL ?? "https://pesamatrix.replit.app";
-
 export async function sendPasswordResetEmail(email: string, name: string, token: string): Promise<void> {
-  const link = `${baseUrl}/reset-password?token=${token}`;
-  const transport = createTransport();
+  const cfg = await getSmtpConfig();
+  const link = `${cfg.appUrl}/reset-password?token=${token}`;
+  const transport = await createTransport();
 
   if (!transport) {
     console.warn(`[mailer] SMTP not configured — password reset link for ${email}: ${link}`);
@@ -32,7 +65,7 @@ export async function sendPasswordResetEmail(email: string, name: string, token:
   }
 
   await transport.sendMail({
-    from,
+    from: cfg.from,
     to: email,
     subject: "Reset your PESAMATRIX password",
     html: `
@@ -70,8 +103,9 @@ export async function sendPasswordResetEmail(email: string, name: string, token:
 }
 
 export async function sendVerificationEmail(email: string, name: string, token: string): Promise<void> {
-  const link = `${baseUrl}/verify-email?token=${token}`;
-  const transport = createTransport();
+  const cfg = await getSmtpConfig();
+  const link = `${cfg.appUrl}/verify-email?token=${token}`;
+  const transport = await createTransport();
 
   if (!transport) {
     console.warn(`[mailer] SMTP not configured — verification link for ${email}: ${link}`);
@@ -79,7 +113,7 @@ export async function sendVerificationEmail(email: string, name: string, token: 
   }
 
   await transport.sendMail({
-    from,
+    from: cfg.from,
     to: email,
     subject: "Verify your PESAMATRIX account",
     html: `
