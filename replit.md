@@ -51,8 +51,8 @@ A premium dark-themed SaaS forex/crypto trading signals platform for serious tra
 
 ## Seeded accounts
 
-- Admin: `craigphilip761@gmail.com` / `TempPass123!` (mustChangePassword=true)
-- Test user: `john.trader@gmail.com` / `TempPass123!`
+- Admin: `craigphilip761@gmail.com` / `Pesa@2026!` (mustChangePassword=true on first login)
+- Test user account is not auto-seeded — create one via /register or admin panel
 
 ## Gotchas
 
