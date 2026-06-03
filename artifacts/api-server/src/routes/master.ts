@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db, systemConfigTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth";
-import { getMetaApiAccount } from "../lib/metaapi";
+import { getMetaApiAccount, deployMetaApiAccount, undeployMetaApiAccount } from "../lib/metaapi";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -105,6 +105,50 @@ router.put("/admin/master", requireAdmin, async (req, res): Promise<void> => {
   }
 
   res.json({ ok: true });
+});
+
+// ─── POST /api/admin/master/deploy ───────────────────────────────────────────
+
+router.post("/admin/master/deploy", requireAdmin, async (_req, res): Promise<void> => {
+  const map = await getSystemConfigMap();
+  const accountId = map["masterMetaApiAccountId"] ?? DEFAULT_MASTER_ID;
+
+  if (!accountId) {
+    res.status(400).json({ error: "No master account ID configured" });
+    return;
+  }
+
+  try {
+    await deployMetaApiAccount(accountId);
+    logger.info({ accountId }, "[Master] Deploy triggered");
+    res.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to deploy account";
+    logger.error({ err, accountId }, "[Master] Deploy failed");
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ─── POST /api/admin/master/undeploy ─────────────────────────────────────────
+
+router.post("/admin/master/undeploy", requireAdmin, async (_req, res): Promise<void> => {
+  const map = await getSystemConfigMap();
+  const accountId = map["masterMetaApiAccountId"] ?? DEFAULT_MASTER_ID;
+
+  if (!accountId) {
+    res.status(400).json({ error: "No master account ID configured" });
+    return;
+  }
+
+  try {
+    await undeployMetaApiAccount(accountId);
+    logger.info({ accountId }, "[Master] Undeploy triggered");
+    res.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to undeploy account";
+    logger.error({ err, accountId }, "[Master] Undeploy failed");
+    res.status(500).json({ error: msg });
+  }
 });
 
 export default router;

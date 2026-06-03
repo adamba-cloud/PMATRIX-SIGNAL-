@@ -144005,6 +144005,40 @@ router24.put("/admin/master", requireAdmin, async (req, res) => {
   }
   res.json({ ok: true });
 });
+router24.post("/admin/master/deploy", requireAdmin, async (_req, res) => {
+  const map2 = await getSystemConfigMap();
+  const accountId = map2["masterMetaApiAccountId"] ?? DEFAULT_MASTER_ID;
+  if (!accountId) {
+    res.status(400).json({ error: "No master account ID configured" });
+    return;
+  }
+  try {
+    await deployMetaApiAccount(accountId);
+    logger.info({ accountId }, "[Master] Deploy triggered");
+    res.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to deploy account";
+    logger.error({ err, accountId }, "[Master] Deploy failed");
+    res.status(500).json({ error: msg });
+  }
+});
+router24.post("/admin/master/undeploy", requireAdmin, async (_req, res) => {
+  const map2 = await getSystemConfigMap();
+  const accountId = map2["masterMetaApiAccountId"] ?? DEFAULT_MASTER_ID;
+  if (!accountId) {
+    res.status(400).json({ error: "No master account ID configured" });
+    return;
+  }
+  try {
+    await undeployMetaApiAccount(accountId);
+    logger.info({ accountId }, "[Master] Undeploy triggered");
+    res.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to undeploy account";
+    logger.error({ err, accountId }, "[Master] Undeploy failed");
+    res.status(500).json({ error: msg });
+  }
+});
 var master_default = router24;
 
 // src/routes/index.ts

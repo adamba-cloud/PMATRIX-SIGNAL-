@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Cpu, Wifi, WifiOff, AlertTriangle, RefreshCw, Clock, Server, CheckCircle2 } from "lucide-react";
+import { Loader2, Cpu, Wifi, WifiOff, AlertTriangle, RefreshCw, Clock, Server, CheckCircle2, PlayCircle, StopCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 
@@ -112,6 +112,32 @@ export default function AdminMaster() {
     onError: (err: unknown) => {
       const msg = (err as { data?: { error?: string } })?.data?.error ?? "Failed to save";
       toast({ title: "Save failed", description: msg, variant: "destructive" });
+    },
+  });
+
+  const deployMutation = useMutation({
+    mutationFn: () =>
+      customFetch("/api/admin/master/deploy", { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: MASTER_QUERY_KEY });
+      toast({ title: "Deploy triggered", description: "MetaApi account deployment started." });
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { data?: { error?: string } })?.data?.error ?? "Deploy failed";
+      toast({ title: "Deploy failed", description: msg, variant: "destructive" });
+    },
+  });
+
+  const undeployMutation = useMutation({
+    mutationFn: () =>
+      customFetch("/api/admin/master/undeploy", { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: MASTER_QUERY_KEY });
+      toast({ title: "Undeploy triggered", description: "MetaApi account is being undeployed." });
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { data?: { error?: string } })?.data?.error ?? "Undeploy failed";
+      toast({ title: "Undeploy failed", description: msg, variant: "destructive" });
     },
   });
 
@@ -231,12 +257,53 @@ export default function AdminMaster() {
               <Wifi className="w-4 h-4 text-green-500" />
               Live Status
             </CardTitle>
-            {data?.lastChecked && (
-              <span className="text-xs text-slate-500 flex items-center gap-1.5">
-                <Clock className="w-3 h-3" />
-                Last heartbeat {formatDistanceToNow(new Date(data.lastChecked), { addSuffix: true })}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {data?.lastChecked && (
+                <span className="text-xs text-slate-500 flex items-center gap-1.5">
+                  <Clock className="w-3 h-3" />
+                  Last heartbeat {formatDistanceToNow(new Date(data.lastChecked), { addSuffix: true })}
+                </span>
+              )}
+              {s && !data?.error && (
+                <>
+                  {s.state === "DEPLOYED" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => undeployMutation.mutate()}
+                      disabled={undeployMutation.isPending || deployMutation.isPending}
+                      className="gap-1.5 border-red-700 text-red-400 hover:bg-red-950 hover:text-red-300 hover:border-red-600"
+                    >
+                      {undeployMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <StopCircle className="w-3.5 h-3.5" />
+                      )}
+                      Undeploy
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => deployMutation.mutate()}
+                      disabled={
+                        deployMutation.isPending ||
+                        undeployMutation.isPending ||
+                        s.state === "DEPLOYING" ||
+                        s.state === "UNDEPLOYING"
+                      }
+                      className="gap-1.5 bg-green-700 hover:bg-green-600 text-white"
+                    >
+                      {deployMutation.isPending || s.state === "DEPLOYING" ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <PlayCircle className="w-3.5 h-3.5" />
+                      )}
+                      Deploy
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
           <CardDescription className="text-slate-400">
             Real-time status fetched directly from MetaApi. Refreshes every 15 seconds.
