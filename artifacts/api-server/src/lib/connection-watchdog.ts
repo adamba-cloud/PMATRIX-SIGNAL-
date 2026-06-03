@@ -29,7 +29,8 @@ const EMERGENCY_KEY = "watchdog:emergency:paused";
 
 /** Called by master-poller after every successful position fetch. */
 export async function updateMasterHeartbeat(metaApiId: string): Promise<void> {
-  const redis = getRedis();
+  let redis;
+  try { redis = getRedis(); } catch { return; } // Redis not available in this environment
   // TTL = 2× the poll interval so a single missed poll doesn't trigger the alarm
   await redis.set(HEARTBEAT_KEY(metaApiId), Date.now().toString(), "EX", 30);
 }
@@ -51,7 +52,8 @@ async function getActiveMasterMetaApiIds(): Promise<string[]> {
 }
 
 async function runWatchdogCycle(): Promise<void> {
-  const redis = getRedis();
+  let redis;
+  try { redis = getRedis(); } catch { return; } // Redis not available in this environment
   const queue = getCopyTradeQueue();
 
   const masterIds = await getActiveMasterMetaApiIds();

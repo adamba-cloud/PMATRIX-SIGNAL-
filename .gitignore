@@ -3,6 +3,13 @@
 # compiled output
 dist
 tmp
+
+# Un-ignore built artifacts so deployment always serves the correct bundle
+!artifacts/pesamatrix/dist/
+!artifacts/pesamatrix/dist/public/
+!artifacts/pesamatrix/dist/public/**
+!artifacts/api-server/dist/
+!artifacts/api-server/dist/**
 out-tsc
 *.tsbuildinfo
 .expo
