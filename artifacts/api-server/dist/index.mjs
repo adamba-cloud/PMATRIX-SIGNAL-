@@ -145127,24 +145127,260 @@ function startMasterTradeListener() {
 // src/lib/master-trade-execution-worker.ts
 var import_bullmq4 = __toESM(require_cjs(), 1);
 var CONCURRENCY2 = 5;
+var MIN_LOT_SIZE2 = 0.01;
+function calculateProportionalLots(masterLots, masterBalance, slaveBalance) {
+  if (masterBalance != null && masterBalance > 0 && slaveBalance != null) {
+    const raw = slaveBalance / masterBalance * masterLots;
+    return Math.max(MIN_LOT_SIZE2, parseFloat(raw.toFixed(2)));
+  }
+  return Math.max(MIN_LOT_SIZE2, parseFloat(masterLots.toFixed(2)));
+}
+async function executeOnSlave(params) {
+  const {
+    eventId,
+    positionId,
+    symbol: symbol2,
+    direction,
+    masterLots,
+    openPrice,
+    stopLoss,
+    takeProfit,
+    masterAccountId,
+    slaveAccountId,
+    slaveMetaApiId,
+    masterBalance
+  } = params;
+  const now = /* @__PURE__ */ new Date();
+  const [activeSub] = await db.select({ id: mt5AccountSubscriptionsTable.id }).from(mt5AccountSubscriptionsTable).where(
+    and(
+      eq(mt5AccountSubscriptionsTable.slaveAccountId, slaveAccountId),
+      eq(mt5AccountSubscriptionsTable.status, "ACTIVE"),
+      gt(mt5AccountSubscriptionsTable.expiryDate, now)
+    )
+  ).limit(1);
+  if (!activeSub) {
+    logger.warn(
+      { eventId, slaveAccountId, slaveMetaApiId, symbol: symbol2 },
+      "[MasterTradeExecution] Slave skipped \u2014 no active MT5 subscription"
+    );
+    await db.insert(copyTradeLogsTable).values({
+      masterAccountId,
+      slaveAccountId,
+      masterTicket: positionId,
+      symbol: symbol2,
+      direction,
+      volume: String(masterLots),
+      entryPrice: openPrice != null ? String(openPrice) : null,
+      stopLoss: stopLoss != null ? String(stopLoss) : null,
+      takeProfit: takeProfit != null ? String(takeProfit) : null,
+      masterLots: String(masterLots),
+      calculatedLots: String(masterLots),
+      status: "SKIPPED",
+      errorMessage: "No active MT5 account subscription"
+    });
+    return;
+  }
+  let slaveBalance = null;
+  try {
+    slaveBalance = await getAccountBalance(slaveMetaApiId);
+  } catch (err) {
+    logger.warn(
+      { err, slaveMetaApiId, symbol: symbol2 },
+      "[MasterTradeExecution] Failed to fetch slave balance \u2014 using masterLots as-is"
+    );
+  }
+  const calculatedLots = calculateProportionalLots(masterLots, masterBalance, slaveBalance);
+  logger.info(
+    {
+      eventId,
+      slaveMetaApiId,
+      slaveAccountId,
+      symbol: symbol2,
+      direction,
+      masterLots,
+      calculatedLots,
+      masterBalance,
+      slaveBalance
+    },
+    "[MasterTradeExecution] Proportional sizing applied"
+  );
+  const [log] = await db.insert(copyTradeLogsTable).values({
+    masterAccountId,
+    slaveAccountId,
+    masterTicket: positionId,
+    symbol: symbol2,
+    direction,
+    volume: String(calculatedLots),
+    entryPrice: openPrice != null ? String(openPrice) : null,
+    stopLoss: stopLoss != null ? String(stopLoss) : null,
+    takeProfit: takeProfit != null ? String(takeProfit) : null,
+    masterBalance: masterBalance != null ? String(masterBalance) : null,
+    slaveBalance: slaveBalance != null ? String(slaveBalance) : null,
+    masterLots: String(masterLots),
+    calculatedLots: String(calculatedLots),
+    status: "PENDING"
+  }).returning({ id: copyTradeLogsTable.id });
+  try {
+    const result = await placeTrade(slaveMetaApiId, {
+      actionType: direction === "BUY" ? "ORDER_TYPE_BUY" : "ORDER_TYPE_SELL",
+      symbol: symbol2,
+      volume: calculatedLots,
+      stopLoss: stopLoss ?? void 0,
+      takeProfit: takeProfit ?? void 0,
+      comment: `MTE:${positionId}`
+    });
+    const success2 = result.stringCode === "TRADE_RETCODE_DONE" || result.numericCode === 10009;
+    if (!success2) {
+      throw new Error(`Trade rejected: ${result.stringCode} \u2014 ${result.message}`);
+    }
+    await db.update(copyTradeLogsTable).set({
+      status: "SUCCESS",
+      slaveTicket: result.orderId ?? null,
+      executedAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq(copyTradeLogsTable.id, log.id));
+    logger.info(
+      {
+        logId: log.id,
+        slaveMetaApiId,
+        slaveAccountId,
+        slaveTicket: result.orderId,
+        symbol: symbol2,
+        direction,
+        calculatedLots,
+        masterLots,
+        masterBalance,
+        slaveBalance
+      },
+      "[MasterTradeExecution] Trade executed successfully on slave"
+    );
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    await db.update(copyTradeLogsTable).set({
+      status: "FAILED",
+      errorMessage,
+      executedAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where(eq(copyTradeLogsTable.id, log.id));
+    logger.error(
+      { err, logId: log.id, slaveMetaApiId, slaveAccountId, symbol: symbol2 },
+      "[MasterTradeExecution] Trade execution failed on slave"
+    );
+    throw err;
+  }
+}
+async function fanOutToSlaves(data) {
+  const {
+    eventId,
+    metaApiAccountId,
+    positionId,
+    symbol: symbol2,
+    direction,
+    volume,
+    openPrice,
+    stopLoss,
+    takeProfit
+  } = data;
+  const masterLots = volume ?? MIN_LOT_SIZE2;
+  const [masterAccount] = await db.select({ id: slaveAccountsTable.id }).from(slaveAccountsTable).where(eq(slaveAccountsTable.metaApiAccountId, metaApiAccountId)).limit(1);
+  if (!masterAccount) {
+    logger.warn(
+      { eventId, metaApiAccountId },
+      "[MasterTradeExecution] Master account not found in slave_accounts \u2014 no slave fan-out"
+    );
+    return;
+  }
+  const links = await db.select({
+    slaveAccountId: copyTradeLinksTable.slaveAccountId,
+    slaveMetaApiId: slaveAccountsTable.metaApiAccountId
+  }).from(copyTradeLinksTable).innerJoin(
+    slaveAccountsTable,
+    and(
+      eq(copyTradeLinksTable.slaveAccountId, slaveAccountsTable.id),
+      eq(slaveAccountsTable.status, "CONNECTED"),
+      isNotNull(slaveAccountsTable.metaApiAccountId)
+    )
+  ).where(
+    and(
+      eq(copyTradeLinksTable.masterAccountId, masterAccount.id),
+      eq(copyTradeLinksTable.isActive, true)
+    )
+  );
+  if (links.length === 0) {
+    logger.info(
+      { eventId, masterAccountId: masterAccount.id, symbol: symbol2 },
+      "[MasterTradeExecution] No active connected slave links \u2014 nothing to execute"
+    );
+    return;
+  }
+  logger.info(
+    { eventId, masterAccountId: masterAccount.id, slaveCount: links.length, symbol: symbol2, direction },
+    "[MasterTradeExecution] Fanning out to slaves"
+  );
+  let masterBalance = null;
+  try {
+    masterBalance = await getAccountBalance(metaApiAccountId);
+    logger.info(
+      { eventId, metaApiAccountId, masterBalance },
+      "[MasterTradeExecution] Master balance fetched"
+    );
+  } catch (err) {
+    logger.warn(
+      { err, metaApiAccountId },
+      "[MasterTradeExecution] Could not fetch master balance \u2014 proportional sizing will use masterLots as-is"
+    );
+  }
+  const results = await Promise.allSettled(
+    links.map(
+      (link) => executeOnSlave({
+        eventId,
+        positionId,
+        symbol: symbol2,
+        direction,
+        masterLots,
+        openPrice,
+        stopLoss,
+        takeProfit,
+        masterAccountId: masterAccount.id,
+        slaveAccountId: link.slaveAccountId,
+        slaveMetaApiId: link.slaveMetaApiId,
+        masterBalance
+      })
+    )
+  );
+  const succeeded = results.filter((r) => r.status === "fulfilled").length;
+  const failed = results.filter((r) => r.status === "rejected").length;
+  logger.info(
+    {
+      eventId,
+      symbol: symbol2,
+      direction,
+      masterLots,
+      masterBalance,
+      totalSlaves: links.length,
+      succeeded,
+      failed
+    },
+    "[MasterTradeExecution] Slave fan-out complete"
+  );
+}
 function startMasterTradeExecutionWorker() {
   const worker = new import_bullmq4.Worker(
     MASTER_TRADE_EXECUTION_QUEUE,
     async (job) => {
-      const { eventId, eventType, positionId, symbol: symbol2, direction, volume, changedFields } = job.data;
+      const { eventId, eventType, positionId, symbol: symbol2, direction } = job.data;
       logger.info(
-        {
-          jobId: job.id,
-          eventId,
-          eventType,
-          positionId,
-          symbol: symbol2,
-          direction,
-          volume,
-          changedFields: changedFields ?? void 0
-        },
+        { jobId: job.id, eventId, eventType, positionId, symbol: symbol2, direction },
         "[MasterTradeExecution] Queue Processed"
       );
+      if (eventType === "POSITION_OPENED") {
+        await fanOutToSlaves(job.data);
+      } else {
+        logger.info(
+          { jobId: job.id, eventId, eventType, positionId, symbol: symbol2 },
+          "[MasterTradeExecution] Slave-side modify/close execution deferred \u2014 event recorded"
+        );
+      }
       await db.update(masterTradeEventsTable).set({ jobStatus: "PROCESSED" }).where(eq(masterTradeEventsTable.id, eventId));
     },
     {
