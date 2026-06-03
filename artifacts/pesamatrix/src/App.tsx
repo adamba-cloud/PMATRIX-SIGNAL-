@@ -49,6 +49,7 @@ import Payments from "@/pages/payments";
 import Subscription from "@/pages/subscription";
 import Profile from "@/pages/profile";
 import Mt5Accounts from "@/pages/mt5";
+import Mt5Subscription from "@/pages/mt5-subscription";
 import CopyTrading from "@/pages/copy-trading";
 import Gallery from "@/pages/gallery";
 import News from "@/pages/news";
@@ -68,6 +69,7 @@ import AdminAnnouncements from "@/pages/admin/announcements";
 import AdminSignals from "@/pages/admin/signals";
 import AdminReferrals from "@/pages/admin/referrals";
 import AdminAdvertisements from "@/pages/admin/advertisements";
+import AdminMt5Billing from "@/pages/admin/mt5-billing";
 
 const queryClient = new QueryClient();
 
@@ -88,6 +90,7 @@ function Router() {
         <Route path="/subscription" component={Subscription} />
         <Route path="/profile" component={Profile} />
         <Route path="/mt5" component={Mt5Accounts} />
+        <Route path="/mt5-subscription" component={Mt5Subscription} />
         <Route path="/copy-trading" component={CopyTrading} />
         <Route path="/gallery" component={Gallery} />
         <Route path="/news" component={News} />
@@ -107,6 +110,7 @@ function Router() {
         <Route path="/admin/signals" component={AdminSignals} />
         <Route path="/admin/referrals" component={AdminReferrals} />
         <Route path="/admin/advertisements" component={AdminAdvertisements} />
+        <Route path="/admin/mt5-billing" component={AdminMt5Billing} />
 
         <Route component={NotFound} />
       </Switch>

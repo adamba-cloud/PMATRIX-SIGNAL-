@@ -1,6 +1,6 @@
 import { Worker, type Job } from "bullmq";
-import { db, copyTradeLogsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, copyTradeLogsTable, slaveAccountsTable, mt5AccountSubscriptionsTable } from "@workspace/db";
+import { and, eq, gt } from "drizzle-orm";
 import { getRedis } from "./redis";
 import { COPY_TRADE_QUEUE, type CopyTradeJobData } from "./copy-trade-queue";
 import { placeTrade } from "./metaapi";
@@ -31,6 +31,36 @@ export function startCopyTradeWorker(): Worker<CopyTradeJobData> {
         );
         await job.moveToDelayed(Date.now() + 30_000, token);
         return;
+      }
+
+      // ── MT5 Subscription check ─────────────────────────────────────────────
+      const [slaveAccount] = await db
+        .select({ id: slaveAccountsTable.id })
+        .from(slaveAccountsTable)
+        .where(eq(slaveAccountsTable.metaApiAccountId, slaveMetaApiId));
+
+      if (slaveAccount) {
+        const now = new Date();
+        const [activeSub] = await db
+          .select({ id: mt5AccountSubscriptionsTable.id })
+          .from(mt5AccountSubscriptionsTable)
+          .where(
+            and(
+              eq(mt5AccountSubscriptionsTable.slaveAccountId, slaveAccount.id),
+              eq(mt5AccountSubscriptionsTable.status, "ACTIVE"),
+              gt(mt5AccountSubscriptionsTable.expiryDate, now)
+            )
+          )
+          .limit(1);
+
+        if (!activeSub) {
+          logger.warn({ logId, slaveMetaApiId }, "Copy trade skipped — no active MT5 subscription");
+          await db
+            .update(copyTradeLogsTable)
+            .set({ status: "FAILED", errorMessage: "No active MT5 account subscription", updatedAt: new Date() })
+            .where(eq(copyTradeLogsTable.id, logId));
+          return;
+        }
       }
 
       // ── Spread protection ──────────────────────────────────────────────────

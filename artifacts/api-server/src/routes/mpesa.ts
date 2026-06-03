@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, paymentsTable, subscriptionsTable, systemConfigTable, advertisementsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, paymentsTable, subscriptionsTable, systemConfigTable, advertisementsTable, mt5AccountSubscriptionsTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
 import { initiateStkPush, parseCallback, formatPhone, type DarajaCallbackBody } from "../lib/daraja";
 import { requireAuth } from "../lib/auth";
 import { logger } from "../lib/logger";
@@ -201,6 +201,23 @@ router.post("/payments/mpesa/callback", async (req, res): Promise<void> => {
           .set({ isPaid: true, updatedAt: new Date() })
           .where(eq(advertisementsTable.id, payment.advertisementId));
         logger.info({ advertisementId: payment.advertisementId }, "Advertisement marked as paid");
+      }
+
+      const pendingMt5Subs = await db
+        .select()
+        .from(mt5AccountSubscriptionsTable)
+        .where(and(eq(mt5AccountSubscriptionsTable.paymentId, payment.id), eq(mt5AccountSubscriptionsTable.status, "PENDING")));
+
+      if (pendingMt5Subs.length > 0) {
+        const now = new Date();
+        for (const sub of pendingMt5Subs) {
+          const expiryDate = new Date(now.getTime() + sub.numberOfDays * 24 * 60 * 60 * 1000);
+          await db
+            .update(mt5AccountSubscriptionsTable)
+            .set({ status: "ACTIVE", startDate: now, expiryDate })
+            .where(eq(mt5AccountSubscriptionsTable.id, sub.id));
+        }
+        logger.info({ paymentId: payment.id, count: pendingMt5Subs.length }, "MT5 subscriptions activated via callback");
       }
 
       logger.info({ paymentId: payment.id, receipt: parsed.mpesaReceiptNumber }, "Payment completed");

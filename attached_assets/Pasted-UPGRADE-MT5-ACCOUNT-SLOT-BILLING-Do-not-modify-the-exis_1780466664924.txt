@@ -1,0 +1,156 @@
+UPGRADE: MT5 ACCOUNT SLOT BILLING
+
+Do not modify the existing MT5 connection architecture.
+
+Keep the current maximum of 5 MT5 accounts per user.
+
+Implement account-based billing.
+
+OBJECTIVE
+
+Each connected MT5 account must have an active paid slot.
+
+Users can still connect up to 5 MT5 accounts, but each account requires its own subscription payment.
+
+EXAMPLE
+
+Admin Settings:
+
+Base Fee Per MT5 Account Per Day = KES 50
+
+User connects:
+
+1 MT5 Account for 30 days
+
+Cost:
+KES 1,500
+
+User connects:
+
+3 MT5 Accounts for 30 days
+
+Cost:
+KES 4,500
+
+User connects:
+
+5 MT5 Accounts for 30 days
+
+Cost:
+KES 7,500
+
+ADMIN FEATURES
+
+Add new settings:
+
+- mt5AccountFeePerDay
+- minimumSubscriptionDays
+- maximumMt5Accounts (default 5)
+
+Admin can update these values from the dashboard.
+
+DATABASE CHANGES
+
+Create MT5AccountSubscription model.
+
+Fields:
+
+- id
+- userId
+- slaveAccountId
+- amount
+- startDate
+- expiryDate
+- status
+- createdAt
+
+Status:
+
+- ACTIVE
+- EXPIRED
+- PENDING
+
+USER DASHBOARD
+
+MT5 Connections Page:
+
+Display:
+
+Connected Accounts:
+X / 5
+
+For each MT5 account show:
+
+- Account Name
+- Broker
+- Status
+- Subscription Expiry Date
+- Days Remaining
+
+When adding a new MT5 account:
+
+System must check:
+
+Does this account have an active subscription?
+
+If NO:
+
+Redirect user to MT5 Account Subscription page.
+
+SUBSCRIPTION PAGE
+
+User selects:
+
+- Number of MT5 accounts
+- Number of subscription days
+
+System calculates automatically:
+
+Total Cost =
+MT5 Account Fee Per Day × Number of Accounts × Number of Days
+
+Display full pricing breakdown before payment.
+
+COPY TRADING RULE
+
+Only MT5 accounts with ACTIVE subscriptions may receive copied trades.
+
+If subscription expires:
+
+- Disable trade copying for that account
+- Keep account record saved
+- Change status to EXPIRED
+
+BACKGROUND WORKER
+
+Run daily.
+
+Check MT5 account subscriptions.
+
+If expired:
+
+- Change status to EXPIRED
+- Remove account from active copy-trading queue
+- Log event in audit history
+
+ANALYTICS
+
+Admin Dashboard should display:
+
+- Total Active MT5 Accounts
+- Total Expired MT5 Accounts
+- Revenue Per MT5 Account
+- Revenue By Subscription Period
+
+IMPORTANT
+
+This is an upgrade to the existing system.
+
+Do not modify:
+
+- MetaApi integration
+- MT5 onboarding
+- Copy trading execution logic
+- Existing user authentication
+
+Only add account-based subscription billing and enforcement.

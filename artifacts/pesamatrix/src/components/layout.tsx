@@ -118,6 +118,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/subscription" icon={ShieldCheck}>Subscription</SidebarLink>
                 <SidebarLink href="/payments" icon={CreditCard}>Payments</SidebarLink>
                 <SidebarLink href="/mt5" icon={Cpu}>MT5 Accounts</SidebarLink>
+                <SidebarLink href="/mt5-subscription" icon={ShieldCheck}>MT5 Subscription</SidebarLink>
                 <SidebarLink href="/copy-trading" icon={GitFork}>Copy Trading</SidebarLink>
                 <SidebarLink href="/trading-calculator" icon={Calculator}>Growth Calculator</SidebarLink>
                 <SidebarLink href="/trade-journal" icon={BookOpen}>Trade Journal</SidebarLink>
@@ -144,6 +145,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/admin/payments" icon={CreditCard}>Payments</SidebarLink>
                 <SidebarLink href="/admin/config" icon={Settings}>System Config</SidebarLink>
                 <SidebarLink href="/admin/mt5" icon={Cpu}>MT5 Accounts</SidebarLink>
+                <SidebarLink href="/admin/mt5-billing" icon={CreditCard}>MT5 Billing</SidebarLink>
                 <SidebarLink href="/admin/content" icon={FolderOpen}>Content</SidebarLink>
                 <SidebarLink href="/admin/signals" icon={Radio}>Signals</SidebarLink>
                 <SidebarLink href="/admin/announcements" icon={Megaphone}>Announcements</SidebarLink>

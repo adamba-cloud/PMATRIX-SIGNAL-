@@ -10,6 +10,7 @@ import { startConnectionWatchdog } from "./lib/connection-watchdog";
 import { startPaymentReconciler } from "./lib/payment-reconciler";
 import { seedAdminUser } from "./lib/seed";
 import { startAdvertisementExpiryJob } from "./lib/advertisement-expiry-job";
+import { startMt5SubscriptionExpiryJob } from "./lib/mt5-subscription-expiry-job";
 
 const rawPort = process.env["PORT"];
 
@@ -29,6 +30,7 @@ const server = createServer(app);
 attachForexWebSocket(server);
 startExpiryJob();
 startAdvertisementExpiryJob();
+startMt5SubscriptionExpiryJob();
 startMetaApiSyncJob();
 
 // Redis-dependent services — gracefully skip if Redis is unavailable (no REDIS_URL set)

@@ -15,3 +15,5 @@ export * from "./push_subscriptions";
 export * from "./referrals";
 export * from "./trade_journal";
 export * from "./advertisements";
+export * from "./mt5_billing_settings";
+export * from "./mt5_account_subscriptions";
