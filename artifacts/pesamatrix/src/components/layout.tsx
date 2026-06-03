@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useGetMe, getGetMeQueryKey, customFetch } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { Ticker } from "./ticker";
 import { AnnouncementBanner } from "./announcement-banner";
 import { useTheme } from "@/contexts/theme";
@@ -92,6 +93,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const isAdmin = user.role === "ADMIN";
 
+  const { data: logoData } = useQuery<{ url: string | null }>({
+    queryKey: ["logo"],
+    queryFn: () => customFetch<{ url: string | null }>("/api/logo"),
+    staleTime: 5 * 60 * 1000,
+  });
+
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col overflow-hidden">
       <Ticker />
@@ -101,10 +108,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Sidebar */}
         <aside className="w-64 bg-card border-r border-border flex flex-col flex-shrink-0">
           <div className="p-6">
-            <h1 className="text-xl font-bold tracking-tight text-green-500 flex items-center gap-2">
-              <ActivitySquare className="w-6 h-6" />
-              PESAMATRIX
-            </h1>
+            {logoData?.url ? (
+              <img
+                src={logoData.url}
+                alt="PESAMATRIX"
+                className="h-10 w-auto max-w-full object-contain"
+              />
+            ) : (
+              <h1 className="text-xl font-bold tracking-tight text-green-500 flex items-center gap-2">
+                <ActivitySquare className="w-6 h-6" />
+                PESAMATRIX
+              </h1>
+            )}
             <p className="text-xs text-muted-foreground uppercase tracking-widest mt-1">
               Signals Platform
             </p>

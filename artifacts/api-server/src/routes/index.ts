@@ -20,6 +20,7 @@ import referralsRouter from "./referrals";
 import journalRouter from "./journal";
 import advertisementsRouter from "./advertisements";
 import mt5BillingRouter from "./mt5-billing";
+import logoRouter from "./logo";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(referralsRouter);
 router.use(journalRouter);
 router.use(advertisementsRouter);
 router.use(mt5BillingRouter);
+router.use(logoRouter);
 
 export default router;
