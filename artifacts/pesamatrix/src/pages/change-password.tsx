@@ -30,8 +30,11 @@ export default function ChangePassword() {
       { data: { currentPassword, newPassword } },
       {
         onSuccess: (data) => {
-          queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
-          
+          // Immediately update the cache with the fresh user (mustChangePassword=false)
+          // before navigating, so the layout's redirect guard doesn't see stale data
+          // and bounce us back to /change-password.
+          queryClient.setQueryData(getGetMeQueryKey(), data.user);
+
           if (data.user.role === "ADMIN") {
             setLocation("/admin/dashboard");
           } else {
