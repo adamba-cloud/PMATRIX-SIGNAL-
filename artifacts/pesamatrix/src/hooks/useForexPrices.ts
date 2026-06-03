@@ -38,13 +38,15 @@ export function useForexPrices() {
 
     ws.onmessage = (event) => {
       try {
-        const msg = JSON.parse(event.data as string) as
-          | { type: "snapshot"; data: ForexPrice[] }
-          | { type: "tick"; data: ForexPrice[] };
+        const msg = JSON.parse(event.data as string) as Record<string, unknown>;
+
+        // Only process forex price messages; ignore mt5_status, admin_event, etc.
+        if (msg.type !== "snapshot" && msg.type !== "tick") return;
+        if (!Array.isArray(msg.data)) return;
 
         setPrices((prev) => {
           const next = { ...prev };
-          for (const p of msg.data) {
+          for (const p of msg.data as ForexPrice[]) {
             next[p.pair] = p;
           }
           return next;
