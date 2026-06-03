@@ -141167,8 +141167,8 @@ function formatSub(s) {
   };
 }
 router5.get("/subscriptions/my", requireAuth, async (req, res) => {
-  const [sub] = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, req.userId)).orderBy(desc(subscriptionsTable.createdAt)).limit(1);
-  if (!sub) {
+  const subs = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.userId, req.userId)).orderBy(desc(subscriptionsTable.createdAt));
+  if (subs.length === 0) {
     res.status(200).json({
       id: 0,
       userId: req.userId,
@@ -141182,7 +141182,8 @@ router5.get("/subscriptions/my", requireAuth, async (req, res) => {
     });
     return;
   }
-  res.json(formatSub(sub));
+  const active = subs.find((s) => s.status === "ACTIVE");
+  res.json(formatSub(active ?? subs[0]));
 });
 router5.post("/subscriptions", requireAuth, async (req, res) => {
   const parsed = CreateSubscriptionBody.safeParse(req.body);

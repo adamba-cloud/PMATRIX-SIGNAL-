@@ -4,6 +4,7 @@ import {
   useGetConfig, getGetConfigQueryKey,
   useGetMyPayments, getGetMyPaymentsQueryKey,
   useInitiateStkPush, useGetPaymentStatus, getGetPaymentStatusQueryKey,
+  getListSignalsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -57,10 +58,10 @@ export default function Subscription() {
 
   const poll = useCallback(async (count: number) => {
     if (!checkoutRequestId) return;
-    if (count >= 24) {
+    if (count >= 60) {
       stopPolling();
       setStage("failed");
-      toast({ title: "Payment Timeout", description: "No response received. Check M-Pesa messages and try again.", variant: "destructive" });
+      toast({ title: "Payment Timeout", description: "No response received after 5 minutes. Check your M-Pesa messages — if deducted, your subscription will activate automatically within minutes.", variant: "destructive" });
       return;
     }
     const { data } = await refetchStatus();
@@ -69,6 +70,7 @@ export default function Subscription() {
       setStage("success");
       queryClient.invalidateQueries({ queryKey: getGetMySubscriptionQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetMyPaymentsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getListSignalsQueryKey() });
       toast({ title: "Payment Successful!", description: `M-Pesa receipt: ${data.mpesaReceiptNumber}` });
     } else if (data?.status === "FAILED" || data?.status === "CANCELLED") {
       stopPolling();
@@ -284,7 +286,7 @@ export default function Subscription() {
                 </div>
                 <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
                   <Clock className="w-3.5 h-3.5" />
-                  Waiting for confirmation… ({Math.max(0, 120 - pollCount * 5)}s)
+                  Waiting for confirmation… ({Math.max(0, 300 - pollCount * 5)}s)
                 </div>
                 <Button variant="ghost" size="sm" onClick={reset} className="text-slate-500 hover:text-slate-300 hover:bg-slate-800 mt-2">
                   Cancel

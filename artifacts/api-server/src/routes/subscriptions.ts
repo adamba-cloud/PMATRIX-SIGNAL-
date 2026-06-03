@@ -21,12 +21,11 @@ function formatSub(s: typeof subscriptionsTable.$inferSelect) {
 }
 
 router.get("/subscriptions/my", requireAuth, async (req, res): Promise<void> => {
-  const [sub] = await db.select().from(subscriptionsTable)
+  const subs = await db.select().from(subscriptionsTable)
     .where(eq(subscriptionsTable.userId, req.userId!))
-    .orderBy(desc(subscriptionsTable.createdAt))
-    .limit(1);
+    .orderBy(desc(subscriptionsTable.createdAt));
 
-  if (!sub) {
+  if (subs.length === 0) {
     res.status(200).json({
       id: 0,
       userId: req.userId!,
@@ -41,7 +40,9 @@ router.get("/subscriptions/my", requireAuth, async (req, res): Promise<void> => 
     return;
   }
 
-  res.json(formatSub(sub));
+  // Prefer the most recent ACTIVE subscription, then fall back to the most recently created
+  const active = subs.find((s) => s.status === "ACTIVE");
+  res.json(formatSub(active ?? subs[0]));
 });
 
 router.post("/subscriptions", requireAuth, async (req, res): Promise<void> => {
