@@ -3,6 +3,8 @@ modules = ["nodejs-20", "web", "bash"]
 [deployment]
 router = "application"
 deploymentTarget = "autoscale"
+run = ["bash", "-c", "redis-server --daemonize yes --logfile /tmp/redis.log && PORT=8080 node --enable-source-maps artifacts/api-server/dist/index.mjs"]
+build = ["bash", "-c", "pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/pesamatrix run build"]
 
 [deployment.postBuild]
 args = ["pnpm", "store", "prune"]
