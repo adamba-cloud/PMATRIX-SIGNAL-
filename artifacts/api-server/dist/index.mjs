@@ -20502,27 +20502,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router25;
+    module.exports = Router26;
     module.exports.Route = Route;
-    function Router25(options) {
-      if (!(this instanceof Router25)) {
-        return new Router25(options);
+    function Router26(options) {
+      if (!(this instanceof Router26)) {
+        return new Router26(options);
       }
       const opts = options || {};
-      function router25(req, res, next) {
-        router25.handle(req, res, next);
+      function router26(req, res, next) {
+        router26.handle(req, res, next);
       }
-      Object.setPrototypeOf(router25, this);
-      router25.caseSensitive = opts.caseSensitive;
-      router25.mergeParams = opts.mergeParams;
-      router25.params = {};
-      router25.strict = opts.strict;
-      router25.stack = [];
-      return router25;
+      Object.setPrototypeOf(router26, this);
+      router26.caseSensitive = opts.caseSensitive;
+      router26.mergeParams = opts.mergeParams;
+      router26.params = {};
+      router26.strict = opts.strict;
+      router26.stack = [];
+      return router26;
     }
-    Router25.prototype = function() {
+    Router26.prototype = function() {
     };
-    Router25.prototype.param = function param(name, fn) {
+    Router26.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20542,7 +20542,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router25.prototype.handle = function handle(req, res, callback) {
+    Router26.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20669,7 +20669,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router25.prototype.use = function use(handler) {
+    Router26.prototype.use = function use(handler) {
       let offset = 0;
       let path6 = "/";
       if (typeof handler !== "function") {
@@ -20702,7 +20702,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router25.prototype.route = function route(path6) {
+    Router26.prototype.route = function route(path6) {
       const route2 = new Route(path6);
       const layer = new Layer(path6, {
         sensitive: this.caseSensitive,
@@ -20717,7 +20717,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router25.prototype[method] = function(path6) {
+      Router26.prototype[method] = function(path6) {
         const route = this.route(path6);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -20900,13 +20900,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router25 = require_router();
+    var Router26 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init2() {
-      var router25 = null;
+      var router26 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -20915,13 +20915,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router25 === null) {
-            router25 = new Router25({
+          if (router26 === null) {
+            router26 = new Router26({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router25;
+          return router26;
         }
       });
     };
@@ -20992,15 +20992,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router25 = this.router;
+      var router26 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router25.use(path6, fn2);
+          return router26.use(path6, fn2);
         }
         debug(".use app under %s", path6);
         fn2.mountpath = path6;
         fn2.parent = this;
-        router25.use(path6, function mounted_app(req, res, next) {
+        router26.use(path6, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23573,7 +23573,7 @@ var require_express = __commonJS({
     var EventEmitter = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router25 = require_router();
+    var Router26 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23595,8 +23595,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router25.Route;
-    exports.Router = Router25;
+    exports.Route = Router26.Route;
+    exports.Router = Router26;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -115095,14 +115095,14 @@ var require_cjs = __commonJS({
 import { createServer } from "http";
 
 // src/app.ts
-var import_express25 = __toESM(require_express2(), 1);
+var import_express26 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 var import_pino_http = __toESM(require_logger(), 1);
 import path5 from "path";
 import fs5 from "fs";
 
 // src/routes/index.ts
-var import_express24 = __toESM(require_express2(), 1);
+var import_express25 = __toESM(require_express2(), 1);
 
 // src/routes/health.ts
 var import_express = __toESM(require_express2(), 1);
@@ -143936,35 +143936,107 @@ router23.post("/admin/smtp/test", requireAdmin, async (req, res) => {
 });
 var smtp_default = router23;
 
-// src/routes/index.ts
+// src/routes/master.ts
+var import_express24 = __toESM(require_express2(), 1);
 var router24 = (0, import_express24.Router)();
-router24.use(health_default);
-router24.use(auth_default);
-router24.use(users_default);
-router24.use(signals_default);
-router24.use(subscriptions_default);
-router24.use(mpesa_default);
-router24.use(payments_default);
-router24.use(config_default);
-router24.use(dashboard_default);
-router24.use(mt5_default);
-router24.use(metaapi_webhook_default);
-router24.use(copy_trading_default);
-router24.use(media_default);
-router24.use(news_default);
-router24.use(resources_default);
-router24.use(announcements_default);
-router24.use(push_default);
-router24.use(referrals_default);
-router24.use(journal_default);
-router24.use(advertisements_default);
-router24.use(mt5_billing_default);
-router24.use(logo_default);
-router24.use(smtp_default);
-var routes_default = router24;
+var DEFAULT_MASTER_ID = "99a2b763-0528-4b0e-91ea-79c0be291d5b";
+async function getSystemConfigMap() {
+  const rows = await db.select().from(systemConfigTable);
+  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+}
+async function upsertConfig(key, value) {
+  const existing = await db.select().from(systemConfigTable).where(eq(systemConfigTable.key, key));
+  if (existing.length > 0) {
+    await db.update(systemConfigTable).set({ value, updatedAt: /* @__PURE__ */ new Date() }).where(eq(systemConfigTable.key, key));
+  } else {
+    await db.insert(systemConfigTable).values({ key, value });
+  }
+}
+router24.get("/admin/master", requireAdmin, async (_req, res) => {
+  const map2 = await getSystemConfigMap();
+  const accountId = map2["masterMetaApiAccountId"] ?? DEFAULT_MASTER_ID;
+  const enabled = map2["masterEnabled"] !== "false";
+  let accountStatus = null;
+  let lastChecked = null;
+  let error40 = null;
+  if (accountId) {
+    try {
+      const acct = await getMetaApiAccount(accountId);
+      accountStatus = {
+        state: acct.state,
+        connectionStatus: acct.connectionStatus,
+        synchronizationStatus: acct.synchronizationStatus,
+        login: acct.login,
+        server: acct.server,
+        platform: acct.platform,
+        name: acct.name,
+        broker: acct.broker,
+        balance: acct.balance,
+        equity: acct.equity,
+        leverage: acct.leverage
+      };
+      lastChecked = (/* @__PURE__ */ new Date()).toISOString();
+    } catch (err) {
+      error40 = err instanceof Error ? err.message : "Failed to fetch MetaApi account";
+      logger.warn({ err, accountId }, "[Master] Failed to fetch account status");
+    }
+  }
+  res.json({
+    accountId,
+    enabled,
+    accountStatus,
+    lastChecked,
+    error: error40
+  });
+});
+router24.put("/admin/master", requireAdmin, async (req, res) => {
+  const { accountId, enabled } = req.body;
+  if (accountId !== void 0) {
+    if (typeof accountId !== "string" || accountId.trim().length === 0) {
+      res.status(400).json({ error: "accountId must be a non-empty string" });
+      return;
+    }
+    await upsertConfig("masterMetaApiAccountId", accountId.trim());
+    logger.info({ accountId }, "[Master] masterMetaApiAccountId updated");
+  }
+  if (enabled !== void 0) {
+    await upsertConfig("masterEnabled", String(!!enabled));
+    logger.info({ enabled }, "[Master] masterEnabled updated");
+  }
+  res.json({ ok: true });
+});
+var master_default = router24;
+
+// src/routes/index.ts
+var router25 = (0, import_express25.Router)();
+router25.use(health_default);
+router25.use(auth_default);
+router25.use(users_default);
+router25.use(signals_default);
+router25.use(subscriptions_default);
+router25.use(mpesa_default);
+router25.use(payments_default);
+router25.use(config_default);
+router25.use(dashboard_default);
+router25.use(mt5_default);
+router25.use(metaapi_webhook_default);
+router25.use(copy_trading_default);
+router25.use(media_default);
+router25.use(news_default);
+router25.use(resources_default);
+router25.use(announcements_default);
+router25.use(push_default);
+router25.use(referrals_default);
+router25.use(journal_default);
+router25.use(advertisements_default);
+router25.use(mt5_billing_default);
+router25.use(logo_default);
+router25.use(smtp_default);
+router25.use(master_default);
+var routes_default = router25;
 
 // src/app.ts
-var app = (0, import_express25.default)();
+var app = (0, import_express26.default)();
 app.use(
   (0, import_pino_http.default)({
     logger,
@@ -143985,14 +144057,14 @@ app.use(
   })
 );
 app.use((0, import_cors.default)());
-app.use(import_express25.default.json({ limit: "100mb" }));
-app.use(import_express25.default.urlencoded({ limit: "100mb", extended: true }));
-app.use("/uploads", import_express25.default.static(path5.resolve("public/uploads")));
+app.use(import_express26.default.json({ limit: "100mb" }));
+app.use(import_express26.default.urlencoded({ limit: "100mb", extended: true }));
+app.use("/uploads", import_express26.default.static(path5.resolve("public/uploads")));
 app.use("/api", routes_default);
 if (process.env.NODE_ENV === "production") {
   const frontendDist = path5.resolve("artifacts/pesamatrix/dist/public");
   if (fs5.existsSync(frontendDist)) {
-    app.use(import_express25.default.static(frontendDist, {
+    app.use(import_express26.default.static(frontendDist, {
       setHeaders(res, filePath) {
         if (filePath.endsWith("index.html")) {
           res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");

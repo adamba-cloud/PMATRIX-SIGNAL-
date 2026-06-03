@@ -164,6 +164,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/admin/config" icon={Settings}>System Config</SidebarLink>
                 <SidebarLink href="/admin/mt5" icon={Cpu}>MT5 Accounts</SidebarLink>
                 <SidebarLink href="/admin/mt5-billing" icon={CreditCard}>MT5 Billing</SidebarLink>
+                <SidebarLink href="/admin/master" icon={Cpu}>Master Account</SidebarLink>
                 <SidebarLink href="/admin/content" icon={FolderOpen}>Content</SidebarLink>
                 <SidebarLink href="/admin/signals" icon={Radio}>Signals</SidebarLink>
                 <SidebarLink href="/admin/announcements" icon={Megaphone}>Announcements</SidebarLink>

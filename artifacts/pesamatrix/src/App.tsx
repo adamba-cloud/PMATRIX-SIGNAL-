@@ -70,6 +70,7 @@ import AdminSignals from "@/pages/admin/signals";
 import AdminReferrals from "@/pages/admin/referrals";
 import AdminAdvertisements from "@/pages/admin/advertisements";
 import AdminMt5Billing from "@/pages/admin/mt5-billing";
+import AdminMaster from "@/pages/admin/master";
 
 const queryClient = new QueryClient();
 
@@ -111,6 +112,7 @@ function Router() {
         <Route path="/admin/referrals" component={AdminReferrals} />
         <Route path="/admin/advertisements" component={AdminAdvertisements} />
         <Route path="/admin/mt5-billing" component={AdminMt5Billing} />
+        <Route path="/admin/master" component={AdminMaster} />
 
         <Route component={NotFound} />
       </Switch>

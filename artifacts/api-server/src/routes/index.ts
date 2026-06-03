@@ -22,6 +22,7 @@ import advertisementsRouter from "./advertisements";
 import mt5BillingRouter from "./mt5-billing";
 import logoRouter from "./logo";
 import smtpRouter from "./smtp";
+import masterRouter from "./master";
 
 const router: IRouter = Router();
 
@@ -48,5 +49,6 @@ router.use(advertisementsRouter);
 router.use(mt5BillingRouter);
 router.use(logoRouter);
 router.use(smtpRouter);
+router.use(masterRouter);
 
 export default router;
