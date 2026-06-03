@@ -118,6 +118,16 @@ export function broadcastSubscriptionActivated(userId: number, data: Record<stri
   }
 }
 
+export function broadcastMasterTradeEvent(payload: object): void {
+  if (!_wss) return;
+  const msg = JSON.stringify({ type: "master_trade_event", data: payload });
+  for (const client of _wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(msg);
+    }
+  }
+}
+
 export function attachForexWebSocket(server: Server): void {
   const wss = new WebSocketServer({ server, path: "/api/ws" });
   _wss = wss;

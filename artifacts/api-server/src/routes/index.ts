@@ -23,6 +23,7 @@ import mt5BillingRouter from "./mt5-billing";
 import logoRouter from "./logo";
 import smtpRouter from "./smtp";
 import masterRouter from "./master";
+import masterTradeEventsRouter from "./master-trade-events";
 
 const router: IRouter = Router();
 
@@ -50,5 +51,6 @@ router.use(mt5BillingRouter);
 router.use(logoRouter);
 router.use(smtpRouter);
 router.use(masterRouter);
+router.use(masterTradeEventsRouter);
 
 export default router;

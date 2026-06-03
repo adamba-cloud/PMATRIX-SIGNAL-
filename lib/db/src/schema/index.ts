@@ -17,3 +17,4 @@ export * from "./trade_journal";
 export * from "./advertisements";
 export * from "./mt5_billing_settings";
 export * from "./mt5_account_subscriptions";
+export * from "./master_trade_events";

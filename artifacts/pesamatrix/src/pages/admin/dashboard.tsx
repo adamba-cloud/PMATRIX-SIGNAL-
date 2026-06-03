@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useGetAdminSummary, getGetAdminSummaryQueryKey, customFetch } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import {
   Users, ShieldCheck, CreditCard, DollarSign, Loader2,
   Database, Zap, Smartphone, BarChart2, Mail, Bell, KeyRound,
-  RefreshCw, CheckCircle2, XCircle, AlertCircle,
+  RefreshCw, CheckCircle2, XCircle, AlertCircle, Activity,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
+import { useEffect, useRef, useState } from "react";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -162,10 +162,51 @@ function ServiceHealthCard() {
   );
 }
 
+// ─── Trade Event Stats ───────────────────────────────────────────────────────
+
+type TradeEventStats = {
+  total: number;
+  today: number;
+  byType: Record<string, number>;
+};
+
+function useTradeEventStats() {
+  const { data, refetch } = useQuery<TradeEventStats>({
+    queryKey: ["master-trade-event-stats"],
+    queryFn: () => customFetch<TradeEventStats>("/api/admin/master/trade-events/stats"),
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
+
+  const [liveCount, setLiveCount] = useState(0);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws`);
+    wsRef.current = ws;
+
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data as string) as { type: string };
+        if (msg.type === "master_trade_event") {
+          setLiveCount((n) => n + 1);
+          refetch();
+        }
+      } catch {}
+    };
+
+    return () => ws.close();
+  }, [refetch]);
+
+  return { stats: data, liveCount };
+}
+
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const { data: summary, isLoading } = useGetAdminSummary({ query: { queryKey: getGetAdminSummaryQueryKey() } });
+  const { stats: tradeStats, liveCount } = useTradeEventStats();
 
   if (isLoading) {
     return (
@@ -185,7 +226,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Metrics */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
         <Card className="bg-slate-900 border-slate-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-slate-400">Total Users</CardTitle>
@@ -223,6 +264,43 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-slate-50">{summary.pendingPayments}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-slate-900 border-slate-800 relative overflow-hidden">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-slate-400">Trade Events Today</CardTitle>
+            <Activity className="h-4 w-4 text-blue-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-slate-50">{tradeStats?.today ?? 0}</div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-slate-500">{tradeStats?.total ?? 0} all-time</span>
+              {liveCount > 0 && (
+                <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 animate-pulse">
+                  +{liveCount} live
+                </span>
+              )}
+            </div>
+            {tradeStats?.byType && (
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {tradeStats.byType["POSITION_OPENED"] != null && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">
+                    ↑ {tradeStats.byType["POSITION_OPENED"]} opened
+                  </span>
+                )}
+                {tradeStats.byType["POSITION_CLOSED"] != null && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-400">
+                    ↓ {tradeStats.byType["POSITION_CLOSED"]} closed
+                  </span>
+                )}
+                {tradeStats.byType["POSITION_MODIFIED"] != null && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400">
+                    ✎ {tradeStats.byType["POSITION_MODIFIED"]} modified
+                  </span>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

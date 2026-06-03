@@ -20502,27 +20502,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router26;
+    module.exports = Router27;
     module.exports.Route = Route;
-    function Router26(options) {
-      if (!(this instanceof Router26)) {
-        return new Router26(options);
+    function Router27(options) {
+      if (!(this instanceof Router27)) {
+        return new Router27(options);
       }
       const opts = options || {};
-      function router26(req, res, next) {
-        router26.handle(req, res, next);
+      function router27(req, res, next) {
+        router27.handle(req, res, next);
       }
-      Object.setPrototypeOf(router26, this);
-      router26.caseSensitive = opts.caseSensitive;
-      router26.mergeParams = opts.mergeParams;
-      router26.params = {};
-      router26.strict = opts.strict;
-      router26.stack = [];
-      return router26;
+      Object.setPrototypeOf(router27, this);
+      router27.caseSensitive = opts.caseSensitive;
+      router27.mergeParams = opts.mergeParams;
+      router27.params = {};
+      router27.strict = opts.strict;
+      router27.stack = [];
+      return router27;
     }
-    Router26.prototype = function() {
+    Router27.prototype = function() {
     };
-    Router26.prototype.param = function param(name, fn) {
+    Router27.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20542,7 +20542,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router26.prototype.handle = function handle(req, res, callback) {
+    Router27.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20669,7 +20669,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router26.prototype.use = function use(handler) {
+    Router27.prototype.use = function use(handler) {
       let offset = 0;
       let path6 = "/";
       if (typeof handler !== "function") {
@@ -20702,7 +20702,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router26.prototype.route = function route(path6) {
+    Router27.prototype.route = function route(path6) {
       const route2 = new Route(path6);
       const layer = new Layer(path6, {
         sensitive: this.caseSensitive,
@@ -20717,7 +20717,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router26.prototype[method] = function(path6) {
+      Router27.prototype[method] = function(path6) {
         const route = this.route(path6);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -20900,13 +20900,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router26 = require_router();
+    var Router27 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init2() {
-      var router26 = null;
+      var router27 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -20915,13 +20915,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router26 === null) {
-            router26 = new Router26({
+          if (router27 === null) {
+            router27 = new Router27({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router26;
+          return router27;
         }
       });
     };
@@ -20992,15 +20992,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router26 = this.router;
+      var router27 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router26.use(path6, fn2);
+          return router27.use(path6, fn2);
         }
         debug(".use app under %s", path6);
         fn2.mountpath = path6;
         fn2.parent = this;
-        router26.use(path6, function mounted_app(req, res, next) {
+        router27.use(path6, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23573,7 +23573,7 @@ var require_express = __commonJS({
     var EventEmitter = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router26 = require_router();
+    var Router27 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23595,8 +23595,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router26.Route;
-    exports.Router = Router26;
+    exports.Route = Router27.Route;
+    exports.Router = Router27;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -51727,7 +51727,7 @@ var require_bn = __commonJS({
         assert2((this.negative | num2.negative) === 0);
         return this.iuand(num2);
       };
-      BN.prototype.and = function and3(num2) {
+      BN.prototype.and = function and4(num2) {
         if (this.length > num2.length) return this.clone().iand(num2);
         return num2.clone().iand(this);
       };
@@ -115095,14 +115095,14 @@ var require_cjs = __commonJS({
 import { createServer } from "http";
 
 // src/app.ts
-var import_express26 = __toESM(require_express2(), 1);
+var import_express27 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 var import_pino_http = __toESM(require_logger(), 1);
 import path5 from "path";
 import fs5 from "fs";
 
 // src/routes/index.ts
-var import_express25 = __toESM(require_express2(), 1);
+var import_express26 = __toESM(require_express2(), 1);
 
 // src/routes/health.ts
 var import_express = __toESM(require_express2(), 1);
@@ -126387,6 +126387,8 @@ __export(schema_exports, {
   insertSystemConfigSchema: () => insertSystemConfigSchema,
   insertUserSchema: () => insertUserSchema,
   lotSizeTypeEnum: () => lotSizeTypeEnum,
+  masterTradeEventTypeEnum: () => masterTradeEventTypeEnum,
+  masterTradeEventsTable: () => masterTradeEventsTable,
   mediaTable: () => mediaTable,
   mediaTypeEnum: () => mediaTypeEnum,
   mt5AccountSubscriptionsTable: () => mt5AccountSubscriptionsTable,
@@ -138129,6 +138131,31 @@ var mt5AccountSubscriptionsTable = pgTable("mt5_account_subscriptions", {
   createdAt: timestamp("created_at").notNull().defaultNow()
 });
 
+// ../../lib/db/src/schema/master_trade_events.ts
+var masterTradeEventTypeEnum = pgEnum("master_trade_event_type", [
+  "POSITION_OPENED",
+  "POSITION_MODIFIED",
+  "POSITION_CLOSED"
+]);
+var masterTradeEventsTable = pgTable("master_trade_events", {
+  id: serial("id").primaryKey(),
+  metaApiAccountId: text("meta_api_account_id").notNull(),
+  eventType: masterTradeEventTypeEnum("event_type").notNull(),
+  positionId: text("position_id").notNull(),
+  symbol: text("symbol").notNull(),
+  direction: text("direction").notNull(),
+  volume: numeric("volume", { precision: 18, scale: 8 }),
+  openPrice: numeric("open_price", { precision: 18, scale: 8 }),
+  currentPrice: numeric("current_price", { precision: 18, scale: 8 }),
+  stopLoss: numeric("stop_loss", { precision: 18, scale: 8 }),
+  takeProfit: numeric("take_profit", { precision: 18, scale: 8 }),
+  profit: numeric("profit", { precision: 18, scale: 8 }),
+  comment: text("comment"),
+  changedFields: text("changed_fields"),
+  rawPayload: text("raw_payload"),
+  createdAt: timestamp("created_at").notNull().defaultNow()
+});
+
 // ../../lib/db/src/index.ts
 var { Pool: Pool3 } = esm_default;
 if (!process.env.DATABASE_URL) {
@@ -140293,6 +140320,15 @@ function broadcastSubscriptionActivated(userId, data) {
     type: "subscription_activated",
     data: { userId, ...data, ts: Date.now() }
   });
+  for (const client of _wss.clients) {
+    if (client.readyState === import_websocket.default.OPEN) {
+      client.send(msg);
+    }
+  }
+}
+function broadcastMasterTradeEvent(payload) {
+  if (!_wss) return;
+  const msg = JSON.stringify({ type: "master_trade_event", data: payload });
   for (const client of _wss.clients) {
     if (client.readyState === import_websocket.default.OPEN) {
       client.send(msg);
@@ -144041,36 +144077,68 @@ router24.post("/admin/master/undeploy", requireAdmin, async (_req, res) => {
 });
 var master_default = router24;
 
-// src/routes/index.ts
+// src/routes/master-trade-events.ts
+var import_express25 = __toESM(require_express2(), 1);
 var router25 = (0, import_express25.Router)();
-router25.use(health_default);
-router25.use(auth_default);
-router25.use(users_default);
-router25.use(signals_default);
-router25.use(subscriptions_default);
-router25.use(mpesa_default);
-router25.use(payments_default);
-router25.use(config_default);
-router25.use(dashboard_default);
-router25.use(mt5_default);
-router25.use(metaapi_webhook_default);
-router25.use(copy_trading_default);
-router25.use(media_default);
-router25.use(news_default);
-router25.use(resources_default);
-router25.use(announcements_default);
-router25.use(push_default);
-router25.use(referrals_default);
-router25.use(journal_default);
-router25.use(advertisements_default);
-router25.use(mt5_billing_default);
-router25.use(logo_default);
-router25.use(smtp_default);
-router25.use(master_default);
-var routes_default = router25;
+router25.get("/admin/master/trade-events/stats", requireAdmin, async (_req, res) => {
+  const todayStart = /* @__PURE__ */ new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const [totalRow] = await db.select({ count: sql`cast(count(*) as int)` }).from(masterTradeEventsTable);
+  const [todayRow] = await db.select({ count: sql`cast(count(*) as int)` }).from(masterTradeEventsTable).where(gte(masterTradeEventsTable.createdAt, todayStart));
+  const byType = await db.select({
+    eventType: masterTradeEventsTable.eventType,
+    count: sql`cast(count(*) as int)`
+  }).from(masterTradeEventsTable).groupBy(masterTradeEventsTable.eventType);
+  res.json({
+    total: totalRow?.count ?? 0,
+    today: todayRow?.count ?? 0,
+    byType: Object.fromEntries(byType.map((r) => [r.eventType, r.count]))
+  });
+});
+router25.get("/admin/master/trade-events", requireAdmin, async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const offset = Number(req.query.offset) || 0;
+  const eventType = req.query.eventType;
+  const where = eventType ? eq(masterTradeEventsTable.eventType, eventType) : void 0;
+  const [events, [countRow]] = await Promise.all([
+    db.select().from(masterTradeEventsTable).where(where).orderBy(desc(masterTradeEventsTable.createdAt)).limit(limit).offset(offset),
+    db.select({ count: sql`cast(count(*) as int)` }).from(masterTradeEventsTable).where(where)
+  ]);
+  res.json({ events, total: countRow?.count ?? 0, limit, offset });
+});
+var master_trade_events_default = router25;
+
+// src/routes/index.ts
+var router26 = (0, import_express26.Router)();
+router26.use(health_default);
+router26.use(auth_default);
+router26.use(users_default);
+router26.use(signals_default);
+router26.use(subscriptions_default);
+router26.use(mpesa_default);
+router26.use(payments_default);
+router26.use(config_default);
+router26.use(dashboard_default);
+router26.use(mt5_default);
+router26.use(metaapi_webhook_default);
+router26.use(copy_trading_default);
+router26.use(media_default);
+router26.use(news_default);
+router26.use(resources_default);
+router26.use(announcements_default);
+router26.use(push_default);
+router26.use(referrals_default);
+router26.use(journal_default);
+router26.use(advertisements_default);
+router26.use(mt5_billing_default);
+router26.use(logo_default);
+router26.use(smtp_default);
+router26.use(master_default);
+router26.use(master_trade_events_default);
+var routes_default = router26;
 
 // src/app.ts
-var app = (0, import_express26.default)();
+var app = (0, import_express27.default)();
 app.use(
   (0, import_pino_http.default)({
     logger,
@@ -144091,14 +144159,14 @@ app.use(
   })
 );
 app.use((0, import_cors.default)());
-app.use(import_express26.default.json({ limit: "100mb" }));
-app.use(import_express26.default.urlencoded({ limit: "100mb", extended: true }));
-app.use("/uploads", import_express26.default.static(path5.resolve("public/uploads")));
+app.use(import_express27.default.json({ limit: "100mb" }));
+app.use(import_express27.default.urlencoded({ limit: "100mb", extended: true }));
+app.use("/uploads", import_express27.default.static(path5.resolve("public/uploads")));
 app.use("/api", routes_default);
 if (process.env.NODE_ENV === "production") {
   const frontendDist = path5.resolve("artifacts/pesamatrix/dist/public");
   if (fs5.existsSync(frontendDist)) {
-    app.use(import_express26.default.static(frontendDist, {
+    app.use(import_express27.default.static(frontendDist, {
       setHeaders(res, filePath) {
         if (filePath.endsWith("index.html")) {
           res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -144898,6 +144966,99 @@ function startMt5SubscriptionExpiryJob() {
   logger.info({ intervalMs: INTERVAL_MS4 }, "MT5 subscription expiry job started");
 }
 
+// src/lib/master-trade-listener.ts
+var POLL_INTERVAL_MS2 = 1e4;
+var DEFAULT_MASTER_ID2 = "99a2b763-0528-4b0e-91ea-79c0be291d5b";
+var previousSnapshot = /* @__PURE__ */ new Map();
+var isRunning = false;
+function getAccountId() {
+  return process.env.MASTER_TRADE_ACCOUNT_ID ?? DEFAULT_MASTER_ID2;
+}
+async function insertEvent(accountId, eventType, position, changedFields) {
+  const row = {
+    metaApiAccountId: accountId,
+    eventType,
+    positionId: position.id,
+    symbol: position.symbol,
+    direction: position.type === "POSITION_TYPE_BUY" ? "BUY" : "SELL",
+    volume: position.volume != null ? String(position.volume) : null,
+    openPrice: position.openPrice != null ? String(position.openPrice) : null,
+    currentPrice: position.currentPrice != null ? String(position.currentPrice) : null,
+    stopLoss: position.stopLoss != null ? String(position.stopLoss) : null,
+    takeProfit: position.takeProfit != null ? String(position.takeProfit) : null,
+    profit: position.profit != null ? String(position.profit) : null,
+    comment: position.comment ?? null,
+    changedFields: changedFields ?? null,
+    rawPayload: JSON.stringify(position)
+  };
+  await db.insert(masterTradeEventsTable).values(row);
+  broadcastMasterTradeEvent({
+    eventType,
+    positionId: position.id,
+    symbol: position.symbol,
+    direction: row.direction,
+    changedFields: changedFields ?? null,
+    ts: Date.now()
+  });
+}
+function detectChanges(prev, curr) {
+  const changed = [];
+  if (prev.volume !== curr.volume) changed.push("volume");
+  if (prev.stopLoss !== curr.stopLoss) changed.push("stopLoss");
+  if (prev.takeProfit !== curr.takeProfit) changed.push("takeProfit");
+  if (prev.openPrice !== curr.openPrice) changed.push("openPrice");
+  if (prev.type !== curr.type) changed.push("type");
+  return changed;
+}
+async function poll() {
+  if (!process.env.METAAPI_TOKEN) return;
+  const accountId = getAccountId();
+  let positions;
+  try {
+    positions = await getAccountPositions(accountId);
+  } catch (err) {
+    logger.warn({ err, accountId }, "[MasterTradeListener] Failed to fetch positions");
+    return;
+  }
+  const currentSnapshot = new Map(positions.map((p) => [p.id, p]));
+  const events = [];
+  for (const [id, curr] of currentSnapshot) {
+    const prev = previousSnapshot.get(id);
+    if (!prev) {
+      logger.info({ positionId: id, symbol: curr.symbol }, "[MasterTradeListener] POSITION_OPENED");
+      events.push(insertEvent(accountId, "POSITION_OPENED", curr));
+    } else {
+      const changed = detectChanges(prev, curr);
+      if (changed.length > 0) {
+        logger.info(
+          { positionId: id, symbol: curr.symbol, changed },
+          "[MasterTradeListener] POSITION_MODIFIED"
+        );
+        events.push(insertEvent(accountId, "POSITION_MODIFIED", curr, changed.join(",")));
+      }
+    }
+  }
+  for (const [id, prev] of previousSnapshot) {
+    if (!currentSnapshot.has(id)) {
+      logger.info({ positionId: id, symbol: prev.symbol }, "[MasterTradeListener] POSITION_CLOSED");
+      events.push(insertEvent(accountId, "POSITION_CLOSED", prev));
+    }
+  }
+  await Promise.allSettled(events);
+  previousSnapshot = currentSnapshot;
+}
+function startMasterTradeListener() {
+  if (!process.env.METAAPI_TOKEN) {
+    logger.warn("[MasterTradeListener] METAAPI_TOKEN not set \u2014 listener will not start");
+    return;
+  }
+  if (isRunning) return;
+  isRunning = true;
+  poll();
+  setInterval(poll, POLL_INTERVAL_MS2);
+  logger.info({ intervalMs: POLL_INTERVAL_MS2, accountId: getAccountId() }, "[MasterTradeListener] Started");
+}
+
 // src/index.ts
 var rawPort = process.env["PORT"];
 if (!rawPort) {
@@ -144931,6 +145092,7 @@ try {
   logger.warn({ err }, "Connection watchdog not started \u2014 Redis unavailable");
 }
 startPaymentReconciler();
+startMasterTradeListener();
 server.listen(port, () => {
   logger.info({ port }, "Server listening");
   seedAdminUser();

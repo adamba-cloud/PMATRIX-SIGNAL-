@@ -11,6 +11,7 @@ import { startPaymentReconciler } from "./lib/payment-reconciler";
 import { seedAdminUser } from "./lib/seed";
 import { startAdvertisementExpiryJob } from "./lib/advertisement-expiry-job";
 import { startMt5SubscriptionExpiryJob } from "./lib/mt5-subscription-expiry-job";
+import { startMasterTradeListener } from "./lib/master-trade-listener";
 
 const rawPort = process.env["PORT"];
 
@@ -51,6 +52,7 @@ try {
 }
 
 startPaymentReconciler();
+startMasterTradeListener();
 
 server.listen(port, () => {
   logger.info({ port }, "Server listening");
