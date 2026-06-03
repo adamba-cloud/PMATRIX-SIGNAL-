@@ -5,5 +5,6 @@ export * from "./admin-users";
 export * from "./journal";
 export * from "./advertisements";
 export * from "./mt5-billing";
+export * from "./payments";
 export { setBaseUrl, setAuthTokenGetter, customFetch, ApiError } from "./custom-fetch";
 export type { AuthTokenGetter } from "./custom-fetch";

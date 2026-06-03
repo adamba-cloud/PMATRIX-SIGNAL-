@@ -101,6 +101,23 @@ export function broadcastAdminEvent(eventType: AdminEventType, data: Record<stri
   }
 }
 
+/**
+ * Broadcasts a subscription_activated event to ALL connected clients.
+ * Each client filters by userId to decide whether to act on it.
+ */
+export function broadcastSubscriptionActivated(userId: number, data: Record<string, unknown>): void {
+  if (!_wss) return;
+  const msg = JSON.stringify({
+    type: "subscription_activated",
+    data: { userId, ...data, ts: Date.now() },
+  });
+  for (const client of _wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(msg);
+    }
+  }
+}
+
 export function attachForexWebSocket(server: Server): void {
   const wss = new WebSocketServer({ server, path: "/api/ws" });
   _wss = wss;

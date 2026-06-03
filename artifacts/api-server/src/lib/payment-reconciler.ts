@@ -13,53 +13,14 @@
  */
 import { and, eq, lt, isNotNull } from "drizzle-orm";
 import { db, paymentsTable, subscriptionsTable } from "@workspace/db";
-import { getDarajaToken, generateTimestamp, generatePassword } from "./daraja";
+import { queryStkStatus } from "./daraja";
 import { writeAuditLog } from "./audit";
 import { logger } from "./logger";
-import { broadcastAdminEvent } from "./forex-ws";
+import { broadcastAdminEvent, broadcastSubscriptionActivated } from "./forex-ws";
 
 const RECONCILE_INTERVAL_MS = 5 * 60 * 1_000;
 const STALE_AFTER_MS = 2 * 60 * 1_000;
 
-interface StkQueryResult {
-  ResponseCode: string;
-  ResultCode: string;
-  ResultDesc: string;
-}
-
-async function queryStkStatus(checkoutRequestId: string): Promise<StkQueryResult | null> {
-  try {
-    const token = await getDarajaToken();
-    const shortCode = process.env.DARAJA_BUSINESS_SHORTCODE;
-    if (!shortCode) return null;
-
-    const timestamp = generateTimestamp();
-    const password = generatePassword(timestamp);
-
-    const payload = {
-      BusinessShortCode: shortCode,
-      Password: password,
-      Timestamp: timestamp,
-      CheckoutRequestID: checkoutRequestId,
-    };
-
-    const res = await fetch("https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(10_000),
-    });
-
-    if (!res.ok) return null;
-    return (await res.json()) as StkQueryResult;
-  } catch (err) {
-    logger.warn({ err, checkoutRequestId }, "Reconciler: STK query failed");
-    return null;
-  }
-}
 
 async function reconcilePayment(payment: typeof paymentsTable.$inferSelect): Promise<void> {
   if (!payment.checkoutRequestId) {
@@ -111,6 +72,23 @@ async function reconcilePayment(payment: typeof paymentsTable.$inferSelect): Pro
       amount: payment.amount,
       receipt: null,
     });
+
+    // Broadcast to user's frontend so it can immediately unlock
+    if (payment.subscriptionId) {
+      const [activatedSub] = await db
+        .select()
+        .from(subscriptionsTable)
+        .where(eq(subscriptionsTable.id, payment.subscriptionId));
+      if (activatedSub) {
+        broadcastSubscriptionActivated(payment.userId, {
+          subscriptionId: activatedSub.id,
+          endDate: activatedSub.endDate?.toISOString() ?? null,
+          daysSelected: activatedSub.daysSelected,
+          receipt: null,
+          source: "reconciler",
+        });
+      }
+    }
 
     logger.info({ paymentId: payment.id }, "Reconciler: payment reconciled as COMPLETED");
     await writeAuditLog("PAYMENT_RECONCILED_SUCCESS", {

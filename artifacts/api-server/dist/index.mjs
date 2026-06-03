@@ -140287,6 +140287,18 @@ function broadcastAdminEvent(eventType, data) {
     }
   }
 }
+function broadcastSubscriptionActivated(userId, data) {
+  if (!_wss) return;
+  const msg = JSON.stringify({
+    type: "subscription_activated",
+    data: { userId, ...data, ts: Date.now() }
+  });
+  for (const client of _wss.clients) {
+    if (client.readyState === import_websocket.default.OPEN) {
+      client.send(msg);
+    }
+  }
+}
 function attachForexWebSocket(server2) {
   const wss = new import_websocket_server.default({ server: server2, path: "/api/ws" });
   _wss = wss;
@@ -141414,6 +141426,35 @@ async function initiateStkPush({
   logger.info({ checkoutRequestId: data.CheckoutRequestID }, "STK Push initiated successfully");
   return data;
 }
+async function queryStkStatus(checkoutRequestId) {
+  try {
+    const token2 = await getDarajaToken();
+    const shortCode = process.env.DARAJA_BUSINESS_SHORTCODE;
+    if (!shortCode) {
+      logger.warn("[DARAJA] DARAJA_BUSINESS_SHORTCODE not set \u2014 cannot query STK status");
+      return null;
+    }
+    const timestamp2 = generateTimestamp();
+    const password = generatePassword(timestamp2);
+    logger.info({ checkoutRequestId, ts: (/* @__PURE__ */ new Date()).toISOString() }, "[DARAJA] Querying STK status");
+    const res = await fetch("https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token2}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ BusinessShortCode: shortCode, Password: password, Timestamp: timestamp2, CheckoutRequestID: checkoutRequestId }),
+      signal: AbortSignal.timeout(1e4)
+    });
+    if (!res.ok) {
+      logger.warn({ status: res.status, checkoutRequestId }, "[DARAJA] STK query non-OK response");
+      return null;
+    }
+    const data = await res.json();
+    logger.info({ checkoutRequestId, ResultCode: data.ResultCode, ResultDesc: data.ResultDesc }, "[DARAJA] STK query result");
+    return data;
+  } catch (err) {
+    logger.warn({ err, checkoutRequestId }, "[DARAJA] STK query failed");
+    return null;
+  }
+}
 function parseCallback(body) {
   const cb = body.Body.stkCallback;
   const items = cb.CallbackMetadata?.Item ?? [];
@@ -141435,26 +141476,26 @@ function getCallbackUrl(req) {
   const base = process.env["DARAJA_CALLBACK_BASE_URL"];
   if (base) {
     const url3 = base.includes("/api/payments/mpesa/callback") ? base.trim() : `${base.replace(/\/+$/, "").replace(/\/api\/.*/, "")}/api/payments/mpesa/callback`;
-    logger.info({ callbackUrl: url3, source: "DARAJA_CALLBACK_BASE_URL" }, "Using callback URL");
+    logger.info({ callbackUrl: url3, source: "DARAJA_CALLBACK_BASE_URL" }, "[MPESA] Using callback URL");
     return url3;
   }
   const domains = process.env["REPLIT_DOMAINS"];
   if (domains) {
     const domain2 = domains.split(",")[0].trim();
     const url3 = `https://${domain2}/api/payments/mpesa/callback`;
-    logger.info({ callbackUrl: url3, source: "REPLIT_DOMAINS" }, "Using callback URL");
+    logger.info({ callbackUrl: url3, source: "REPLIT_DOMAINS" }, "[MPESA] Using callback URL");
     return url3;
   }
   const devDomain = process.env["REPLIT_DEV_DOMAIN"];
   if (devDomain) {
     const url3 = `https://${devDomain}/api/payments/mpesa/callback`;
-    logger.info({ callbackUrl: url3, source: "REPLIT_DEV_DOMAIN" }, "Using callback URL");
+    logger.info({ callbackUrl: url3, source: "REPLIT_DEV_DOMAIN" }, "[MPESA] Using callback URL");
     return url3;
   }
   const host = req.get("host") ?? "localhost";
   const proto = req.get("x-forwarded-proto") ?? req.protocol;
   const url2 = `${proto}://${host}/api/payments/mpesa/callback`;
-  logger.warn({ callbackUrl: url2, source: "request-headers" }, "Using callback URL derived from headers \u2014 set DARAJA_CALLBACK_BASE_URL for reliability");
+  logger.warn({ callbackUrl: url2, source: "request-headers" }, "[MPESA] Callback URL derived from headers \u2014 set DARAJA_CALLBACK_BASE_URL for reliability");
   return url2;
 }
 async function getSystemConfig() {
@@ -141465,8 +141506,45 @@ async function getSystemConfig() {
     minDays: parseInt(map2["minDays"] ?? "7", 10)
   };
 }
+async function activatePayment(payment, receiptNumber) {
+  const now = /* @__PURE__ */ new Date();
+  await db.update(paymentsTable).set({ status: "COMPLETED", mpesaReceiptNumber: receiptNumber, reference: receiptNumber, completedAt: now }).where(eq(paymentsTable.id, payment.id));
+  logger.info(
+    { paymentId: payment.id, receipt: receiptNumber, ts: now.toISOString() },
+    "[MPESA] Payment marked COMPLETED"
+  );
+  let activatedSub = null;
+  if (payment.subscriptionId) {
+    const [sub] = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.id, payment.subscriptionId));
+    if (sub && sub.status !== "ACTIVE") {
+      const endDate = new Date(now.getTime() + sub.daysSelected * 24 * 60 * 60 * 1e3);
+      const [updated] = await db.update(subscriptionsTable).set({ status: "ACTIVE", startDate: now, endDate }).where(eq(subscriptionsTable.id, sub.id)).returning();
+      activatedSub = updated;
+      logger.info(
+        {
+          subscriptionId: sub.id,
+          userId: sub.userId,
+          daysSelected: sub.daysSelected,
+          startDate: now.toISOString(),
+          endDate: endDate.toISOString(),
+          ts: (/* @__PURE__ */ new Date()).toISOString()
+        },
+        "[MPESA] Subscription ACTIVATED"
+      );
+    } else if (sub?.status === "ACTIVE") {
+      activatedSub = sub;
+      logger.info({ subscriptionId: sub.id }, "[MPESA] Subscription was already ACTIVE");
+    }
+  }
+  return activatedSub;
+}
 router7.post("/payments/mpesa/stk", requireAuth, async (req, res) => {
+  const t0 = Date.now();
   const { phoneNumber, daysSelected } = req.body;
+  logger.info(
+    { userId: req.userId, phoneNumber, daysSelected, ts: (/* @__PURE__ */ new Date()).toISOString() },
+    "[MPESA] STK Push requested"
+  );
   if (!phoneNumber || !daysSelected) {
     res.status(400).json({ error: "phoneNumber and daysSelected are required" });
     return;
@@ -141501,6 +141579,19 @@ router7.post("/payments/mpesa/stk", requireAuth, async (req, res) => {
     method: "MPESA",
     phoneNumber: formattedPhone
   }).returning();
+  const callbackUrl = getCallbackUrl(req);
+  logger.info(
+    {
+      userId: req.userId,
+      paymentId: payment.id,
+      subscriptionId: subscription.id,
+      amount: totalAmount,
+      phone: formattedPhone,
+      callbackUrl,
+      ts: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    "[MPESA] Initiating STK Push"
+  );
   let stkResult;
   try {
     stkResult = await initiateStkPush({
@@ -141508,11 +141599,11 @@ router7.post("/payments/mpesa/stk", requireAuth, async (req, res) => {
       amount: totalAmount,
       accountReference: `PESA-${subscription.id}`,
       transactionDesc: `PESAMATRIX ${daysSelected} day subscription`,
-      callbackUrl: getCallbackUrl(req)
+      callbackUrl
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "STK Push failed";
-    logger.error({ err, paymentId: payment.id }, "STK Push initiation failed");
+    logger.error({ err, paymentId: payment.id, elapsedMs: Date.now() - t0 }, "[MPESA] STK Push initiation FAILED");
     await db.update(paymentsTable).set({ status: "FAILED", failureReason: msg }).where(eq(paymentsTable.id, payment.id));
     await db.update(subscriptionsTable).set({ status: "CANCELLED" }).where(eq(subscriptionsTable.id, subscription.id));
     res.status(502).json({ error: msg });
@@ -141522,6 +141613,15 @@ router7.post("/payments/mpesa/stk", requireAuth, async (req, res) => {
     checkoutRequestId: stkResult.CheckoutRequestID,
     merchantRequestId: stkResult.MerchantRequestID
   }).where(eq(paymentsTable.id, payment.id));
+  logger.info(
+    {
+      paymentId: payment.id,
+      checkoutRequestId: stkResult.CheckoutRequestID,
+      elapsedMs: Date.now() - t0,
+      ts: (/* @__PURE__ */ new Date()).toISOString()
+    },
+    "[MPESA] STK Push sent \u2014 waiting for callback"
+  );
   res.json({
     checkoutRequestId: stkResult.CheckoutRequestID,
     merchantRequestId: stkResult.MerchantRequestID,
@@ -141530,37 +141630,44 @@ router7.post("/payments/mpesa/stk", requireAuth, async (req, res) => {
   });
 });
 router7.post("/payments/mpesa/callback", async (req, res) => {
+  const t0 = Date.now();
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
   try {
     const body = req.body;
     const parsed = parseCallback(body);
     logger.info(
-      { checkoutRequestId: parsed.checkoutRequestId, resultCode: parsed.resultCode },
-      "Daraja callback received"
+      {
+        checkoutRequestId: parsed.checkoutRequestId,
+        resultCode: parsed.resultCode,
+        resultDesc: parsed.resultDesc,
+        receipt: parsed.mpesaReceiptNumber,
+        ts: (/* @__PURE__ */ new Date()).toISOString()
+      },
+      "[MPESA] Callback received"
     );
     const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.checkoutRequestId, parsed.checkoutRequestId));
     if (!payment) {
-      logger.warn({ checkoutRequestId: parsed.checkoutRequestId }, "No payment found for callback");
+      logger.warn({ checkoutRequestId: parsed.checkoutRequestId }, "[MPESA] Callback \u2014 no matching payment found");
       return;
     }
+    if (payment.status === "COMPLETED") {
+      logger.info({ paymentId: payment.id }, "[MPESA] Callback \u2014 payment already COMPLETED, skipping");
+      return;
+    }
+    logger.info(
+      { paymentId: payment.id, subscriptionId: payment.subscriptionId, ts: (/* @__PURE__ */ new Date()).toISOString() },
+      "[MPESA] Callback \u2014 processing payment"
+    );
     if (parsed.resultCode === 0) {
-      await db.update(paymentsTable).set({
-        status: "COMPLETED",
-        mpesaReceiptNumber: parsed.mpesaReceiptNumber,
-        reference: parsed.mpesaReceiptNumber,
-        completedAt: /* @__PURE__ */ new Date()
-      }).where(eq(paymentsTable.id, payment.id));
-      if (payment.subscriptionId) {
-        const now = /* @__PURE__ */ new Date();
-        const [sub] = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.id, payment.subscriptionId));
-        if (sub) {
-          const endDate = new Date(now.getTime() + sub.daysSelected * 24 * 60 * 60 * 1e3);
-          await db.update(subscriptionsTable).set({ status: "ACTIVE", startDate: now, endDate }).where(eq(subscriptionsTable.id, payment.subscriptionId));
-        }
-      }
-      if (payment.advertisementId) {
-        await db.update(advertisementsTable).set({ isPaid: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq(advertisementsTable.id, payment.advertisementId));
-        logger.info({ advertisementId: payment.advertisementId }, "Advertisement marked as paid");
+      const activatedSub = await activatePayment(payment, parsed.mpesaReceiptNumber);
+      if (activatedSub) {
+        broadcastSubscriptionActivated(payment.userId, {
+          subscriptionId: activatedSub.id,
+          endDate: activatedSub.endDate?.toISOString() ?? null,
+          daysSelected: activatedSub.daysSelected,
+          receipt: parsed.mpesaReceiptNumber,
+          source: "callback"
+        });
       }
       const pendingMt5Subs = await db.select().from(mt5AccountSubscriptionsTable).where(and(eq(mt5AccountSubscriptionsTable.paymentId, payment.id), eq(mt5AccountSubscriptionsTable.status, "PENDING")));
       if (pendingMt5Subs.length > 0) {
@@ -141569,33 +141676,33 @@ router7.post("/payments/mpesa/callback", async (req, res) => {
           const expiryDate = new Date(now.getTime() + sub.numberOfDays * 24 * 60 * 60 * 1e3);
           await db.update(mt5AccountSubscriptionsTable).set({ status: "ACTIVE", startDate: now, expiryDate }).where(eq(mt5AccountSubscriptionsTable.id, sub.id));
         }
-        logger.info({ paymentId: payment.id, count: pendingMt5Subs.length }, "MT5 subscriptions activated via callback");
+        logger.info({ paymentId: payment.id, count: pendingMt5Subs.length }, "[MPESA] MT5 subscriptions activated");
+      }
+      if (payment.advertisementId) {
+        await db.update(advertisementsTable).set({ isPaid: true, updatedAt: /* @__PURE__ */ new Date() }).where(eq(advertisementsTable.id, payment.advertisementId));
+        logger.info({ advertisementId: payment.advertisementId }, "[MPESA] Advertisement marked as paid");
       }
       broadcastAdminEvent("payment_completed", {
         paymentId: payment.id,
         amount: payment.amount,
         receipt: parsed.mpesaReceiptNumber ?? null
       });
-      if (payment.subscriptionId) {
-        const activatedSub = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.id, payment.subscriptionId)).then((r) => r[0]);
-        if (activatedSub && activatedSub.status === "ACTIVE") {
-          broadcastAdminEvent("subscription_activated", {
-            userId: payment.userId,
-            days: activatedSub.daysSelected,
-            amount: activatedSub.totalAmount
-          });
-        }
-      }
-      logger.info({ paymentId: payment.id, receipt: parsed.mpesaReceiptNumber }, "Payment completed");
+      logger.info(
+        { paymentId: payment.id, elapsedMs: Date.now() - t0, ts: (/* @__PURE__ */ new Date()).toISOString() },
+        "[MPESA] Callback processing COMPLETE"
+      );
     } else {
       await db.update(paymentsTable).set({ status: "FAILED", failureReason: parsed.resultDesc }).where(eq(paymentsTable.id, payment.id));
       if (payment.subscriptionId) {
         await db.update(subscriptionsTable).set({ status: "CANCELLED" }).where(eq(subscriptionsTable.id, payment.subscriptionId));
       }
-      logger.info({ paymentId: payment.id, reason: parsed.resultDesc }, "Payment failed via callback");
+      logger.info(
+        { paymentId: payment.id, resultCode: parsed.resultCode, reason: parsed.resultDesc },
+        "[MPESA] Payment FAILED via callback"
+      );
     }
   } catch (err) {
-    logger.error({ err }, "Error processing Daraja callback");
+    logger.error({ err, elapsedMs: Date.now() - t0 }, "[MPESA] Error processing callback");
   }
 });
 router7.get("/payments/mpesa/status/:checkoutRequestId", requireAuth, async (req, res) => {
@@ -141630,6 +141737,78 @@ router7.get("/payments/mpesa/status/:checkoutRequestId", requireAuth, async (req
     failureReason: payment.failureReason ?? null,
     subscription
   });
+});
+router7.post("/payments/mpesa/verify/:checkoutRequestId", requireAuth, async (req, res) => {
+  const t0 = Date.now();
+  const checkoutRequestId = Array.isArray(req.params.checkoutRequestId) ? req.params.checkoutRequestId[0] : req.params.checkoutRequestId;
+  logger.info(
+    { checkoutRequestId, userId: req.userId, ts: (/* @__PURE__ */ new Date()).toISOString() },
+    "[MPESA] Manual verification triggered (60-second fallback)"
+  );
+  const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.checkoutRequestId, checkoutRequestId));
+  if (!payment) {
+    res.status(404).json({ error: "Payment not found" });
+    return;
+  }
+  if (payment.userId !== req.userId && req.userRole !== "ADMIN") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  if (payment.status === "COMPLETED") {
+    logger.info({ paymentId: payment.id }, "[MPESA] Verify \u2014 payment already COMPLETED");
+    res.json({ status: "COMPLETED", paymentId: payment.id, alreadyCompleted: true });
+    return;
+  }
+  if (payment.status === "FAILED") {
+    res.json({ status: "FAILED", paymentId: payment.id, failureReason: payment.failureReason });
+    return;
+  }
+  const stkResult = await queryStkStatus(checkoutRequestId);
+  if (!stkResult) {
+    logger.warn({ checkoutRequestId, elapsedMs: Date.now() - t0 }, "[MPESA] Verify \u2014 Daraja query returned null");
+    res.json({ status: payment.status, paymentId: payment.id, verified: false, reason: "Daraja query failed" });
+    return;
+  }
+  const resultCode = parseInt(stkResult.ResultCode ?? stkResult.ResponseCode ?? "1", 10);
+  logger.info(
+    { checkoutRequestId, resultCode, ResultDesc: stkResult.ResultDesc, elapsedMs: Date.now() - t0 },
+    "[MPESA] Verify \u2014 Daraja responded"
+  );
+  if (resultCode === 0) {
+    const activatedSub = await activatePayment(payment, null);
+    if (activatedSub) {
+      broadcastSubscriptionActivated(payment.userId, {
+        subscriptionId: activatedSub.id,
+        endDate: activatedSub.endDate?.toISOString() ?? null,
+        daysSelected: activatedSub.daysSelected,
+        receipt: null,
+        source: "verify"
+      });
+    }
+    broadcastAdminEvent("payment_completed", {
+      paymentId: payment.id,
+      amount: payment.amount,
+      receipt: null
+    });
+    logger.info(
+      { paymentId: payment.id, subscriptionId: activatedSub?.id, elapsedMs: Date.now() - t0 },
+      "[MPESA] Verify \u2014 payment ACTIVATED"
+    );
+    res.json({ status: "COMPLETED", paymentId: payment.id, verified: true, subscriptionActivated: !!activatedSub });
+  } else if (resultCode === 1032 || resultCode === 1037) {
+    await db.update(paymentsTable).set({ status: "FAILED", failureReason: stkResult.ResultDesc ?? "Transaction cancelled" }).where(eq(paymentsTable.id, payment.id));
+    if (payment.subscriptionId) {
+      await db.update(subscriptionsTable).set({ status: "CANCELLED" }).where(eq(subscriptionsTable.id, payment.subscriptionId));
+    }
+    logger.info({ paymentId: payment.id, resultCode }, "[MPESA] Verify \u2014 payment cancelled by user");
+    res.json({ status: "FAILED", paymentId: payment.id, verified: true, failureReason: stkResult.ResultDesc });
+  } else {
+    logger.info(
+      { paymentId: payment.id, resultCode, ResultDesc: stkResult.ResultDesc },
+      "[MPESA] Verify \u2014 payment still PENDING"
+    );
+    res.json({ status: "PENDING", paymentId: payment.id, verified: true, resultCode, reason: stkResult.ResultDesc });
+  }
 });
 var mpesa_default = router7;
 
@@ -144418,35 +144597,6 @@ function startMasterPoller() {
 // src/lib/payment-reconciler.ts
 var RECONCILE_INTERVAL_MS = 5 * 60 * 1e3;
 var STALE_AFTER_MS = 2 * 60 * 1e3;
-async function queryStkStatus(checkoutRequestId) {
-  try {
-    const token2 = await getDarajaToken();
-    const shortCode = process.env.DARAJA_BUSINESS_SHORTCODE;
-    if (!shortCode) return null;
-    const timestamp2 = generateTimestamp();
-    const password = generatePassword(timestamp2);
-    const payload = {
-      BusinessShortCode: shortCode,
-      Password: password,
-      Timestamp: timestamp2,
-      CheckoutRequestID: checkoutRequestId
-    };
-    const res = await fetch("https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token2}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(1e4)
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (err) {
-    logger.warn({ err, checkoutRequestId }, "Reconciler: STK query failed");
-    return null;
-  }
-}
 async function reconcilePayment(payment) {
   if (!payment.checkoutRequestId) {
     await db.update(paymentsTable).set({ status: "FAILED", failureReason: "No checkoutRequestId" }).where(eq(paymentsTable.id, payment.id));
@@ -144477,6 +144627,18 @@ async function reconcilePayment(payment) {
       amount: payment.amount,
       receipt: null
     });
+    if (payment.subscriptionId) {
+      const [activatedSub] = await db.select().from(subscriptionsTable).where(eq(subscriptionsTable.id, payment.subscriptionId));
+      if (activatedSub) {
+        broadcastSubscriptionActivated(payment.userId, {
+          subscriptionId: activatedSub.id,
+          endDate: activatedSub.endDate?.toISOString() ?? null,
+          daysSelected: activatedSub.daysSelected,
+          receipt: null,
+          source: "reconciler"
+        });
+      }
+    }
     logger.info({ paymentId: payment.id }, "Reconciler: payment reconciled as COMPLETED");
     await writeAuditLog("PAYMENT_RECONCILED_SUCCESS", {
       paymentId: payment.id,

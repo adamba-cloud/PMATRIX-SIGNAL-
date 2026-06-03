@@ -5,6 +5,8 @@ import {
   useGetMyPayments, getGetMyPaymentsQueryKey,
   useInitiateStkPush, useGetPaymentStatus, getGetPaymentStatusQueryKey,
   getListSignalsQueryKey,
+  useVerifyPayment,
+  useGetMe, getGetMeQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -13,19 +15,22 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, ShieldCheck, Smartphone, CheckCircle2, XCircle, Clock, CalendarDays, Banknote, Phone } from "lucide-react";
+import { Loader2, ShieldCheck, Smartphone, CheckCircle2, XCircle, Clock, CalendarDays, Banknote, Phone, RefreshCw } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { usePaymentEvents } from "@/hooks/usePaymentEvents";
 
-type PaymentStage = "idle" | "awaiting_stk" | "polling" | "success" | "failed";
+type PaymentStage = "idle" | "awaiting_stk" | "polling" | "verifying" | "success" | "failed";
 
 export default function Subscription() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey(), retry: false } });
   const { data: subscription, isLoading: isLoadingSub } = useGetMySubscription({ query: { queryKey: getGetMySubscriptionQueryKey() } });
   const { data: config, isLoading: isLoadingConfig } = useGetConfig({ query: { queryKey: getGetConfigQueryKey() } });
   const stkMutation = useInitiateStkPush();
+  const verifyMutation = useVerifyPayment();
 
   const [days, setDays] = useState<number>(30);
   const [phone, setPhone] = useState<string>("");
@@ -33,6 +38,7 @@ export default function Subscription() {
   const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null);
   const [pollCount, setPollCount] = useState(0);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const verifyTriggered = useRef(false);
 
   const { data: paymentStatus, refetch: refetchStatus } = useGetPaymentStatus(
     checkoutRequestId ?? "",
@@ -49,6 +55,26 @@ export default function Subscription() {
     ? Math.max(0, Math.ceil((new Date(subscription.endDate).getTime() - Date.now()) / 86400000))
     : null;
 
+  const invalidateAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: getGetMySubscriptionQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetMyPaymentsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListSignalsQueryKey() });
+  }, [queryClient]);
+
+  // WebSocket: instantly complete flow when server broadcasts activation for this user
+  usePaymentEvents(me?.id, (payload) => {
+    if (stage !== "polling" && stage !== "verifying") return;
+    stopPolling();
+    setStage("success");
+    invalidateAll();
+    toast({
+      title: "Subscription Activated!",
+      description: payload.receipt
+        ? `M-Pesa receipt: ${payload.receipt}`
+        : `Your ${payload.daysSelected}-day subscription is now active.`,
+    });
+  });
+
   const stopPolling = useCallback(() => {
     if (pollTimer.current) {
       clearTimeout(pollTimer.current);
@@ -56,22 +82,64 @@ export default function Subscription() {
     }
   }, []);
 
+  const triggerVerify = useCallback(async () => {
+    if (!checkoutRequestId || verifyTriggered.current) return;
+    verifyTriggered.current = true;
+    setStage("verifying");
+
+    try {
+      const result = await verifyMutation.mutateAsync(checkoutRequestId);
+
+      if (result.status === "COMPLETED") {
+        stopPolling();
+        setStage("success");
+        invalidateAll();
+        toast({ title: "Payment Confirmed!", description: "Your subscription is now active." });
+      } else if (result.status === "FAILED") {
+        stopPolling();
+        setStage("failed");
+        toast({ title: "Payment Failed", description: result.failureReason ?? "Transaction was not completed.", variant: "destructive" });
+      } else {
+        // Still pending — go back to polling
+        verifyTriggered.current = false;
+        setStage("polling");
+      }
+    } catch {
+      verifyTriggered.current = false;
+      setStage("polling");
+    }
+  }, [checkoutRequestId, verifyMutation, stopPolling, invalidateAll, toast]);
+
   const poll = useCallback(async (count: number) => {
     if (!checkoutRequestId) return;
+
+    // At 60 seconds trigger server-side Daraja verification
+    if (count === 12 && !verifyTriggered.current) {
+      void triggerVerify();
+      // Keep polling in parallel for callback
+      const next = count + 1;
+      setPollCount(next);
+      pollTimer.current = setTimeout(() => poll(next), 5000);
+      return;
+    }
+
     if (count >= 60) {
       stopPolling();
       setStage("failed");
-      toast({ title: "Payment Timeout", description: "No response received after 5 minutes. Check your M-Pesa messages — if deducted, your subscription will activate automatically within minutes.", variant: "destructive" });
+      toast({
+        title: "Payment Timeout",
+        description: "No confirmation after 5 minutes. If money was deducted, your subscription will activate automatically — check back in a few minutes.",
+        variant: "destructive",
+      });
       return;
     }
+
     const { data } = await refetchStatus();
     if (data?.status === "COMPLETED") {
       stopPolling();
       setStage("success");
-      queryClient.invalidateQueries({ queryKey: getGetMySubscriptionQueryKey() });
-      queryClient.invalidateQueries({ queryKey: getGetMyPaymentsQueryKey() });
-      queryClient.invalidateQueries({ queryKey: getListSignalsQueryKey() });
-      toast({ title: "Payment Successful!", description: `M-Pesa receipt: ${data.mpesaReceiptNumber}` });
+      invalidateAll();
+      toast({ title: "Payment Successful!", description: `M-Pesa receipt: ${data.mpesaReceiptNumber ?? "confirmed"}` });
     } else if (data?.status === "FAILED" || data?.status === "CANCELLED") {
       stopPolling();
       setStage("failed");
@@ -81,10 +149,11 @@ export default function Subscription() {
       setPollCount(next);
       pollTimer.current = setTimeout(() => poll(next), 5000);
     }
-  }, [checkoutRequestId, refetchStatus, stopPolling, queryClient, toast]);
+  }, [checkoutRequestId, refetchStatus, stopPolling, invalidateAll, toast, triggerVerify]);
 
   useEffect(() => {
     if (stage === "polling" && checkoutRequestId) {
+      verifyTriggered.current = false;
       poll(0);
     }
     return () => stopPolling();
@@ -123,8 +192,13 @@ export default function Subscription() {
     setStage("idle");
     setCheckoutRequestId(null);
     setPollCount(0);
+    verifyTriggered.current = false;
     stkMutation.reset();
+    verifyMutation.reset();
   };
+
+  const elapsedSeconds = pollCount * 5;
+  const remainingSeconds = Math.max(0, 300 - elapsedSeconds);
 
   if (isLoadingSub || isLoadingConfig) {
     return (
@@ -224,7 +298,6 @@ export default function Subscription() {
           <CardContent className="relative z-10 space-y-6">
             {stage === "idle" || stage === "awaiting_stk" ? (
               <>
-                {/* Phone */}
                 <div className="space-y-2">
                   <Label className="text-slate-300 flex items-center gap-1.5">
                     <Phone className="w-3.5 h-3.5" /> M-Pesa Phone Number
@@ -240,7 +313,6 @@ export default function Subscription() {
                   <p className="text-xs text-slate-500">The number that will receive the STK Push prompt.</p>
                 </div>
 
-                {/* Days slider */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-end">
                     <Label className="text-slate-300">Subscription Duration</Label>
@@ -257,7 +329,6 @@ export default function Subscription() {
                   <p className="text-xs text-slate-500">Minimum {minDays} day{minDays !== 1 ? "s" : ""} required</p>
                 </div>
 
-                {/* Summary */}
                 <div className="p-4 bg-slate-950 rounded-lg border border-slate-800 space-y-2.5">
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Daily Rate</span>
@@ -286,11 +357,23 @@ export default function Subscription() {
                 </div>
                 <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
                   <Clock className="w-3.5 h-3.5" />
-                  Waiting for confirmation… ({Math.max(0, 300 - pollCount * 5)}s)
+                  Waiting for confirmation… ({remainingSeconds}s)
                 </div>
                 <Button variant="ghost" size="sm" onClick={reset} className="text-slate-500 hover:text-slate-300 hover:bg-slate-800 mt-2">
                   Cancel
                 </Button>
+              </div>
+            ) : stage === "verifying" ? (
+              <div className="text-center space-y-5 py-6">
+                <div className="relative mx-auto w-16 h-16">
+                  <div className="w-16 h-16 rounded-full border-4 border-yellow-500/20 border-t-yellow-500 animate-spin" />
+                  <RefreshCw className="w-6 h-6 text-yellow-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-slate-200 font-semibold text-lg">Verifying with Safaricom…</p>
+                  <p className="text-slate-400 text-sm">Checking payment status directly with Safaricom.</p>
+                  <p className="text-slate-400 text-sm">This only takes a moment.</p>
+                </div>
               </div>
             ) : stage === "success" ? (
               <div className="text-center space-y-4 py-6">

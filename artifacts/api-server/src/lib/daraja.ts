@@ -146,6 +146,45 @@ export interface DarajaCallbackBody {
   };
 }
 
+export interface StkQueryResult {
+  ResponseCode: string;
+  ResultCode: string;
+  ResultDesc: string;
+}
+
+export async function queryStkStatus(checkoutRequestId: string): Promise<StkQueryResult | null> {
+  try {
+    const token = await getDarajaToken();
+    const shortCode = process.env.DARAJA_BUSINESS_SHORTCODE;
+    if (!shortCode) {
+      logger.warn("[DARAJA] DARAJA_BUSINESS_SHORTCODE not set — cannot query STK status");
+      return null;
+    }
+    const timestamp = generateTimestamp();
+    const password = generatePassword(timestamp);
+
+    logger.info({ checkoutRequestId, ts: new Date().toISOString() }, "[DARAJA] Querying STK status");
+
+    const res = await fetch("https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ BusinessShortCode: shortCode, Password: password, Timestamp: timestamp, CheckoutRequestID: checkoutRequestId }),
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!res.ok) {
+      logger.warn({ status: res.status, checkoutRequestId }, "[DARAJA] STK query non-OK response");
+      return null;
+    }
+    const data = (await res.json()) as StkQueryResult;
+    logger.info({ checkoutRequestId, ResultCode: data.ResultCode, ResultDesc: data.ResultDesc }, "[DARAJA] STK query result");
+    return data;
+  } catch (err) {
+    logger.warn({ err, checkoutRequestId }, "[DARAJA] STK query failed");
+    return null;
+  }
+}
+
 export function parseCallback(body: DarajaCallbackBody): {
   merchantRequestId: string;
   checkoutRequestId: string;
