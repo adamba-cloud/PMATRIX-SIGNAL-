@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { customFetch, ApiError, getGetMeQueryKey } from "@workspace/api-client-react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,11 @@ import { ActivitySquare, Loader2, Gift } from "lucide-react";
 export default function Register() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { data: logoData } = useQuery<{ url: string | null }>({
+    queryKey: ["logo"],
+    queryFn: () => customFetch<{ url: string | null }>("/api/logo"),
+    staleTime: 5 * 60 * 1000,
+  });
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -65,10 +70,18 @@ export default function Register() {
     <div className="flex-1 flex items-center justify-center p-6 bg-slate-950">
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-8 shadow-xl shadow-black/50">
         <div className="flex justify-center mb-8">
-          <div className="flex items-center gap-2 text-green-500">
-            <ActivitySquare className="w-8 h-8" />
-            <span className="font-bold text-2xl tracking-tight text-white">PESAMATRIX</span>
-          </div>
+          {logoData?.url ? (
+            <img
+              src={logoData.url}
+              alt="PESAMATRIX"
+              className="h-12 w-auto max-w-[200px] object-contain"
+            />
+          ) : (
+            <div className="flex items-center gap-2 text-green-500">
+              <ActivitySquare className="w-8 h-8" />
+              <span className="font-bold text-2xl tracking-tight text-white">PESAMATRIX</span>
+            </div>
+          )}
         </div>
 
         <h2 className="text-2xl font-bold text-white mb-2 text-center">Create Account</h2>
