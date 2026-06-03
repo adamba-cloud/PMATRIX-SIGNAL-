@@ -7,12 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Gift, TrendingUp, Settings, Users } from "lucide-react";
+import { Loader2, Gift, TrendingUp, Settings, Users, Trophy, Medal, Award } from "lucide-react";
 import { format } from "date-fns";
 
 type ReferralSettings = {
   refereeBonusDays: number;
   referrerBonusDays: number;
+};
+
+type LeaderboardEntry = {
+  rank: number;
+  userId: number;
+  name: string;
+  email: string;
+  totalReferrals: number;
+  totalBonusDaysEarned: number;
 };
 
 type ReferralRow = {
@@ -28,8 +37,27 @@ type ReferralRow = {
 
 type AdminReferralsResponse = {
   settings: ReferralSettings;
+  leaderboard: LeaderboardEntry[];
   referrals: ReferralRow[];
 };
+
+function RankIcon({ rank }: { rank: number }) {
+  if (rank === 1) return <Trophy className="w-4 h-4 text-yellow-400" />;
+  if (rank === 2) return <Medal className="w-4 h-4 text-slate-400" />;
+  if (rank === 3) return <Award className="w-4 h-4 text-amber-600" />;
+  return (
+    <span className="w-4 h-4 flex items-center justify-center text-xs font-bold text-muted-foreground">
+      {rank}
+    </span>
+  );
+}
+
+function RankBg({ rank }: { rank: number }) {
+  if (rank === 1) return "bg-yellow-500/10 border-yellow-500/20";
+  if (rank === 2) return "bg-slate-500/10 border-slate-500/20";
+  if (rank === 3) return "bg-amber-600/10 border-amber-600/20";
+  return "bg-muted/20 border-border";
+}
 
 export default function AdminReferrals() {
   const { toast } = useToast();
@@ -41,6 +69,7 @@ export default function AdminReferrals() {
   });
 
   const referrals = data?.referrals ?? [];
+  const leaderboard = data?.leaderboard ?? [];
   const settings = data?.settings;
 
   const [refereeInput, setRefereeInput] = useState("");
@@ -160,25 +189,70 @@ export default function AdminReferrals() {
         </Card>
       </div>
 
-      {/* Referrals table */}
+      {/* Leaderboard */}
       {isLoading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-green-500" />
         </div>
-      ) : referrals.length === 0 ? (
+      ) : leaderboard.length > 0 ? (
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Trophy className="w-4 h-4 text-yellow-400" />
+              Top Referrers Leaderboard
+            </CardTitle>
+            <CardDescription>Ranked by total successful referrals</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {leaderboard.map((entry) => (
+              <div
+                key={entry.userId}
+                className={`flex items-center gap-4 p-3 rounded-lg border ${RankBg({ rank: entry.rank })}`}
+              >
+                {/* Rank */}
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-background/60 flex-shrink-0">
+                  <RankIcon rank={entry.rank} />
+                </div>
+
+                {/* User info */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{entry.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{entry.email}</p>
+                </div>
+
+                {/* Stats */}
+                <div className="flex items-center gap-4 flex-shrink-0 text-right">
+                  <div>
+                    <p className="text-lg font-bold leading-none">{entry.totalReferrals}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">referrals</p>
+                  </div>
+                  <div className="pl-4 border-l border-border">
+                    <p className="text-lg font-bold text-green-400 leading-none">+{entry.totalBonusDaysEarned}d</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">earned</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Referrals history table */}
+      {!isLoading && referrals.length === 0 ? (
         <Card className="bg-card border-border">
           <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <Gift className="w-10 h-10 mb-3 opacity-40" />
             <p>No referrals yet.</p>
           </CardContent>
         </Card>
-      ) : (
+      ) : !isLoading ? (
         <Card className="bg-card border-border">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-4 h-4 text-green-500" />
-              All Referrals
+              All Referral Activity
             </CardTitle>
+            <CardDescription>{referrals.length} total records</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-border">
@@ -207,7 +281,7 @@ export default function AdminReferrals() {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
     </div>
   );
 }

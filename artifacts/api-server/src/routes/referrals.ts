@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, usersTable, referralsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql, sum, count } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { ensureReferralCode, getReferralSettings, setReferralSettings } from "../lib/referrals";
 
@@ -88,8 +88,37 @@ router.get("/admin/referrals", requireAdmin, async (_req, res): Promise<void> =>
 
   const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
 
+  // Build leaderboard: group by referrerId, sum bonus days earned, count referrals
+  const leaderboardRaw = await db
+    .select({
+      referrerId: referralsTable.referrerId,
+      totalReferrals: count(referralsTable.id),
+      totalBonusDaysEarned: sum(referralsTable.referrerBonusDays),
+    })
+    .from(referralsTable)
+    .groupBy(referralsTable.referrerId)
+    .orderBy(sql`count(${referralsTable.id}) desc`);
+
+  const leaderboardUserIds = leaderboardRaw.map((r) => r.referrerId);
+  const leaderboardUsers = leaderboardUserIds.length
+    ? await db
+        .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+        .from(usersTable)
+    : [];
+  const leaderboardUserMap = Object.fromEntries(leaderboardUsers.map((u) => [u.id, u]));
+
+  const leaderboard = leaderboardRaw.map((row, idx) => ({
+    rank: idx + 1,
+    userId: row.referrerId,
+    name: leaderboardUserMap[row.referrerId]?.name ?? "Unknown",
+    email: leaderboardUserMap[row.referrerId]?.email ?? "",
+    totalReferrals: row.totalReferrals,
+    totalBonusDaysEarned: parseInt(row.totalBonusDaysEarned ?? "0", 10),
+  }));
+
   res.json({
     settings,
+    leaderboard,
     referrals: referrals.map((r) => ({
       id: r.id,
       status: r.status,
