@@ -24,6 +24,38 @@ router.get("/referral/stats", requireAuth, async (req, res): Promise<void> => {
 
   const totalBonusDays = referrals.reduce((sum, r) => sum + r.referrerBonusDays, 0);
 
+  // Build global leaderboard to derive current user's rank
+  const allRanks = await db
+    .select({
+      referrerId: referralsTable.referrerId,
+      totalReferrals: count(referralsTable.id),
+      totalBonusDaysEarned: sum(referralsTable.referrerBonusDays),
+    })
+    .from(referralsTable)
+    .groupBy(referralsTable.referrerId)
+    .orderBy(sql`count(${referralsTable.id}) desc`);
+
+  // Fetch user names for top 5 + current user (if not in top 5)
+  const top5Ids = allRanks.slice(0, 5).map((r) => r.referrerId);
+  const neededIds = [...new Set([...top5Ids, req.userId!])];
+  const nameRows = neededIds.length
+    ? await db
+        .select({ id: usersTable.id, name: usersTable.name })
+        .from(usersTable)
+    : [];
+  const nameMap = Object.fromEntries(nameRows.map((u) => [u.id, u.name]));
+
+  const myRankIndex = allRanks.findIndex((r) => r.referrerId === req.userId!);
+  const myRank = myRankIndex === -1 ? null : myRankIndex + 1;
+
+  const top5 = allRanks.slice(0, 5).map((row, idx) => ({
+    rank: idx + 1,
+    name: nameMap[row.referrerId] ?? "Unknown",
+    isMe: row.referrerId === req.userId!,
+    totalReferrals: row.totalReferrals,
+    totalBonusDaysEarned: parseInt(row.totalBonusDaysEarned ?? "0", 10),
+  }));
+
   res.json({
     referralCode: code,
     totalReferrals: referrals.length,
@@ -31,6 +63,9 @@ router.get("/referral/stats", requireAuth, async (req, res): Promise<void> => {
     totalBonusDays,
     refereeBonusDays: settings.refereeBonusDays,
     referrerBonusDays: settings.referrerBonusDays,
+    myRank,
+    totalReferrers: allRanks.length,
+    leaderboard: top5,
     referrals: referrals.map((r) => ({
       id: r.id,
       status: r.status,
