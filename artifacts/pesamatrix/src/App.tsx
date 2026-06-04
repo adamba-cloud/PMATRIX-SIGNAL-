@@ -71,6 +71,7 @@ import AdminReferrals from "@/pages/admin/referrals";
 import AdminAdvertisements from "@/pages/admin/advertisements";
 import AdminMt5Billing from "@/pages/admin/mt5-billing";
 import AdminMaster from "@/pages/admin/master";
+import AdminMasterEvents from "@/pages/admin/master-events";
 
 const queryClient = new QueryClient();
 
@@ -113,6 +114,7 @@ function Router() {
         <Route path="/admin/advertisements" component={AdminAdvertisements} />
         <Route path="/admin/mt5-billing" component={AdminMt5Billing} />
         <Route path="/admin/master" component={AdminMaster} />
+        <Route path="/admin/master-events" component={AdminMasterEvents} />
 
         <Route component={NotFound} />
       </Switch>
