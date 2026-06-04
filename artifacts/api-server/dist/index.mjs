@@ -142192,6 +142192,16 @@ async function getMetaApiAccount(metaApiId) {
     tradeAllowed: info.tradeAllowed
   };
 }
+async function getMetaApiAccountManagementState(metaApiId) {
+  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}`, {
+    headers: headers()
+  });
+  if (!res.ok) {
+    const text2 = await res.text();
+    throw new Error(`MetaApi getAccount (mgmt) failed (${res.status}): ${text2}`);
+  }
+  return res.json();
+}
 async function deployMetaApiAccount(metaApiId) {
   return withRetry(async () => {
     const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}/deploy`, {
@@ -144571,27 +144581,59 @@ function startExpiryJob() {
 }
 
 // src/lib/metaapi-sync-job.ts
-var INTERVAL_MS2 = 15 * 1e3;
+var INTERVAL_MS2 = 10 * 1e3;
+var PROVISIONING_WINDOW_MS = 12 * 60 * 1e3;
+var STUCK_SYNCING_MS = 15 * 60 * 1e3;
 async function syncMetaApiStatuses() {
   if (!process.env.METAAPI_TOKEN) return;
-  let syncing;
+  const windowStart = new Date(Date.now() - PROVISIONING_WINDOW_MS);
+  let accounts;
   try {
-    syncing = await db.select().from(slaveAccountsTable).where(
+    accounts = await db.select().from(slaveAccountsTable).where(
       and(
-        eq(slaveAccountsTable.status, "SYNCING"),
-        isNotNull(slaveAccountsTable.metaApiAccountId)
+        isNotNull(slaveAccountsTable.metaApiAccountId),
+        or(
+          // All accounts still actively syncing
+          eq(slaveAccountsTable.status, "SYNCING"),
+          // Error accounts that are still young — provisioning may still be in progress
+          and(
+            eq(slaveAccountsTable.status, "ERROR"),
+            gte(slaveAccountsTable.createdAt, windowStart)
+          )
+        )
       )
     );
   } catch (err) {
-    logger.error({ err }, "MetaApi sync: failed to query SYNCING accounts");
+    logger.error({ err }, "MetaApi sync: failed to query accounts");
     return;
   }
-  if (syncing.length === 0) return;
-  logger.debug({ count: syncing.length }, "MetaApi sync: checking SYNCING accounts");
+  if (accounts.length === 0) return;
+  logger.debug({ count: accounts.length }, "MetaApi sync: checking accounts");
   await Promise.allSettled(
-    syncing.map(async (account) => {
+    accounts.map(async (account) => {
+      const metaApiId = account.metaApiAccountId;
+      const ageMs = Date.now() - account.createdAt.getTime();
       try {
-        const state = await getMetaApiAccount(account.metaApiAccountId);
+        if (account.status === "SYNCING" && ageMs > STUCK_SYNCING_MS) {
+          await db.update(slaveAccountsTable).set({
+            status: "ERROR",
+            statusMessage: "Provisioning timed out after 15 minutes. Please delete this account and try again, or contact support.",
+            updatedAt: /* @__PURE__ */ new Date()
+          }).where(eq(slaveAccountsTable.id, account.id));
+          logger.warn({ accountId: account.id, metaApiId }, "MetaApi sync: provisioning timed out");
+          return;
+        }
+        let state;
+        const useManagementApi = account.status === "SYNCING" || ageMs < 3 * 60 * 1e3;
+        if (useManagementApi) {
+          state = await getMetaApiAccountManagementState(metaApiId);
+        } else {
+          try {
+            state = await getMetaApiAccount(metaApiId);
+          } catch {
+            state = await getMetaApiAccountManagementState(metaApiId);
+          }
+        }
         const { status, message } = mapMetaApiStatus(state);
         const needsUpdate = account.status !== status || account.statusMessage !== message;
         if (needsUpdate) {
@@ -144602,16 +144644,23 @@ async function syncMetaApiStatuses() {
             updatedAt: /* @__PURE__ */ new Date()
           }).where(eq(slaveAccountsTable.id, account.id));
           logger.info(
-            { accountId: account.id, metaApiId: account.metaApiAccountId, status },
+            { accountId: account.id, metaApiId, from: account.status, to: status },
             "MetaApi sync: status updated"
           );
         }
       } catch (err) {
         logger.warn(
-          { err, accountId: account.id, metaApiId: account.metaApiAccountId },
+          { err, accountId: account.id, metaApiId },
           "MetaApi sync: failed to fetch status for account"
         );
-        await db.update(slaveAccountsTable).set({ status: "ERROR", statusMessage: "Failed to reach MetaApi. Will retry.", updatedAt: /* @__PURE__ */ new Date() }).where(eq(slaveAccountsTable.id, account.id));
+        const isEarlyProvisioning = ageMs < 3 * 60 * 1e3;
+        if (!isEarlyProvisioning) {
+          await db.update(slaveAccountsTable).set({
+            status: "ERROR",
+            statusMessage: parseMetaApiError(err),
+            updatedAt: /* @__PURE__ */ new Date()
+          }).where(eq(slaveAccountsTable.id, account.id));
+        }
       }
     })
   );

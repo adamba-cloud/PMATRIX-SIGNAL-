@@ -287,6 +287,25 @@ export async function getMetaApiAccount(metaApiId: string): Promise<MetaApiAccou
   };
 }
 
+// ── Management API state (provisioning phase) ─────────────────────────────────
+// Use this during provisioning (SYNCING) — the trading API only responds once
+// the terminal is CONNECTED, so calling it too early returns a 4xx error.
+// The management API returns state (DEPLOYING/DEPLOYED/ERROR) at any phase.
+export async function getMetaApiAccountManagementState(
+  metaApiId: string,
+): Promise<MetaApiAccountState> {
+  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}`, {
+    headers: headers(),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`MetaApi getAccount (mgmt) failed (${res.status}): ${text}`);
+  }
+
+  return res.json() as Promise<MetaApiAccountState>;
+}
+
 export async function deployMetaApiAccount(metaApiId: string): Promise<void> {
   return withRetry(async () => {
     const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}/deploy`, {

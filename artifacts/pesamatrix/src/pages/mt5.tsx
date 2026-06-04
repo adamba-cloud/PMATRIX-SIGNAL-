@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   useGetMt5Accounts,
   useConnectMt5Account,
@@ -47,7 +47,159 @@ import {
   TrendingUp,
   DollarSign,
   Shield,
+  ChevronDown,
 } from "lucide-react";
+
+// ─── Broker server list ───────────────────────────────────────────────────────
+// Common MT5 broker servers, especially popular in Kenya / East Africa.
+// Users can always type any server name not in this list.
+const BROKER_SERVERS: { broker: string; servers: string[] }[] = [
+  {
+    broker: "Exness",
+    servers: [
+      "Exness-MT5Real",
+      "Exness-MT5Real2",
+      "Exness-MT5Real4",
+      "Exness-MT5Real6",
+      "Exness-MT5Real8",
+      "Exness-MT5Real10",
+      "Exness-MT5Trial1",
+    ],
+  },
+  {
+    broker: "XM / XMTrading",
+    servers: ["XMTrading-MT5 1", "XMTrading-MT5 2", "XMTrading-MT5 3", "XM-Real", "XM-Demo"],
+  },
+  {
+    broker: "ICMarkets",
+    servers: ["ICMarkets-MT5-2", "ICMarkets-Live02", "ICMarkets-Demo01", "ICMarketsSC-MT5-2"],
+  },
+  {
+    broker: "Pepperstone",
+    servers: ["Pepperstone-MT5-Live01", "Pepperstone-Demo01", "PepperstoneSC-MT5-Live01"],
+  },
+  {
+    broker: "HFM / HotForex",
+    servers: ["HFMarkets-MT5Live", "HFMarkets-MT5Demo", "HFMarketsKE-MT5Live"],
+  },
+  {
+    broker: "FXTM / ForexTime",
+    servers: ["FXTM-Real11", "FXTM-MT5 Demo", "ForexTimeFXTM-Server"],
+  },
+  {
+    broker: "OctaFX",
+    servers: ["OctaFX-MT5", "OctaFX-Demo"],
+  },
+  {
+    broker: "Deriv",
+    servers: ["DerivSVG-Server", "Deriv-Server", "DerivFX-Server"],
+  },
+  {
+    broker: "FBS",
+    servers: ["FBS-Real", "FBS-Demo", "FBSPrime-Real"],
+  },
+  {
+    broker: "Avatrade",
+    servers: ["AvaTrade-MT5", "AvaTrade-MT5 1"],
+  },
+  {
+    broker: "OANDA",
+    servers: ["OANDA-v20 Live-1", "OANDA-v20 Practice-1"],
+  },
+  {
+    broker: "FxPro",
+    servers: ["FxPro-MT5-Trial", "FxPro-MT5Real7"],
+  },
+];
+
+const ALL_SERVERS = BROKER_SERVERS.flatMap((g) => g.servers);
+
+// ─── Broker server combobox ───────────────────────────────────────────────────
+function BrokerServerInput({
+  value,
+  onChange,
+  error,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  error?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filtered = value.trim().length === 0
+    ? ALL_SERVERS
+    : ALL_SERVERS.filter((s) => s.toLowerCase().includes(value.toLowerCase()));
+
+  // Close when clicking outside
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <Input
+          id="brokerServer"
+          placeholder="e.g. Exness-MT5Real8"
+          value={value}
+          autoComplete="off"
+          onFocus={() => setOpen(true)}
+          onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+          className={`bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500 pr-8 ${error ? "border-red-500/60" : ""}`}
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => setOpen((o) => !o)}
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+        >
+          <ChevronDown className="w-4 h-4" />
+        </button>
+      </div>
+
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 rounded-md border border-slate-700 bg-slate-800 shadow-xl max-h-52 overflow-y-auto">
+          {BROKER_SERVERS.map((group) => {
+            const visible = group.servers.filter((s) =>
+              value.trim().length === 0 || s.toLowerCase().includes(value.toLowerCase())
+            );
+            if (visible.length === 0) return null;
+            return (
+              <div key={group.broker}>
+                <p className="px-3 py-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-900/60 sticky top-0">
+                  {group.broker}
+                </p>
+                {visible.map((server) => (
+                  <button
+                    key={server}
+                    type="button"
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-700 transition-colors ${
+                      value === server ? "text-green-400 bg-green-500/10" : "text-slate-200"
+                    }`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onChange(server);
+                      setOpen(false);
+                    }}
+                  >
+                    {server}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Mt5Status = "CONNECTED" | "SYNCING" | "DISCONNECTED" | "ERROR";
 
@@ -411,15 +563,13 @@ function ConnectAccountDialog({ onSuccess }: { onSuccess: () => void }) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="brokerServer" className="text-slate-300">Broker Server</Label>
-              <Input
-                id="brokerServer"
-                placeholder="e.g. ICMarkets-Demo01"
+              <BrokerServerInput
                 value={form.brokerServer}
-                onChange={(e) => { setForm((f) => ({ ...f, brokerServer: e.target.value })); setFormError(null); }}
-                className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
+                onChange={(v) => { setForm((f) => ({ ...f, brokerServer: v })); setFormError(null); }}
+                error={!!formError && !form.brokerServer}
               />
               <p className="text-xs text-slate-500">
-                Find this in MT5 → File → Open an Account. Example: <span className="font-mono text-slate-400">Exness-MT5Real8</span>
+                Find this in MT5 → File → Open an Account, or pick from the list above.
               </p>
             </div>
 
