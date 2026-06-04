@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "export NODE_ENV=development && redis-server --daemonize yes --logfile /tmp/redis.log && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
-    "start": "redis-server --daemonize yes --logfile /tmp/redis.log; sleep 1 && node --enable-source-maps ./dist/index.mjs",
+    "start": "redis-server --daemonize yes --logfile /tmp/redis.log; sleep 2 && node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

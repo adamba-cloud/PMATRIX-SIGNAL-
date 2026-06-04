@@ -138202,31 +138202,92 @@ var logger = (0, import_pino.default)({
 // src/lib/redis.ts
 var _redis = null;
 var _unavailable = false;
+var _ready = false;
+var _readyResolvers = [];
 function getRedis() {
   if (_unavailable) {
-    throw new Error("Redis is not available in this environment. Set the REDIS_URL environment variable to connect to an external Redis instance.");
+    throw new Error(
+      "Redis is not available in this environment. Set the REDIS_URL environment variable to connect to an external Redis instance."
+    );
   }
   if (!_redis) {
     const url2 = process.env.REDIS_URL ?? "redis://localhost:6379";
+    const displayUrl = url2.replace(/:\/\/([^@]+)@/, "://<credentials>@");
+    logger.info({ url: displayUrl }, "Redis: connecting");
     _redis = new import_ioredis.default(url2, {
+      // Required by BullMQ
       maxRetriesPerRequest: null,
-      lazyConnect: true,
-      enableOfflineQueue: false,
+      // Do NOT use lazyConnect — BullMQ sends commands immediately on Queue/Worker
+      // creation and needs the connection to be establishing before those arrive.
+      //
+      // Do NOT set enableOfflineQueue: false — with lazyConnect removed the default
+      // (true) lets commands queue while the initial handshake completes. Without
+      // this, every BullMQ command races the connect and fails → retryStrategy fires
+      // → _unavailable=true before Redis even responds.
       retryStrategy: (times) => {
-        if (times > 3) {
+        if (times > 10) {
           _unavailable = true;
-          logger.warn("Redis unavailable after retries \u2014 Redis-dependent features (copy trading, spread guard) are disabled. Set REDIS_URL to enable them.");
+          logger.error(
+            { attempts: times },
+            "Redis: gave up after 10 retries \u2014 Redis-dependent features disabled. Set REDIS_URL to fix."
+          );
+          for (const { reject } of _readyResolvers.splice(0)) {
+            reject(new Error("Redis unavailable after max retries"));
+          }
           return null;
         }
-        return Math.min(times * 500, 2e3);
+        const delay = Math.min(times * 500, 3e3);
+        logger.warn({ attempt: times, retryInMs: delay }, "Redis: connection lost \u2014 will retry");
+        return delay;
       }
     });
-    _redis.on("error", (err) => {
-      if (!_unavailable) logger.warn({ err }, "Redis error");
+    _redis.on("connect", () => {
+      logger.info("Redis: TCP connection established");
     });
-    _redis.on("connect", () => logger.info("Redis connected"));
+    _redis.on("ready", () => {
+      _ready = true;
+      logger.info("Redis: ready \u2014 all queued commands unblocked");
+      for (const { resolve } of _readyResolvers.splice(0)) resolve();
+    });
+    _redis.on("error", (err) => {
+      if (!_unavailable) {
+        logger.warn({ err: err.message }, "Redis: error");
+      }
+    });
+    _redis.on("reconnecting", () => {
+      _ready = false;
+      logger.warn("Redis: reconnecting");
+    });
+    _redis.on("close", () => {
+      _ready = false;
+      logger.warn("Redis: connection closed");
+    });
   }
   return _redis;
+}
+function waitForRedis(timeoutMs = 15e3) {
+  try {
+    getRedis();
+  } catch (err) {
+    return Promise.reject(err);
+  }
+  if (_ready) return Promise.resolve();
+  if (_unavailable) return Promise.reject(new Error("Redis is unavailable"));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Redis did not become ready within ${timeoutMs}ms \u2014 is it running?`));
+    }, timeoutMs);
+    _readyResolvers.push({
+      resolve: () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      reject: (e) => {
+        clearTimeout(timer);
+        reject(e);
+      }
+    });
+  });
 }
 
 // src/lib/mailer.ts
@@ -145463,31 +145524,52 @@ startExpiryJob();
 startAdvertisementExpiryJob();
 startMt5SubscriptionExpiryJob();
 startMetaApiSyncJob();
-try {
-  startCopyTradeWorker();
-} catch (err) {
-  logger.warn({ err }, "Copy trade worker not started \u2014 Redis unavailable");
-}
-try {
-  startMasterPoller();
-} catch (err) {
-  logger.warn({ err }, "Master poller not started \u2014 Redis unavailable");
-}
-try {
-  startConnectionWatchdog();
-} catch (err) {
-  logger.warn({ err }, "Connection watchdog not started \u2014 Redis unavailable");
-}
 startPaymentReconciler();
 startMasterTradeListener();
-try {
-  startMasterTradeExecutionWorker();
-} catch (err) {
-  logger.warn({ err }, "Master trade execution worker not started \u2014 Redis unavailable");
+async function startRedisServices() {
+  logger.info("Redis: waiting for ready signal before initialising queues and workers\u2026");
+  try {
+    await waitForRedis(15e3);
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "Redis: not ready \u2014 copy-trading queue, master poller, connection watchdog, and master execution worker will NOT start. Ensure Redis is running and set REDIS_URL if using an external instance."
+    );
+    return;
+  }
+  logger.info("Redis: connection confirmed \u2014 initialising Redis-dependent services");
+  try {
+    startCopyTradeWorker();
+    logger.info("Queue: copy-trade worker initialised \u2713");
+  } catch (err) {
+    logger.warn({ err }, "Queue: copy-trade worker failed to start");
+  }
+  try {
+    startMasterPoller();
+    logger.info("Queue: master poller initialised \u2713");
+  } catch (err) {
+    logger.warn({ err }, "Queue: master poller failed to start");
+  }
+  try {
+    startConnectionWatchdog();
+    logger.info("Queue: connection watchdog initialised \u2713");
+  } catch (err) {
+    logger.warn({ err }, "Queue: connection watchdog failed to start");
+  }
+  try {
+    startMasterTradeExecutionWorker();
+    logger.info("Queue: master-trade execution worker initialised \u2713");
+  } catch (err) {
+    logger.warn({ err }, "Queue: master-trade execution worker failed to start");
+  }
+  logger.info("Redis: all queue workers running \u2713");
 }
 server.listen(port, () => {
   logger.info({ port }, "Server listening");
   seedAdminUser();
+  startRedisServices().catch(
+    (err) => logger.error({ err }, "startRedisServices: unexpected error")
+  );
 });
 /*! Bundled license information:
 

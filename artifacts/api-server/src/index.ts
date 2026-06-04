@@ -13,6 +13,7 @@ import { startAdvertisementExpiryJob } from "./lib/advertisement-expiry-job";
 import { startMt5SubscriptionExpiryJob } from "./lib/mt5-subscription-expiry-job";
 import { startMasterTradeListener } from "./lib/master-trade-listener";
 import { startMasterTradeExecutionWorker } from "./lib/master-trade-execution-worker";
+import { waitForRedis } from "./lib/redis";
 
 const rawPort = process.env["PORT"];
 
@@ -30,38 +31,84 @@ if (Number.isNaN(port) || port <= 0) {
 
 const server = createServer(app);
 attachForexWebSocket(server);
+
+// ── Non-Redis services — start immediately ────────────────────────────────────
 startExpiryJob();
 startAdvertisementExpiryJob();
 startMt5SubscriptionExpiryJob();
 startMetaApiSyncJob();
-
-// Redis-dependent services — gracefully skip if Redis is unavailable (no REDIS_URL set)
-try {
-  startCopyTradeWorker();
-} catch (err) {
-  logger.warn({ err }, "Copy trade worker not started — Redis unavailable");
-}
-try {
-  startMasterPoller();
-} catch (err) {
-  logger.warn({ err }, "Master poller not started — Redis unavailable");
-}
-try {
-  startConnectionWatchdog();
-} catch (err) {
-  logger.warn({ err }, "Connection watchdog not started — Redis unavailable");
-}
-
 startPaymentReconciler();
 startMasterTradeListener();
 
-try {
-  startMasterTradeExecutionWorker();
-} catch (err) {
-  logger.warn({ err }, "Master trade execution worker not started — Redis unavailable");
+// ── Redis-dependent services — wait until Redis is ready ─────────────────────
+//
+// Root cause of the "Failed to enqueue job — Redis may be unavailable" error:
+//   redis.ts previously used lazyConnect:true + enableOfflineQueue:false.
+//   BullMQ fires commands the instant a Queue/Worker is constructed; with those
+//   flags the commands raced the TCP handshake, failed immediately, exhausted
+//   the retryStrategy ceiling (3), and set _unavailable=true permanently.
+//
+// Fix: redis.ts now connects eagerly (no lazyConnect) with the offline queue
+// enabled, so BullMQ commands queue until the handshake completes. We also
+// await Redis here before constructing any Queue or Worker so the workers are
+// only registered once the connection is confirmed healthy.
+
+async function startRedisServices(): Promise<void> {
+  logger.info("Redis: waiting for ready signal before initialising queues and workers…");
+
+  try {
+    await waitForRedis(15_000);
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "Redis: not ready — copy-trading queue, master poller, connection watchdog, and master execution worker will NOT start. " +
+      "Ensure Redis is running and set REDIS_URL if using an external instance."
+    );
+    return;
+  }
+
+  logger.info("Redis: connection confirmed — initialising Redis-dependent services");
+
+  // ── Copy trade queue worker ───────────────────────────────────────────────
+  try {
+    startCopyTradeWorker();
+    logger.info("Queue: copy-trade worker initialised ✓");
+  } catch (err) {
+    logger.warn({ err }, "Queue: copy-trade worker failed to start");
+  }
+
+  // ── Master position poller (MetaApi → queue) ──────────────────────────────
+  try {
+    startMasterPoller();
+    logger.info("Queue: master poller initialised ✓");
+  } catch (err) {
+    logger.warn({ err }, "Queue: master poller failed to start");
+  }
+
+  // ── Connection watchdog (kill switch) ─────────────────────────────────────
+  try {
+    startConnectionWatchdog();
+    logger.info("Queue: connection watchdog initialised ✓");
+  } catch (err) {
+    logger.warn({ err }, "Queue: connection watchdog failed to start");
+  }
+
+  // ── Master trade execution worker (fan-out to slaves) ────────────────────
+  try {
+    startMasterTradeExecutionWorker();
+    logger.info("Queue: master-trade execution worker initialised ✓");
+  } catch (err) {
+    logger.warn({ err }, "Queue: master-trade execution worker failed to start");
+  }
+
+  logger.info("Redis: all queue workers running ✓");
 }
 
 server.listen(port, () => {
   logger.info({ port }, "Server listening");
   seedAdminUser();
+  // Fire-and-forget — Redis services start asynchronously after ready signal
+  startRedisServices().catch((err) =>
+    logger.error({ err }, "startRedisServices: unexpected error")
+  );
 });
