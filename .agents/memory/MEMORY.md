@@ -4,3 +4,4 @@
 - [API client codegen](api-client-codegen.md) — no orval codegen script exists; add hand-written hooks to `lib/api-client-react/src/copy-trading.ts` and re-export from `src/index.ts`.
 - [Reliability layer patterns](reliability-patterns.md) — BullMQ kill switch via queue.pause/resume + Redis emergency key; spread guard via EWMA avg in Redis + job.moveToDelayed; payment reconciler via Daraja STK query endpoint.
 - [Drizzle unique on populated table](drizzle-unique-populated.md) — drizzle-kit push on a table with existing rows + new UNIQUE column needs interactive TTY confirmation; bypass with raw SQL via executeSql (partial unique index `WHERE col IS NOT NULL` allows multiple NULLs).
+- [MetaApi correct REST API URLs](metaapi-urls.md) — metaapi.cloud is the marketing website; trading API is at mt-client-api-v1.{region}.agiliumtrade.ai.

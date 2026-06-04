@@ -1,4 +1,12 @@
-const BASE = "https://metaapi.cloud";
+// Trading API: positions, account info, trades
+// Confirmed working: mt-client-api-v1.{region}.agiliumtrade.ai
+// metaapi.cloud is the marketing website — it does NOT serve REST API requests.
+const TRADING_BASE = `https://mt-client-api-v1.${process.env.METAAPI_REGION ?? "london"}.agiliumtrade.ai`;
+
+// Management API: create/deploy/undeploy/delete accounts
+// This is the legacy management plane — may not be needed if accounts are
+// pre-provisioned via the MetaApi dashboard.
+const MANAGEMENT_BASE = "https://metaapi.cloud";
 
 function token(): string {
   const t = process.env.METAAPI_TOKEN;
@@ -8,6 +16,7 @@ function token(): string {
 
 function headers() {
   return {
+    "Accept": "application/json",
     "Content-Type": "application/json",
     "auth-token": token(),
   };
@@ -88,55 +97,98 @@ export async function createMetaApiAccount(params: {
     body.webhookUrl = params.webhookUrl;
   }
 
-  const res = await fetch(`${BASE}/users/current/accounts`, {
+  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(body),
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`MetaApi createAccount failed (${res.status}): ${body}`);
+    const text = await res.text();
+    throw new Error(`MetaApi createAccount failed (${res.status}): ${text}`);
   }
 
   const data = (await res.json()) as { id: string };
   return { id: data.id };
 }
 
+// ── Account info via trading API ──────────────────────────────────────────────
+// The trading API's /accountInformation endpoint returns real-time balance,
+// equity, leverage, broker, and server info. State/connection are synthesised:
+// if the call succeeds the account is reachable → DEPLOYED / CONNECTED / SYNCHRONIZED.
+
+interface AccountInformation {
+  platform: string;
+  type: string;
+  broker: string;
+  currency: string;
+  server: string;
+  balance: number;
+  equity: number;
+  margin: number;
+  freeMargin: number;
+  leverage: number;
+  tradeAllowed: boolean;
+  name: string;
+  login: number;
+  credit?: number;
+}
+
 export async function getMetaApiAccount(metaApiId: string): Promise<MetaApiAccountState> {
-  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}`, {
-    headers: headers(),
-  });
+  const res = await fetch(
+    `${TRADING_BASE}/users/current/accounts/${metaApiId}/accountInformation`,
+    { headers: headers() }
+  );
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`MetaApi getAccount failed (${res.status}): ${body}`);
+    const text = await res.text();
+    throw new Error(`MetaApi getAccount failed (${res.status}): ${text}`);
   }
 
-  return res.json() as Promise<MetaApiAccountState>;
+  const info = (await res.json()) as AccountInformation;
+
+  return {
+    id: metaApiId,
+    login: String(info.login),
+    server: info.server,
+    platform: info.platform,
+    name: info.name,
+    // If we got a 200, the account is live and reachable
+    state: "DEPLOYED",
+    connectionStatus: "CONNECTED",
+    synchronizationStatus: "SYNCHRONIZED",
+    broker: info.broker,
+    currency: info.currency,
+    balance: info.balance,
+    equity: info.equity,
+    margin: info.margin,
+    freeMargin: info.freeMargin,
+    leverage: info.leverage,
+    tradeAllowed: info.tradeAllowed,
+  };
 }
 
 export async function deployMetaApiAccount(metaApiId: string): Promise<void> {
-  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}/deploy`, {
+  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}/deploy`, {
     method: "POST",
     headers: headers(),
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`MetaApi deploy failed (${res.status}): ${body}`);
+    const text = await res.text();
+    throw new Error(`MetaApi deploy failed (${res.status}): ${text}`);
   }
 }
 
 export async function undeployMetaApiAccount(metaApiId: string): Promise<void> {
-  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}/undeploy`, {
+  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}/undeploy`, {
     method: "POST",
     headers: headers(),
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`MetaApi undeploy failed (${res.status}): ${body}`);
+    const text = await res.text();
+    throw new Error(`MetaApi undeploy failed (${res.status}): ${text}`);
   }
 }
 
@@ -166,13 +218,14 @@ export async function getAccountBalance(metaApiId: string): Promise<number | nul
 }
 
 export async function getAccountPositions(metaApiId: string): Promise<MetaApiPosition[]> {
-  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}/positions`, {
-    headers: headers(),
-  });
+  const res = await fetch(
+    `${TRADING_BASE}/users/current/accounts/${metaApiId}/positions`,
+    { headers: headers() }
+  );
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`MetaApi getPositions failed (${res.status}): ${body}`);
+    const text = await res.text();
+    throw new Error(`MetaApi getPositions failed (${res.status}): ${text}`);
   }
 
   return res.json() as Promise<MetaApiPosition[]>;
@@ -189,28 +242,28 @@ export async function placeTrade(
     comment?: string;
   }
 ): Promise<MetaApiTradeResult> {
-  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}/trade`, {
+  const res = await fetch(`${TRADING_BASE}/users/current/accounts/${metaApiId}/trade`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(params),
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`MetaApi placeTrade failed (${res.status}): ${body}`);
+    const text = await res.text();
+    throw new Error(`MetaApi placeTrade failed (${res.status}): ${text}`);
   }
 
   return res.json() as Promise<MetaApiTradeResult>;
 }
 
 export async function deleteMetaApiAccount(metaApiId: string): Promise<void> {
-  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}`, {
+  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}`, {
     method: "DELETE",
     headers: headers(),
   });
 
   if (!res.ok && res.status !== 404) {
-    const body = await res.text();
-    throw new Error(`MetaApi deleteAccount failed (${res.status}): ${body}`);
+    const text = await res.text();
+    throw new Error(`MetaApi deleteAccount failed (${res.status}): ${text}`);
   }
 }

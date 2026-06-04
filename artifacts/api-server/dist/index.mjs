@@ -29001,7 +29001,7 @@ var require_textParsers = __commonJS({
 var require_pg_int8 = __commonJS({
   "../../node_modules/.pnpm/pg-int8@1.0.1/node_modules/pg-int8/index.js"(exports, module) {
     "use strict";
-    var BASE2 = 1e6;
+    var BASE = 1e6;
     function readInt8(buffer) {
       var high = buffer.readInt32BE(0);
       var low = buffer.readUInt32BE(4);
@@ -29019,11 +29019,11 @@ var require_pg_int8 = __commonJS({
       var l;
       var i;
       {
-        carry = high % BASE2;
-        high = high / BASE2 >>> 0;
+        carry = high % BASE;
+        high = high / BASE >>> 0;
         t = 4294967296 * carry + low;
-        low = t / BASE2 >>> 0;
-        digits = "" + (t - BASE2 * low);
+        low = t / BASE >>> 0;
+        digits = "" + (t - BASE * low);
         if (low === 0 && high === 0) {
           return sign + digits + result;
         }
@@ -29035,11 +29035,11 @@ var require_pg_int8 = __commonJS({
         result = pad + digits + result;
       }
       {
-        carry = high % BASE2;
-        high = high / BASE2 >>> 0;
+        carry = high % BASE;
+        high = high / BASE >>> 0;
         t = 4294967296 * carry + low;
-        low = t / BASE2 >>> 0;
-        digits = "" + (t - BASE2 * low);
+        low = t / BASE >>> 0;
+        digits = "" + (t - BASE * low);
         if (low === 0 && high === 0) {
           return sign + digits + result;
         }
@@ -29051,11 +29051,11 @@ var require_pg_int8 = __commonJS({
         result = pad + digits + result;
       }
       {
-        carry = high % BASE2;
-        high = high / BASE2 >>> 0;
+        carry = high % BASE;
+        high = high / BASE >>> 0;
         t = 4294967296 * carry + low;
-        low = t / BASE2 >>> 0;
-        digits = "" + (t - BASE2 * low);
+        low = t / BASE >>> 0;
+        digits = "" + (t - BASE * low);
         if (low === 0 && high === 0) {
           return sign + digits + result;
         }
@@ -29067,9 +29067,9 @@ var require_pg_int8 = __commonJS({
         result = pad + digits + result;
       }
       {
-        carry = high % BASE2;
+        carry = high % BASE;
         t = 4294967296 * carry + low;
-        digits = "" + t % BASE2;
+        digits = "" + t % BASE;
         return sign + digits + result;
       }
     }
@@ -141975,7 +141975,8 @@ function encryptPassword(plaintext) {
 }
 
 // src/lib/metaapi.ts
-var BASE = "https://metaapi.cloud";
+var TRADING_BASE = `https://mt-client-api-v1.${process.env.METAAPI_REGION ?? "london"}.agiliumtrade.ai`;
+var MANAGEMENT_BASE = "https://metaapi.cloud";
 function token() {
   const t = process.env.METAAPI_TOKEN;
   if (!t) throw new Error("METAAPI_TOKEN environment variable is not set");
@@ -141983,6 +141984,7 @@ function token() {
 }
 function headers() {
   return {
+    "Accept": "application/json",
     "Content-Type": "application/json",
     "auth-token": token()
   };
@@ -142028,46 +142030,66 @@ async function createMetaApiAccount(params) {
   if (params.webhookUrl) {
     body.webhookUrl = params.webhookUrl;
   }
-  const res = await fetch(`${BASE}/users/current/accounts`, {
+  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(body)
   });
   if (!res.ok) {
-    const body2 = await res.text();
-    throw new Error(`MetaApi createAccount failed (${res.status}): ${body2}`);
+    const text2 = await res.text();
+    throw new Error(`MetaApi createAccount failed (${res.status}): ${text2}`);
   }
   const data = await res.json();
   return { id: data.id };
 }
 async function getMetaApiAccount(metaApiId) {
-  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}`, {
-    headers: headers()
-  });
+  const res = await fetch(
+    `${TRADING_BASE}/users/current/accounts/${metaApiId}/accountInformation`,
+    { headers: headers() }
+  );
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`MetaApi getAccount failed (${res.status}): ${body}`);
+    const text2 = await res.text();
+    throw new Error(`MetaApi getAccount failed (${res.status}): ${text2}`);
   }
-  return res.json();
+  const info = await res.json();
+  return {
+    id: metaApiId,
+    login: String(info.login),
+    server: info.server,
+    platform: info.platform,
+    name: info.name,
+    // If we got a 200, the account is live and reachable
+    state: "DEPLOYED",
+    connectionStatus: "CONNECTED",
+    synchronizationStatus: "SYNCHRONIZED",
+    broker: info.broker,
+    currency: info.currency,
+    balance: info.balance,
+    equity: info.equity,
+    margin: info.margin,
+    freeMargin: info.freeMargin,
+    leverage: info.leverage,
+    tradeAllowed: info.tradeAllowed
+  };
 }
 async function deployMetaApiAccount(metaApiId) {
-  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}/deploy`, {
+  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}/deploy`, {
     method: "POST",
     headers: headers()
   });
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`MetaApi deploy failed (${res.status}): ${body}`);
+    const text2 = await res.text();
+    throw new Error(`MetaApi deploy failed (${res.status}): ${text2}`);
   }
 }
 async function undeployMetaApiAccount(metaApiId) {
-  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}/undeploy`, {
+  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}/undeploy`, {
     method: "POST",
     headers: headers()
   });
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`MetaApi undeploy failed (${res.status}): ${body}`);
+    const text2 = await res.text();
+    throw new Error(`MetaApi undeploy failed (${res.status}): ${text2}`);
   }
 }
 async function getAccountBalance(metaApiId) {
@@ -142075,35 +142097,36 @@ async function getAccountBalance(metaApiId) {
   return account.balance ?? null;
 }
 async function getAccountPositions(metaApiId) {
-  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}/positions`, {
-    headers: headers()
-  });
+  const res = await fetch(
+    `${TRADING_BASE}/users/current/accounts/${metaApiId}/positions`,
+    { headers: headers() }
+  );
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`MetaApi getPositions failed (${res.status}): ${body}`);
+    const text2 = await res.text();
+    throw new Error(`MetaApi getPositions failed (${res.status}): ${text2}`);
   }
   return res.json();
 }
 async function placeTrade(metaApiId, params) {
-  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}/trade`, {
+  const res = await fetch(`${TRADING_BASE}/users/current/accounts/${metaApiId}/trade`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify(params)
   });
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`MetaApi placeTrade failed (${res.status}): ${body}`);
+    const text2 = await res.text();
+    throw new Error(`MetaApi placeTrade failed (${res.status}): ${text2}`);
   }
   return res.json();
 }
 async function deleteMetaApiAccount(metaApiId) {
-  const res = await fetch(`${BASE}/users/current/accounts/${metaApiId}`, {
+  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}`, {
     method: "DELETE",
     headers: headers()
   });
   if (!res.ok && res.status !== 404) {
-    const body = await res.text();
-    throw new Error(`MetaApi deleteAccount failed (${res.status}): ${body}`);
+    const text2 = await res.text();
+    throw new Error(`MetaApi deleteAccount failed (${res.status}): ${text2}`);
   }
 }
 
