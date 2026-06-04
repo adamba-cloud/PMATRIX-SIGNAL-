@@ -143977,7 +143977,6 @@ var smtp_default = router23;
 // src/routes/master.ts
 var import_express24 = __toESM(require_express2(), 1);
 var router24 = (0, import_express24.Router)();
-var DEFAULT_MASTER_ID = "99a2b763-0528-4b0e-91ea-79c0be291d5b";
 async function getSystemConfigMap() {
   const rows = await db.select().from(systemConfigTable);
   return Object.fromEntries(rows.map((r) => [r.key, r.value]));
@@ -143990,9 +143989,17 @@ async function upsertConfig(key, value) {
     await db.insert(systemConfigTable).values({ key, value });
   }
 }
+function extractMetaApiError(err) {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (raw.includes("(404)")) {
+    return "Account not found on MetaApi \u2014 verify the Account ID is correct and the account belongs to your MetaApi token.";
+  }
+  const clean = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return clean.length > 200 ? clean.slice(0, 197) + "\u2026" : clean;
+}
 router24.get("/admin/master", requireAdmin, async (_req, res) => {
   const map2 = await getSystemConfigMap();
-  const accountId = map2["masterMetaApiAccountId"] ?? DEFAULT_MASTER_ID;
+  const accountId = map2["masterMetaApiAccountId"] ?? null;
   const enabled = map2["masterEnabled"] !== "false";
   let accountStatus = null;
   let lastChecked = null;
@@ -144015,7 +144022,7 @@ router24.get("/admin/master", requireAdmin, async (_req, res) => {
       };
       lastChecked = (/* @__PURE__ */ new Date()).toISOString();
     } catch (err) {
-      error40 = err instanceof Error ? err.message : "Failed to fetch MetaApi account";
+      error40 = extractMetaApiError(err);
       logger.warn({ err, accountId }, "[Master] Failed to fetch account status");
     }
   }
@@ -144045,9 +144052,9 @@ router24.put("/admin/master", requireAdmin, async (req, res) => {
 });
 router24.post("/admin/master/deploy", requireAdmin, async (_req, res) => {
   const map2 = await getSystemConfigMap();
-  const accountId = map2["masterMetaApiAccountId"] ?? DEFAULT_MASTER_ID;
+  const accountId = map2["masterMetaApiAccountId"] ?? null;
   if (!accountId) {
-    res.status(400).json({ error: "No master account ID configured" });
+    res.status(400).json({ error: "No master account ID configured. Enter a MetaApi Account ID first." });
     return;
   }
   try {
@@ -144055,16 +144062,16 @@ router24.post("/admin/master/deploy", requireAdmin, async (_req, res) => {
     logger.info({ accountId }, "[Master] Deploy triggered");
     res.json({ ok: true });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to deploy account";
+    const msg = extractMetaApiError(err);
     logger.error({ err, accountId }, "[Master] Deploy failed");
     res.status(500).json({ error: msg });
   }
 });
 router24.post("/admin/master/undeploy", requireAdmin, async (_req, res) => {
   const map2 = await getSystemConfigMap();
-  const accountId = map2["masterMetaApiAccountId"] ?? DEFAULT_MASTER_ID;
+  const accountId = map2["masterMetaApiAccountId"] ?? null;
   if (!accountId) {
-    res.status(400).json({ error: "No master account ID configured" });
+    res.status(400).json({ error: "No master account ID configured. Enter a MetaApi Account ID first." });
     return;
   }
   try {
@@ -144072,7 +144079,7 @@ router24.post("/admin/master/undeploy", requireAdmin, async (_req, res) => {
     logger.info({ accountId }, "[Master] Undeploy triggered");
     res.json({ ok: true });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to undeploy account";
+    const msg = extractMetaApiError(err);
     logger.error({ err, accountId }, "[Master] Undeploy failed");
     res.status(500).json({ error: msg });
   }
@@ -144989,11 +144996,16 @@ function getMasterTradeExecutionQueue() {
 
 // src/lib/master-trade-listener.ts
 var POLL_INTERVAL_MS2 = 1e4;
-var DEFAULT_MASTER_ID2 = "99a2b763-0528-4b0e-91ea-79c0be291d5b";
 var previousSnapshot = /* @__PURE__ */ new Map();
 var isRunning = false;
-function getAccountId() {
-  return process.env.MASTER_TRADE_ACCOUNT_ID ?? DEFAULT_MASTER_ID2;
+async function resolveAccountId() {
+  const envId = process.env.MASTER_TRADE_ACCOUNT_ID ?? null;
+  try {
+    const [row] = await db.select({ value: systemConfigTable.value }).from(systemConfigTable).where(eq(systemConfigTable.key, "masterMetaApiAccountId")).limit(1);
+    return row?.value ?? envId;
+  } catch {
+    return envId;
+  }
 }
 async function insertEvent(accountId, eventType, position, changedFields) {
   const row = {
@@ -145041,14 +145053,7 @@ async function insertEvent(accountId, eventType, position, changedFields) {
     const job = await queue.add(jobName, jobData);
     await db.update(masterTradeEventsTable).set({ jobId: job.id ?? null, jobStatus: "QUEUED" }).where(eq(masterTradeEventsTable.id, inserted.id));
     logger.info(
-      {
-        jobId: job.id,
-        jobName,
-        eventId: inserted.id,
-        eventType,
-        symbol: position.symbol,
-        direction: row.direction
-      },
+      { jobId: job.id, jobName, eventId: inserted.id, eventType, symbol: position.symbol, direction: row.direction },
       "[MasterTradeListener] Queue Added"
     );
   } catch (queueErr) {
@@ -145077,12 +145082,23 @@ function detectChanges(prev, curr) {
 }
 async function poll() {
   if (!process.env.METAAPI_TOKEN) return;
-  const accountId = getAccountId();
+  const accountId = await resolveAccountId();
+  if (!accountId) {
+    return;
+  }
   let positions;
   try {
     positions = await getAccountPositions(accountId);
   } catch (err) {
-    logger.warn({ err, accountId }, "[MasterTradeListener] Failed to fetch positions \u2014 will retry");
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.includes("(404)")) {
+      logger.debug(
+        { accountId },
+        "[MasterTradeListener] Account not found on MetaApi (404) \u2014 deploy the account to start receiving positions"
+      );
+    } else {
+      logger.warn({ err, accountId }, "[MasterTradeListener] Failed to fetch positions \u2014 will retry");
+    }
     return;
   }
   const currentSnapshot = new Map(positions.map((p) => [p.id, p]));
@@ -145121,7 +145137,7 @@ function startMasterTradeListener() {
   isRunning = true;
   poll();
   setInterval(poll, POLL_INTERVAL_MS2);
-  logger.info({ intervalMs: POLL_INTERVAL_MS2, accountId: getAccountId() }, "[MasterTradeListener] Started");
+  logger.info({ intervalMs: POLL_INTERVAL_MS2 }, "[MasterTradeListener] Started");
 }
 
 // src/lib/master-trade-execution-worker.ts

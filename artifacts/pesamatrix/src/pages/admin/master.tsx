@@ -26,7 +26,7 @@ interface MasterAccountStatus {
 }
 
 interface MasterConfig {
-  accountId: string;
+  accountId: string | null;
   enabled: boolean;
   accountStatus: MasterAccountStatus | null;
   lastChecked: string | null;
@@ -225,7 +225,16 @@ export default function AdminMaster() {
                   </Button>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Default: <span className="font-mono">99a2b763-0528-4b0e-91ea-79c0be291d5b</span>
+                  Find your MetaApi Account ID in the{" "}
+                  <a
+                    href="https://app.metaapi.cloud/accounts"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-green-500 hover:text-green-400 underline underline-offset-2"
+                  >
+                    MetaApi dashboard
+                  </a>
+                  .
                 </p>
               </div>
 

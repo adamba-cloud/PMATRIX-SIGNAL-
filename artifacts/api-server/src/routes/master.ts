@@ -7,8 +7,6 @@ import { logger } from "../lib/logger";
 
 const router = Router();
 
-const DEFAULT_MASTER_ID = "99a2b763-0528-4b0e-91ea-79c0be291d5b";
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function getSystemConfigMap(): Promise<Record<string, string>> {
@@ -25,12 +23,29 @@ async function upsertConfig(key: string, value: string): Promise<void> {
   }
 }
 
+/**
+ * Converts a raw MetaApi error (which can contain an entire HTML page) into a
+ * short, human-readable string safe to surface in the UI.
+ */
+function extractMetaApiError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+
+  // 404 — account not found
+  if (raw.includes("(404)")) {
+    return "Account not found on MetaApi — verify the Account ID is correct and the account belongs to your MetaApi token.";
+  }
+
+  // Strip any HTML tags and collapse whitespace, cap at 200 chars
+  const clean = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return clean.length > 200 ? clean.slice(0, 197) + "…" : clean;
+}
+
 // ─── GET /api/admin/master ────────────────────────────────────────────────────
 
 router.get("/admin/master", requireAdmin, async (_req, res): Promise<void> => {
   const map = await getSystemConfigMap();
 
-  const accountId = map["masterMetaApiAccountId"] ?? DEFAULT_MASTER_ID;
+  const accountId = map["masterMetaApiAccountId"] ?? null;
   const enabled = map["masterEnabled"] !== "false"; // default true
 
   let accountStatus: {
@@ -68,7 +83,7 @@ router.get("/admin/master", requireAdmin, async (_req, res): Promise<void> => {
       };
       lastChecked = new Date().toISOString();
     } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to fetch MetaApi account";
+      error = extractMetaApiError(err);
       logger.warn({ err, accountId }, "[Master] Failed to fetch account status");
     }
   }
@@ -111,10 +126,10 @@ router.put("/admin/master", requireAdmin, async (req, res): Promise<void> => {
 
 router.post("/admin/master/deploy", requireAdmin, async (_req, res): Promise<void> => {
   const map = await getSystemConfigMap();
-  const accountId = map["masterMetaApiAccountId"] ?? DEFAULT_MASTER_ID;
+  const accountId = map["masterMetaApiAccountId"] ?? null;
 
   if (!accountId) {
-    res.status(400).json({ error: "No master account ID configured" });
+    res.status(400).json({ error: "No master account ID configured. Enter a MetaApi Account ID first." });
     return;
   }
 
@@ -123,7 +138,7 @@ router.post("/admin/master/deploy", requireAdmin, async (_req, res): Promise<voi
     logger.info({ accountId }, "[Master] Deploy triggered");
     res.json({ ok: true });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to deploy account";
+    const msg = extractMetaApiError(err);
     logger.error({ err, accountId }, "[Master] Deploy failed");
     res.status(500).json({ error: msg });
   }
@@ -133,10 +148,10 @@ router.post("/admin/master/deploy", requireAdmin, async (_req, res): Promise<voi
 
 router.post("/admin/master/undeploy", requireAdmin, async (_req, res): Promise<void> => {
   const map = await getSystemConfigMap();
-  const accountId = map["masterMetaApiAccountId"] ?? DEFAULT_MASTER_ID;
+  const accountId = map["masterMetaApiAccountId"] ?? null;
 
   if (!accountId) {
-    res.status(400).json({ error: "No master account ID configured" });
+    res.status(400).json({ error: "No master account ID configured. Enter a MetaApi Account ID first." });
     return;
   }
 
@@ -145,7 +160,7 @@ router.post("/admin/master/undeploy", requireAdmin, async (_req, res): Promise<v
     logger.info({ accountId }, "[Master] Undeploy triggered");
     res.json({ ok: true });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to undeploy account";
+    const msg = extractMetaApiError(err);
     logger.error({ err, accountId }, "[Master] Undeploy failed");
     res.status(500).json({ error: msg });
   }

@@ -1,4 +1,4 @@
-import { db, masterTradeEventsTable } from "@workspace/db";
+import { db, masterTradeEventsTable, systemConfigTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { getAccountPositions, type MetaApiPosition } from "./metaapi";
 import { broadcastMasterTradeEvent } from "./forex-ws";
@@ -6,16 +6,31 @@ import { getMasterTradeExecutionQueue } from "./master-trade-execution-queue";
 import { logger } from "./logger";
 
 const POLL_INTERVAL_MS = 10_000;
-const DEFAULT_MASTER_ID = "99a2b763-0528-4b0e-91ea-79c0be291d5b";
 
 type PositionSnapshot = Map<string, MetaApiPosition>;
 
 let previousSnapshot: PositionSnapshot = new Map();
 let isRunning = false;
 
-function getAccountId(): string {
-  return process.env.MASTER_TRADE_ACCOUNT_ID ?? DEFAULT_MASTER_ID;
+// ── Account ID resolution ─────────────────────────────────────────────────────
+// Read from system_config first, fall back to env var. Returns null if neither
+// is set so the listener skips the poll cycle instead of hitting a bad ID.
+
+async function resolveAccountId(): Promise<string | null> {
+  const envId = process.env.MASTER_TRADE_ACCOUNT_ID ?? null;
+  try {
+    const [row] = await db
+      .select({ value: systemConfigTable.value })
+      .from(systemConfigTable)
+      .where(eq(systemConfigTable.key, "masterMetaApiAccountId"))
+      .limit(1);
+    return row?.value ?? envId;
+  } catch {
+    return envId;
+  }
 }
+
+// ── Event insert + queue enqueue ──────────────────────────────────────────────
 
 async function insertEvent(
   accountId: string,
@@ -23,7 +38,6 @@ async function insertEvent(
   position: MetaApiPosition,
   changedFields?: string
 ): Promise<void> {
-  // ── 1. Save event to database ─────────────────────────────────────────────
   const row = {
     metaApiAccountId: accountId,
     eventType,
@@ -52,7 +66,7 @@ async function insertEvent(
     "[MasterTradeListener] Event saved to database"
   );
 
-  // ── 2. Create & enqueue execution job ─────────────────────────────────────
+  // ── Enqueue execution job ─────────────────────────────────────────────────
   try {
     const queue = getMasterTradeExecutionQueue();
     const jobName = `master-trade:${eventType}:${position.id}:${inserted.id}`;
@@ -71,7 +85,6 @@ async function insertEvent(
       changedFields: changedFields ?? null,
     };
 
-    // Log: Job Created
     logger.info(
       { eventId: inserted.id, eventType, positionId: position.id, symbol: position.symbol },
       "[MasterTradeListener] Job Created"
@@ -79,22 +92,13 @@ async function insertEvent(
 
     const job = await queue.add(jobName, jobData);
 
-    // Persist job ID and mark as QUEUED
     await db
       .update(masterTradeEventsTable)
       .set({ jobId: job.id ?? null, jobStatus: "QUEUED" })
       .where(eq(masterTradeEventsTable.id, inserted.id));
 
-    // Log: Queue Added
     logger.info(
-      {
-        jobId: job.id,
-        jobName,
-        eventId: inserted.id,
-        eventType,
-        symbol: position.symbol,
-        direction: row.direction,
-      },
+      { jobId: job.id, jobName, eventId: inserted.id, eventType, symbol: position.symbol, direction: row.direction },
       "[MasterTradeListener] Queue Added"
     );
   } catch (queueErr) {
@@ -104,7 +108,7 @@ async function insertEvent(
     );
   }
 
-  // ── 3. Broadcast via WebSocket ────────────────────────────────────────────
+  // ── WebSocket broadcast ───────────────────────────────────────────────────
   broadcastMasterTradeEvent({
     eventType,
     positionId: position.id,
@@ -128,13 +132,27 @@ function detectChanges(prev: MetaApiPosition, curr: MetaApiPosition): string[] {
 async function poll(): Promise<void> {
   if (!process.env.METAAPI_TOKEN) return;
 
-  const accountId = getAccountId();
+  const accountId = await resolveAccountId();
+
+  if (!accountId) {
+    // No ID configured yet — wait silently until admin saves one
+    return;
+  }
 
   let positions: MetaApiPosition[];
   try {
     positions = await getAccountPositions(accountId);
   } catch (err) {
-    logger.warn({ err, accountId }, "[MasterTradeListener] Failed to fetch positions — will retry");
+    // Log 404 at debug to avoid flooding logs when the account isn't deployed
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.includes("(404)")) {
+      logger.debug(
+        { accountId },
+        "[MasterTradeListener] Account not found on MetaApi (404) — deploy the account to start receiving positions"
+      );
+    } else {
+      logger.warn({ err, accountId }, "[MasterTradeListener] Failed to fetch positions — will retry");
+    }
     return;
   }
 
@@ -180,5 +198,5 @@ export function startMasterTradeListener(): void {
 
   poll();
   setInterval(poll, POLL_INTERVAL_MS);
-  logger.info({ intervalMs: POLL_INTERVAL_MS, accountId: getAccountId() }, "[MasterTradeListener] Started");
+  logger.info({ intervalMs: POLL_INTERVAL_MS }, "[MasterTradeListener] Started");
 }
