@@ -58,7 +58,7 @@ const BROKER_SERVERS: { broker: string; servers: string[] }[] = [
   {
     broker: "Exness",
     servers: [
-      // Live
+      // Live (global)
       "Exness-MT5Real",
       "Exness-MT5Real2",
       "Exness-MT5Real3",
@@ -69,7 +69,7 @@ const BROKER_SERVERS: { broker: string; servers: string[] }[] = [
       "Exness-MT5Real8",
       "Exness-MT5Real9",
       "Exness-MT5Real10",
-      // Demo / Trial
+      // Demo / Trial (global)
       "Exness-MT5Trial1",
       "Exness-MT5Trial2",
       "Exness-MT5Trial3",
@@ -79,6 +79,32 @@ const BROKER_SERVERS: { broker: string; servers: string[] }[] = [
       "Exness-MT5Trial7",
       "Exness-MT5Trial8",
       "Exness-MT5Trial9",
+    ],
+  },
+  {
+    broker: "Exness Kenya (ExnessKE)",
+    servers: [
+      // Live
+      "ExnessKE-MT5Real",
+      "ExnessKE-MT5Real2",
+      "ExnessKE-MT5Real3",
+      "ExnessKE-MT5Real4",
+      "ExnessKE-MT5Real5",
+      "ExnessKE-MT5Real6",
+      "ExnessKE-MT5Real7",
+      "ExnessKE-MT5Real8",
+      "ExnessKE-MT5Real9",
+      "ExnessKE-MT5Real10",
+      // Demo / Trial
+      "ExnessKE-MT5Trial1",
+      "ExnessKE-MT5Trial2",
+      "ExnessKE-MT5Trial3",
+      "ExnessKE-MT5Trial4",
+      "ExnessKE-MT5Trial5",
+      "ExnessKE-MT5Trial6",
+      "ExnessKE-MT5Trial7",
+      "ExnessKE-MT5Trial8",
+      "ExnessKE-MT5Trial9",
     ],
   },
   {
