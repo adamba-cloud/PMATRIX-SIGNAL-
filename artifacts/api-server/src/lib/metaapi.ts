@@ -22,6 +22,123 @@ function headers() {
   };
 }
 
+// ── Friendly error parser ─────────────────────────────────────────────────────
+// Translates raw MetaApi error codes / HTTP status codes into human-readable
+// messages suitable for display in the UI. Never leaks raw JSON or stack traces.
+export function parseMetaApiError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  const lower = raw.toLowerCase();
+
+  // Auth / invalid credentials
+  if (
+    lower.includes("invalid credentials") ||
+    lower.includes("err_auth_failed") ||
+    lower.includes("authentication failed") ||
+    lower.includes("wrong password") ||
+    lower.includes("invalid login") ||
+    (lower.includes("401") && lower.includes("unauthorized"))
+  ) {
+    return "Invalid MT5 login or password — please double-check your credentials and try again.";
+  }
+
+  // Broker server not found / unreachable
+  if (
+    lower.includes("server not found") ||
+    lower.includes("invalid server") ||
+    lower.includes("unknown server") ||
+    lower.includes("no such server") ||
+    (lower.includes("server") && lower.includes("not exist"))
+  ) {
+    return "Broker server not found — verify the server name in your MT5 terminal (e.g. ICMarkets-Live02).";
+  }
+
+  // Account already exists on MetaApi
+  if (
+    lower.includes("already exists") ||
+    lower.includes("duplicate") ||
+    lower.includes("conflict")
+  ) {
+    return "This MT5 account is already registered — if you previously deleted it, wait a few minutes and try again.";
+  }
+
+  // Rate limit
+  if (lower.includes("429") || lower.includes("too many requests") || lower.includes("rate limit")) {
+    return "Too many requests — please wait a moment and try again.";
+  }
+
+  // Connection timeout / broker offline
+  if (
+    lower.includes("timeout") ||
+    lower.includes("timed out") ||
+    lower.includes("econnreset") ||
+    lower.includes("connection refused") ||
+    lower.includes("err_connection")
+  ) {
+    return "Connection timed out — the broker server may be temporarily offline. Please try again in a few minutes.";
+  }
+
+  // MetaApi token / platform auth issue
+  if (lower.includes("auth-token") || lower.includes("invalid token") || lower.includes("token expired")) {
+    return "Platform authentication error — please contact support.";
+  }
+
+  // MetaApi service errors (5xx)
+  if (
+    lower.includes("500") ||
+    lower.includes("502") ||
+    lower.includes("503") ||
+    lower.includes("504") ||
+    lower.includes("service unavailable") ||
+    lower.includes("internal server error")
+  ) {
+    return "MetaApi service is temporarily unavailable — please try again in a few minutes.";
+  }
+
+  // MetaApi token not configured
+  if (lower.includes("metaapi_token")) {
+    return "Copy-trading is not configured on this platform yet. Please contact support.";
+  }
+
+  // Fallback — still friendly, no raw code
+  return "Failed to connect the cloud terminal. Please check your details and try again, or contact support if the issue persists.";
+}
+
+// ── Retry with exponential backoff ────────────────────────────────────────────
+// Only retries transient errors (5xx, network). Credential / validation errors
+// (4xx) are not retried — they will fail immediately on every attempt.
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts = 3,
+  baseDelayMs = 2000,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const raw = err instanceof Error ? err.message : String(err);
+      const lower = raw.toLowerCase();
+
+      // Don't retry client errors — they won't change
+      const isClientError =
+        lower.includes("401") ||
+        lower.includes("400") ||
+        lower.includes("409") ||
+        lower.includes("422") ||
+        lower.includes("invalid credentials") ||
+        lower.includes("server not found") ||
+        lower.includes("already exists");
+
+      if (isClientError || attempt === maxAttempts) break;
+
+      const delay = baseDelayMs * Math.pow(2, attempt - 1); // 2s, 4s
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
 export interface MetaApiAccountState {
   id: string;
   login: string;
@@ -83,33 +200,35 @@ export async function createMetaApiAccount(params: {
   name: string;
   webhookUrl?: string;
 }): Promise<{ id: string }> {
-  const body: Record<string, unknown> = {
-    login: params.login,
-    password: params.password,
-    server: params.server,
-    platform: "mt5",
-    name: params.name,
-    magic: 0,
-    quoteStreamingIntervalInSeconds: 2.5,
-    reliability: "high",
-  };
-  if (params.webhookUrl) {
-    body.webhookUrl = params.webhookUrl;
-  }
+  return withRetry(async () => {
+    const body: Record<string, unknown> = {
+      login: params.login,
+      password: params.password,
+      server: params.server,
+      platform: "mt5",
+      name: params.name,
+      magic: 0,
+      quoteStreamingIntervalInSeconds: 2.5,
+      reliability: "high",
+    };
+    if (params.webhookUrl) {
+      body.webhookUrl = params.webhookUrl;
+    }
 
-  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(body),
+    const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`MetaApi createAccount failed (${res.status}): ${text}`);
+    }
+
+    const data = (await res.json()) as { id: string };
+    return { id: data.id };
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`MetaApi createAccount failed (${res.status}): ${text}`);
-  }
-
-  const data = (await res.json()) as { id: string };
-  return { id: data.id };
 }
 
 // ── Account info via trading API ──────────────────────────────────────────────
@@ -169,15 +288,17 @@ export async function getMetaApiAccount(metaApiId: string): Promise<MetaApiAccou
 }
 
 export async function deployMetaApiAccount(metaApiId: string): Promise<void> {
-  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}/deploy`, {
-    method: "POST",
-    headers: headers(),
-  });
+  return withRetry(async () => {
+    const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}/deploy`, {
+      method: "POST",
+      headers: headers(),
+    });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`MetaApi deploy failed (${res.status}): ${text}`);
-  }
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`MetaApi deploy failed (${res.status}): ${text}`);
+    }
+  });
 }
 
 export async function undeployMetaApiAccount(metaApiId: string): Promise<void> {

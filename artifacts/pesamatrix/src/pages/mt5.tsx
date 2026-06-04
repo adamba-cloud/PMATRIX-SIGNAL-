@@ -313,14 +313,23 @@ function AccountCard({
 function ConnectAccountDialog({ onSuccess }: { onSuccess: () => void }) {
   const [open, setOpen] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [form, setForm] = useState({ mt5Login: "", mt5Password: "", brokerServer: "" });
   const { toast } = useToast();
   const mutation = useConnectMt5Account();
 
+  const handleOpenChange = (v: boolean) => {
+    if (provisioning) return;
+    setOpen(v);
+    if (!v) setFormError(null);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+
     if (!form.mt5Login || !form.mt5Password || !form.brokerServer) {
-      toast({ title: "All fields are required", variant: "destructive" });
+      setFormError("Please fill in all three fields before connecting.");
       return;
     }
 
@@ -332,20 +341,22 @@ function ConnectAccountDialog({ onSuccess }: { onSuccess: () => void }) {
           setTimeout(() => {
             setProvisioning(false);
             setForm({ mt5Login: "", mt5Password: "", brokerServer: "" });
+            setFormError(null);
             setOpen(false);
             onSuccess();
           }, 2000);
         },
         onError: (err: unknown) => {
           const msg = (err as { data?: { error?: string } })?.data?.error ?? "Failed to connect account";
-          toast({ title: msg, variant: "destructive" });
+          setFormError(msg);
+          toast({ title: "Connection failed", description: msg, variant: "destructive" });
         },
       }
     );
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!provisioning) setOpen(v); }}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button className="bg-green-600 hover:bg-green-700 text-white">
           <Plus className="w-4 h-4 mr-2" />
@@ -383,7 +394,7 @@ function ConnectAccountDialog({ onSuccess }: { onSuccess: () => void }) {
                 id="mt5Login"
                 placeholder="e.g. 123456789"
                 value={form.mt5Login}
-                onChange={(e) => setForm((f) => ({ ...f, mt5Login: e.target.value }))}
+                onChange={(e) => { setForm((f) => ({ ...f, mt5Login: e.target.value })); setFormError(null); }}
                 className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
               />
             </div>
@@ -394,7 +405,7 @@ function ConnectAccountDialog({ onSuccess }: { onSuccess: () => void }) {
                 type="password"
                 placeholder="Your MT5 account password"
                 value={form.mt5Password}
-                onChange={(e) => setForm((f) => ({ ...f, mt5Password: e.target.value }))}
+                onChange={(e) => { setForm((f) => ({ ...f, mt5Password: e.target.value })); setFormError(null); }}
                 className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
               />
             </div>
@@ -404,10 +415,21 @@ function ConnectAccountDialog({ onSuccess }: { onSuccess: () => void }) {
                 id="brokerServer"
                 placeholder="e.g. ICMarkets-Demo01"
                 value={form.brokerServer}
-                onChange={(e) => setForm((f) => ({ ...f, brokerServer: e.target.value }))}
+                onChange={(e) => { setForm((f) => ({ ...f, brokerServer: e.target.value })); setFormError(null); }}
                 className="bg-slate-800 border-slate-700 text-slate-50 placeholder:text-slate-500"
               />
+              <p className="text-xs text-slate-500">
+                Find this in MT5 → File → Open an Account. Example: <span className="font-mono text-slate-400">Exness-MT5Real8</span>
+              </p>
             </div>
+
+            {/* Inline error block — persists so the user can read and act on it */}
+            {formError && (
+              <div className="flex gap-2.5 rounded-md bg-red-500/10 border border-red-500/25 px-3 py-2.5">
+                <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-300 leading-snug">{formError}</p>
+              </div>
+            )}
 
             <div className="rounded-md bg-slate-800 border border-slate-700 p-3 space-y-2">
               <div className="flex items-center gap-2">

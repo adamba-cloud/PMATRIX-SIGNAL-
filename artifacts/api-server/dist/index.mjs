@@ -142061,6 +142061,52 @@ function headers() {
     "auth-token": token()
   };
 }
+function parseMetaApiError(err) {
+  const raw = err instanceof Error ? err.message : String(err);
+  const lower = raw.toLowerCase();
+  if (lower.includes("invalid credentials") || lower.includes("err_auth_failed") || lower.includes("authentication failed") || lower.includes("wrong password") || lower.includes("invalid login") || lower.includes("401") && lower.includes("unauthorized")) {
+    return "Invalid MT5 login or password \u2014 please double-check your credentials and try again.";
+  }
+  if (lower.includes("server not found") || lower.includes("invalid server") || lower.includes("unknown server") || lower.includes("no such server") || lower.includes("server") && lower.includes("not exist")) {
+    return "Broker server not found \u2014 verify the server name in your MT5 terminal (e.g. ICMarkets-Live02).";
+  }
+  if (lower.includes("already exists") || lower.includes("duplicate") || lower.includes("conflict")) {
+    return "This MT5 account is already registered \u2014 if you previously deleted it, wait a few minutes and try again.";
+  }
+  if (lower.includes("429") || lower.includes("too many requests") || lower.includes("rate limit")) {
+    return "Too many requests \u2014 please wait a moment and try again.";
+  }
+  if (lower.includes("timeout") || lower.includes("timed out") || lower.includes("econnreset") || lower.includes("connection refused") || lower.includes("err_connection")) {
+    return "Connection timed out \u2014 the broker server may be temporarily offline. Please try again in a few minutes.";
+  }
+  if (lower.includes("auth-token") || lower.includes("invalid token") || lower.includes("token expired")) {
+    return "Platform authentication error \u2014 please contact support.";
+  }
+  if (lower.includes("500") || lower.includes("502") || lower.includes("503") || lower.includes("504") || lower.includes("service unavailable") || lower.includes("internal server error")) {
+    return "MetaApi service is temporarily unavailable \u2014 please try again in a few minutes.";
+  }
+  if (lower.includes("metaapi_token")) {
+    return "Copy-trading is not configured on this platform yet. Please contact support.";
+  }
+  return "Failed to connect the cloud terminal. Please check your details and try again, or contact support if the issue persists.";
+}
+async function withRetry(fn, maxAttempts = 3, baseDelayMs = 2e3) {
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const raw = err instanceof Error ? err.message : String(err);
+      const lower = raw.toLowerCase();
+      const isClientError = lower.includes("401") || lower.includes("400") || lower.includes("409") || lower.includes("422") || lower.includes("invalid credentials") || lower.includes("server not found") || lower.includes("already exists");
+      if (isClientError || attempt === maxAttempts) break;
+      const delay = baseDelayMs * Math.pow(2, attempt - 1);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
 function mapMetaApiStatus(account) {
   const { state, connectionStatus, synchronizationStatus } = account;
   if (state === "ERROR") {
@@ -142089,30 +142135,32 @@ function mapMetaApiStatus(account) {
   return { status: "SYNCING", message: "Provisioning Cloud Terminal\u2026" };
 }
 async function createMetaApiAccount(params) {
-  const body = {
-    login: params.login,
-    password: params.password,
-    server: params.server,
-    platform: "mt5",
-    name: params.name,
-    magic: 0,
-    quoteStreamingIntervalInSeconds: 2.5,
-    reliability: "high"
-  };
-  if (params.webhookUrl) {
-    body.webhookUrl = params.webhookUrl;
-  }
-  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify(body)
+  return withRetry(async () => {
+    const body = {
+      login: params.login,
+      password: params.password,
+      server: params.server,
+      platform: "mt5",
+      name: params.name,
+      magic: 0,
+      quoteStreamingIntervalInSeconds: 2.5,
+      reliability: "high"
+    };
+    if (params.webhookUrl) {
+      body.webhookUrl = params.webhookUrl;
+    }
+    const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const text2 = await res.text();
+      throw new Error(`MetaApi createAccount failed (${res.status}): ${text2}`);
+    }
+    const data = await res.json();
+    return { id: data.id };
   });
-  if (!res.ok) {
-    const text2 = await res.text();
-    throw new Error(`MetaApi createAccount failed (${res.status}): ${text2}`);
-  }
-  const data = await res.json();
-  return { id: data.id };
 }
 async function getMetaApiAccount(metaApiId) {
   const res = await fetch(
@@ -142145,14 +142193,16 @@ async function getMetaApiAccount(metaApiId) {
   };
 }
 async function deployMetaApiAccount(metaApiId) {
-  const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}/deploy`, {
-    method: "POST",
-    headers: headers()
+  return withRetry(async () => {
+    const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}/deploy`, {
+      method: "POST",
+      headers: headers()
+    });
+    if (!res.ok) {
+      const text2 = await res.text();
+      throw new Error(`MetaApi deploy failed (${res.status}): ${text2}`);
+    }
   });
-  if (!res.ok) {
-    const text2 = await res.text();
-    throw new Error(`MetaApi deploy failed (${res.status}): ${text2}`);
-  }
 }
 async function undeployMetaApiAccount(metaApiId) {
   const res = await fetch(`${MANAGEMENT_BASE}/users/current/accounts/${metaApiId}/undeploy`, {
@@ -142286,7 +142336,7 @@ router10.post("/mt5/accounts", requireAuth, async (req, res) => {
         logger.error({ err, accountId: account.id, metaApiId }, "Failed to provision MetaApi cloud terminal");
         await db.update(slaveAccountsTable).set({
           status: "ERROR",
-          statusMessage: err instanceof Error ? err.message : "Failed to provision cloud terminal.",
+          statusMessage: parseMetaApiError(err),
           updatedAt: /* @__PURE__ */ new Date()
         }).where(eq(slaveAccountsTable.id, account.id));
       }

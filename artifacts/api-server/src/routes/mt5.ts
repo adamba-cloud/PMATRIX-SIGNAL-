@@ -10,6 +10,7 @@ import {
   deleteMetaApiAccount,
   getMetaApiAccount,
   mapMetaApiStatus,
+  parseMetaApiError,
 } from "../lib/metaapi";
 import { logger } from "../lib/logger";
 
@@ -137,7 +138,7 @@ router.post("/mt5/accounts", requireAuth, async (req, res): Promise<void> => {
           .update(slaveAccountsTable)
           .set({
             status: "ERROR",
-            statusMessage: err instanceof Error ? err.message : "Failed to provision cloud terminal.",
+            statusMessage: parseMetaApiError(err),
             updatedAt: new Date(),
           })
           .where(eq(slaveAccountsTable.id, account.id));
