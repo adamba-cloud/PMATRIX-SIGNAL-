@@ -145081,7 +145081,12 @@ async function insertEvent(accountId, eventType, position, changedFields) {
     );
   } catch (queueErr) {
     logger.warn(
-      { queueErr, eventId: inserted.id, eventType, symbol: position.symbol },
+      {
+        err: queueErr instanceof Error ? { message: queueErr.message, code: queueErr.code } : String(queueErr),
+        eventId: inserted.id,
+        eventType,
+        symbol: position.symbol
+      },
       "[MasterTradeListener] Failed to enqueue job \u2014 Redis may be unavailable"
     );
   }
