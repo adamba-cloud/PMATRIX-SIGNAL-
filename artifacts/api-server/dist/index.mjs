@@ -20502,27 +20502,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router27;
+    module.exports = Router28;
     module.exports.Route = Route;
-    function Router27(options) {
-      if (!(this instanceof Router27)) {
-        return new Router27(options);
+    function Router28(options) {
+      if (!(this instanceof Router28)) {
+        return new Router28(options);
       }
       const opts = options || {};
-      function router27(req, res, next) {
-        router27.handle(req, res, next);
+      function router28(req, res, next) {
+        router28.handle(req, res, next);
       }
-      Object.setPrototypeOf(router27, this);
-      router27.caseSensitive = opts.caseSensitive;
-      router27.mergeParams = opts.mergeParams;
-      router27.params = {};
-      router27.strict = opts.strict;
-      router27.stack = [];
-      return router27;
+      Object.setPrototypeOf(router28, this);
+      router28.caseSensitive = opts.caseSensitive;
+      router28.mergeParams = opts.mergeParams;
+      router28.params = {};
+      router28.strict = opts.strict;
+      router28.stack = [];
+      return router28;
     }
-    Router27.prototype = function() {
+    Router28.prototype = function() {
     };
-    Router27.prototype.param = function param(name, fn) {
+    Router28.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20542,7 +20542,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router27.prototype.handle = function handle(req, res, callback) {
+    Router28.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20669,7 +20669,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router27.prototype.use = function use(handler) {
+    Router28.prototype.use = function use(handler) {
       let offset = 0;
       let path6 = "/";
       if (typeof handler !== "function") {
@@ -20702,7 +20702,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router27.prototype.route = function route(path6) {
+    Router28.prototype.route = function route(path6) {
       const route2 = new Route(path6);
       const layer = new Layer(path6, {
         sensitive: this.caseSensitive,
@@ -20717,7 +20717,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router27.prototype[method] = function(path6) {
+      Router28.prototype[method] = function(path6) {
         const route = this.route(path6);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -20900,13 +20900,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router27 = require_router();
+    var Router28 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init2() {
-      var router27 = null;
+      var router28 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -20915,13 +20915,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router27 === null) {
-            router27 = new Router27({
+          if (router28 === null) {
+            router28 = new Router28({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router27;
+          return router28;
         }
       });
     };
@@ -20992,15 +20992,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router27 = this.router;
+      var router28 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router27.use(path6, fn2);
+          return router28.use(path6, fn2);
         }
         debug(".use app under %s", path6);
         fn2.mountpath = path6;
         fn2.parent = this;
-        router27.use(path6, function mounted_app(req, res, next) {
+        router28.use(path6, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23573,7 +23573,7 @@ var require_express = __commonJS({
     var EventEmitter = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router27 = require_router();
+    var Router28 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23595,8 +23595,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router27.Route;
-    exports.Router = Router27;
+    exports.Route = Router28.Route;
+    exports.Router = Router28;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -112941,7 +112941,7 @@ var require_queue = __commonJS({
     var job_scheduler_1 = require_job_scheduler();
     var version_1 = require_version();
     var utils_1 = require_utils10();
-    var Queue3 = class extends queue_getters_1.QueueGetters {
+    var Queue4 = class extends queue_getters_1.QueueGetters {
       constructor(name, opts, Connection2) {
         var _a;
         super(name, Object.assign({}, opts), Connection2);
@@ -113633,7 +113633,7 @@ var require_queue = __commonJS({
         return totalRemoved;
       }
     };
-    exports.Queue = Queue3;
+    exports.Queue = Queue4;
   }
 });
 
@@ -115095,14 +115095,14 @@ var require_cjs = __commonJS({
 import { createServer } from "http";
 
 // src/app.ts
-var import_express27 = __toESM(require_express2(), 1);
+var import_express28 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 var import_pino_http = __toESM(require_logger(), 1);
 import path5 from "path";
 import fs5 from "fs";
 
 // src/routes/index.ts
-var import_express26 = __toESM(require_express2(), 1);
+var import_express27 = __toESM(require_express2(), 1);
 
 // src/routes/health.ts
 var import_express = __toESM(require_express2(), 1);
@@ -138289,6 +138289,9 @@ function waitForRedis(timeoutMs = 15e3) {
     });
   });
 }
+function isRedisAvailable() {
+  return !_unavailable && _redis !== null && _ready;
+}
 
 // src/lib/mailer.ts
 import nodemailer from "nodemailer";
@@ -144201,37 +144204,162 @@ router25.get("/admin/master/trade-events", requireAdmin, async (req, res) => {
 });
 var master_trade_events_default = router25;
 
-// src/routes/index.ts
+// src/routes/queue-monitor.ts
+var import_express26 = __toESM(require_express2(), 1);
+var import_bullmq3 = __toESM(require_cjs(), 1);
+
+// src/lib/copy-trade-queue.ts
+var import_bullmq = __toESM(require_cjs(), 1);
+var COPY_TRADE_QUEUE = "copy-trade";
+var _queue = null;
+function getCopyTradeQueue() {
+  if (!_queue) {
+    _queue = new import_bullmq.Queue(COPY_TRADE_QUEUE, {
+      connection: getRedis(),
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2e3 },
+        removeOnComplete: { count: 1e3 },
+        removeOnFail: { count: 500 }
+      }
+    });
+  }
+  return _queue;
+}
+
+// src/lib/master-trade-execution-queue.ts
+var import_bullmq2 = __toESM(require_cjs(), 1);
+var MASTER_TRADE_EXECUTION_QUEUE = "master-trade-execution";
+var _queue2 = null;
+function getMasterTradeExecutionQueue() {
+  if (!_queue2) {
+    _queue2 = new import_bullmq2.Queue(MASTER_TRADE_EXECUTION_QUEUE, {
+      connection: getRedis(),
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2e3 },
+        removeOnComplete: { count: 500 },
+        removeOnFail: { count: 200 }
+      }
+    });
+  }
+  return _queue2;
+}
+
+// src/routes/queue-monitor.ts
 var router26 = (0, import_express26.Router)();
-router26.use(health_default);
-router26.use(auth_default);
-router26.use(users_default);
-router26.use(signals_default);
-router26.use(subscriptions_default);
-router26.use(mpesa_default);
-router26.use(payments_default);
-router26.use(config_default);
-router26.use(dashboard_default);
-router26.use(mt5_default);
-router26.use(metaapi_webhook_default);
-router26.use(copy_trading_default);
-router26.use(media_default);
-router26.use(news_default);
-router26.use(resources_default);
-router26.use(announcements_default);
-router26.use(push_default);
-router26.use(referrals_default);
-router26.use(journal_default);
-router26.use(advertisements_default);
-router26.use(mt5_billing_default);
-router26.use(logo_default);
-router26.use(smtp_default);
-router26.use(master_default);
-router26.use(master_trade_events_default);
-var routes_default = router26;
+router26.get("/admin/queue-monitor", requireAdmin, async (_req, res) => {
+  const checkedAt = (/* @__PURE__ */ new Date()).toISOString();
+  let redisStatus = "not_configured";
+  let redisLatencyMs = null;
+  let redisUrl2 = (process.env.REDIS_URL ?? "redis://localhost:6379").replace(/:\/\/([^@]+)@/, "://<credentials>@");
+  try {
+    if (!isRedisAvailable()) {
+      redisStatus = "error";
+    } else {
+      const redis = getRedis();
+      const t0 = Date.now();
+      await redis.ping();
+      redisLatencyMs = Date.now() - t0;
+      redisStatus = "ok";
+    }
+  } catch {
+    redisStatus = "error";
+  }
+  const QUEUE_DEFS = [
+    { name: COPY_TRADE_QUEUE, label: "Copy Trade" },
+    { name: MASTER_TRADE_EXECUTION_QUEUE, label: "Master Trade Execution" }
+  ];
+  const queues = [];
+  const recentFailed = [];
+  if (isRedisAvailable()) {
+    const redis = getRedis();
+    for (const { name, label } of QUEUE_DEFS) {
+      try {
+        const q = new import_bullmq3.Queue(name, { connection: redis });
+        const counts = await q.getJobCounts("waiting", "active", "completed", "failed", "delayed", "paused");
+        queues.push({
+          name,
+          label,
+          waiting: counts.waiting ?? 0,
+          active: counts.active ?? 0,
+          completed: counts.completed ?? 0,
+          failed: counts.failed ?? 0,
+          delayed: counts.delayed ?? 0,
+          paused: counts.paused ?? 0
+        });
+        const failedJobs = await q.getFailed(0, 9);
+        for (const job of failedJobs) {
+          recentFailed.push({
+            queue: label,
+            jobId: job.id,
+            name: job.name,
+            failedReason: job.failedReason ?? "Unknown error",
+            attemptsMade: job.attemptsMade,
+            finishedOn: job.finishedOn ?? null
+          });
+        }
+        await q.close();
+      } catch {
+        queues.push({
+          name,
+          label,
+          waiting: 0,
+          active: 0,
+          completed: 0,
+          failed: 0,
+          delayed: 0,
+          paused: 0
+        });
+      }
+    }
+  } else {
+    for (const { name, label } of QUEUE_DEFS) {
+      queues.push({ name, label, waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, paused: 0 });
+    }
+  }
+  recentFailed.sort((a, b) => (b.finishedOn ?? 0) - (a.finishedOn ?? 0));
+  res.json({
+    checkedAt,
+    redis: { status: redisStatus, latencyMs: redisLatencyMs, url: redisUrl2 },
+    queues,
+    recentFailed: recentFailed.slice(0, 20)
+  });
+});
+var queue_monitor_default = router26;
+
+// src/routes/index.ts
+var router27 = (0, import_express27.Router)();
+router27.use(health_default);
+router27.use(auth_default);
+router27.use(users_default);
+router27.use(signals_default);
+router27.use(subscriptions_default);
+router27.use(mpesa_default);
+router27.use(payments_default);
+router27.use(config_default);
+router27.use(dashboard_default);
+router27.use(mt5_default);
+router27.use(metaapi_webhook_default);
+router27.use(copy_trading_default);
+router27.use(media_default);
+router27.use(news_default);
+router27.use(resources_default);
+router27.use(announcements_default);
+router27.use(push_default);
+router27.use(referrals_default);
+router27.use(journal_default);
+router27.use(advertisements_default);
+router27.use(mt5_billing_default);
+router27.use(logo_default);
+router27.use(smtp_default);
+router27.use(master_default);
+router27.use(master_trade_events_default);
+router27.use(queue_monitor_default);
+var routes_default = router27;
 
 // src/app.ts
-var app = (0, import_express27.default)();
+var app = (0, import_express28.default)();
 app.use(
   (0, import_pino_http.default)({
     logger,
@@ -144252,14 +144380,14 @@ app.use(
   })
 );
 app.use((0, import_cors.default)());
-app.use(import_express27.default.json({ limit: "100mb" }));
-app.use(import_express27.default.urlencoded({ limit: "100mb", extended: true }));
-app.use("/uploads", import_express27.default.static(path5.resolve("public/uploads")));
+app.use(import_express28.default.json({ limit: "100mb" }));
+app.use(import_express28.default.urlencoded({ limit: "100mb", extended: true }));
+app.use("/uploads", import_express28.default.static(path5.resolve("public/uploads")));
 app.use("/api", routes_default);
 if (process.env.NODE_ENV === "production") {
   const frontendDist = path5.resolve("artifacts/pesamatrix/dist/public");
   if (fs5.existsSync(frontendDist)) {
-    app.use(import_express27.default.static(frontendDist, {
+    app.use(import_express28.default.static(frontendDist, {
       setHeaders(res, filePath) {
         if (filePath.endsWith("index.html")) {
           res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -144362,26 +144490,7 @@ function startMetaApiSyncJob() {
 }
 
 // src/lib/copy-trade-worker.ts
-var import_bullmq2 = __toESM(require_cjs(), 1);
-
-// src/lib/copy-trade-queue.ts
-var import_bullmq = __toESM(require_cjs(), 1);
-var COPY_TRADE_QUEUE = "copy-trade";
-var _queue = null;
-function getCopyTradeQueue() {
-  if (!_queue) {
-    _queue = new import_bullmq.Queue(COPY_TRADE_QUEUE, {
-      connection: getRedis(),
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: { type: "exponential", delay: 2e3 },
-        removeOnComplete: { count: 1e3 },
-        removeOnFail: { count: 500 }
-      }
-    });
-  }
-  return _queue;
-}
+var import_bullmq4 = __toESM(require_cjs(), 1);
 
 // src/lib/spread-guard.ts
 var SPREAD_AVG_KEY = (symbol2) => `spread:avg:${symbol2}`;
@@ -144451,7 +144560,7 @@ async function checkSpreadGuard(metaApiId, symbol2) {
 var CONCURRENCY = 10;
 var EMERGENCY_KEY = "watchdog:emergency:paused";
 function startCopyTradeWorker() {
-  const worker = new import_bullmq2.Worker(
+  const worker = new import_bullmq4.Worker(
     COPY_TRADE_QUEUE,
     async (job, token2) => {
       const { logId, slaveMetaApiId, trade } = job.data;
@@ -145059,25 +145168,6 @@ function startMt5SubscriptionExpiryJob() {
   logger.info({ intervalMs: INTERVAL_MS4 }, "MT5 subscription expiry job started");
 }
 
-// src/lib/master-trade-execution-queue.ts
-var import_bullmq3 = __toESM(require_cjs(), 1);
-var MASTER_TRADE_EXECUTION_QUEUE = "master-trade-execution";
-var _queue2 = null;
-function getMasterTradeExecutionQueue() {
-  if (!_queue2) {
-    _queue2 = new import_bullmq3.Queue(MASTER_TRADE_EXECUTION_QUEUE, {
-      connection: getRedis(),
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: { type: "exponential", delay: 2e3 },
-        removeOnComplete: { count: 500 },
-        removeOnFail: { count: 200 }
-      }
-    });
-  }
-  return _queue2;
-}
-
 // src/lib/master-trade-listener.ts
 var POLL_INTERVAL_MS2 = 1e4;
 var previousSnapshot = /* @__PURE__ */ new Map();
@@ -145230,7 +145320,7 @@ function startMasterTradeListener() {
 }
 
 // src/lib/master-trade-execution-worker.ts
-var import_bullmq4 = __toESM(require_cjs(), 1);
+var import_bullmq5 = __toESM(require_cjs(), 1);
 var CONCURRENCY2 = 5;
 var MIN_LOT_SIZE2 = 0.01;
 function calculateProportionalLots(masterLots, masterBalance, slaveBalance) {
@@ -145470,7 +145560,7 @@ async function fanOutToSlaves(data) {
   );
 }
 function startMasterTradeExecutionWorker() {
-  const worker = new import_bullmq4.Worker(
+  const worker = new import_bullmq5.Worker(
     MASTER_TRADE_EXECUTION_QUEUE,
     async (job) => {
       const { eventId, eventType, positionId, symbol: symbol2, direction } = job.data;

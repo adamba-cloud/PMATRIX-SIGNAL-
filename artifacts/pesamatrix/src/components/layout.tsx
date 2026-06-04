@@ -31,6 +31,7 @@ import {
   Gift,
   Calculator,
   Megaphone as MegaphoneIcon,
+  Layers,
 } from "lucide-react";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { AdminNotificationBell } from "./admin-notification-bell";
@@ -166,6 +167,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <SidebarLink href="/admin/mt5-billing" icon={CreditCard}>MT5 Billing</SidebarLink>
                 <SidebarLink href="/admin/master" icon={Cpu}>Master Account</SidebarLink>
                 <SidebarLink href="/admin/master-events" icon={ActivitySquare}>Master Events</SidebarLink>
+                <SidebarLink href="/admin/queue-monitor" icon={Layers}>Queue Monitor</SidebarLink>
                 <SidebarLink href="/admin/content" icon={FolderOpen}>Content</SidebarLink>
                 <SidebarLink href="/admin/signals" icon={Radio}>Signals</SidebarLink>
                 <SidebarLink href="/admin/announcements" icon={Megaphone}>Announcements</SidebarLink>
