@@ -24,6 +24,7 @@ export function getMasterTradeExecutionQueue(): Queue<MasterTradeExecutionJobDat
   if (!_queue) {
     _queue = new Queue<MasterTradeExecutionJobData>(MASTER_TRADE_EXECUTION_QUEUE, {
       connection: getRedis(),
+      skipVersionCheck: true,
       defaultJobOptions: {
         attempts: 3,
         backoff: { type: "exponential", delay: 2000 },

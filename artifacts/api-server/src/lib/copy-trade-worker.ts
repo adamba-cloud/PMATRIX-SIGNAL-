@@ -129,6 +129,7 @@ export function startCopyTradeWorker(): Worker<CopyTradeJobData> {
     {
       connection: getRedis(),
       concurrency: CONCURRENCY,
+      skipVersionCheck: true,
     }
   );
 

@@ -26,6 +26,7 @@ export function getCopyTradeQueue(): Queue<CopyTradeJobData> {
   if (!_queue) {
     _queue = new Queue<CopyTradeJobData>(COPY_TRADE_QUEUE, {
       connection: getRedis(),
+      skipVersionCheck: true,
       defaultJobOptions: {
         attempts: 3,
         backoff: { type: "exponential", delay: 2000 },

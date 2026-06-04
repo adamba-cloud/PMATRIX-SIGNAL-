@@ -357,6 +357,7 @@ export function startMasterTradeExecutionWorker(): Worker<MasterTradeExecutionJo
     {
       connection: getRedis(),
       concurrency: CONCURRENCY,
+      skipVersionCheck: true,
     }
   );
 

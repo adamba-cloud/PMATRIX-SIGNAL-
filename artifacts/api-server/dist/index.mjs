@@ -144224,6 +144224,7 @@ function getCopyTradeQueue() {
   if (!_queue) {
     _queue = new import_bullmq.Queue(COPY_TRADE_QUEUE, {
       connection: getRedis(),
+      skipVersionCheck: true,
       defaultJobOptions: {
         attempts: 3,
         backoff: { type: "exponential", delay: 2e3 },
@@ -144244,6 +144245,7 @@ function getMasterTradeExecutionQueue() {
   if (!_queue2) {
     _queue2 = new import_bullmq2.Queue(MASTER_TRADE_EXECUTION_QUEUE, {
       connection: getRedis(),
+      skipVersionCheck: true,
       defaultJobOptions: {
         attempts: 3,
         backoff: { type: "exponential", delay: 2e3 },
@@ -144728,7 +144730,8 @@ function startCopyTradeWorker() {
     },
     {
       connection: getRedis(),
-      concurrency: CONCURRENCY
+      concurrency: CONCURRENCY,
+      skipVersionCheck: true
     }
   );
   worker.on("failed", (job, err) => {
@@ -145665,7 +145668,8 @@ function startMasterTradeExecutionWorker() {
     },
     {
       connection: getRedis(),
-      concurrency: CONCURRENCY2
+      concurrency: CONCURRENCY2,
+      skipVersionCheck: true
     }
   );
   worker.on("failed", (job, err) => {
