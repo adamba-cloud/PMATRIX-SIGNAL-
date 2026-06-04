@@ -142140,7 +142140,7 @@ function mapMetaApiStatus(account) {
     return { status: "DISCONNECTED", message: "Cloud terminal is undeployed." };
   }
   if (state === "DEPLOYING" || state === "UNDEPLOYING") {
-    return { status: "SYNCING", message: "Cloud terminal is being provisioned\u2026" };
+    return { status: "SYNCING", message: "Deploying cloud terminal \u2014 this usually takes 2\u20135 minutes." };
   }
   if (state === "DEPLOYED") {
     if (connectionStatus === "CONNECTED" && synchronizationStatus === "SYNCHRONIZED") {
@@ -142168,7 +142168,7 @@ async function createMetaApiAccount(params) {
       name: params.name,
       magic: 0,
       quoteStreamingIntervalInSeconds: 2.5,
-      reliability: "high"
+      reliability: "regular"
     };
     if (params.webhookUrl) {
       body.webhookUrl = params.webhookUrl;

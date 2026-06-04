@@ -264,7 +264,7 @@ function getProvisioningStep(account: SlaveAccount): number {
 
   if (!hasId) return 0;
   if (msg.includes("connecting") || msg.includes("synchronizing account")) return 3;
-  if (msg.includes("deployed") || msg.includes("synchroniz")) return 2;
+  if (msg.includes("deploy") || msg.includes("synchroniz")) return 2;
   return 1; // has ID but still deploying
 }
 
@@ -276,7 +276,7 @@ interface ProvisioningStep {
 const STEPS: ProvisioningStep[] = [
   { label: "Account registered", detail: "Your MT5 credentials have been securely stored." },
   { label: "Cloud terminal created", detail: "MetaApi has allocated a cloud container for your account." },
-  { label: "Deploying terminal", detail: "The cloud MT5 terminal is starting up — this takes ~30 seconds." },
+  { label: "Deploying terminal", detail: "The cloud MT5 terminal is starting up — this usually takes 2–5 minutes." },
   { label: "Connecting to broker", detail: "The terminal is logging in to your broker server." },
   { label: "Synchronized", detail: "Connected and ready. Balance and trades are now live." },
 ];
