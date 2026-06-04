@@ -1,4 +1,6 @@
 import webpush from "web-push";
+import { db, pushSubscriptionsTable } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
 import { logger } from "./logger";
 
 let _publicKey: string;
@@ -81,4 +83,29 @@ export async function broadcastPush(
   }
 
   return { sent, failed, staleIds };
+}
+
+/**
+ * Fetch all push subscriptions for a user, send them a notification,
+ * and automatically prune stale endpoints from the database.
+ */
+export async function sendUserPush(userId: number, payload: PushPayload): Promise<void> {
+  try {
+    const subs = await db
+      .select()
+      .from(pushSubscriptionsTable)
+      .where(eq(pushSubscriptionsTable.userId, userId));
+
+    if (subs.length === 0) return;
+
+    const { staleIds } = await broadcastPush(subs, payload);
+
+    if (staleIds.length > 0) {
+      await db
+        .delete(pushSubscriptionsTable)
+        .where(inArray(pushSubscriptionsTable.id, staleIds));
+    }
+  } catch (err) {
+    logger.warn({ err, userId }, "sendUserPush: failed to send notification");
+  }
 }

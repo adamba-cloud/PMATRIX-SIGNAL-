@@ -60,7 +60,7 @@ self.addEventListener('push', (event) => {
       body: data.body,
       icon: '/favicon.svg',
       badge: '/favicon.svg',
-      tag: 'pesamatrix-signal',
+      tag: data.tag || 'pesamatrix-signal',
       renotify: true,
       data: { url: data.url },
       vibrate: [200, 100, 200],

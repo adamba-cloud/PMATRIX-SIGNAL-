@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { initiateStkPush, parseCallback, formatPhone, queryStkStatus, type DarajaCallbackBody } from "../lib/daraja";
 import { requireAuth } from "../lib/auth";
 import { logger } from "../lib/logger";
+import { sendUserPush } from "../lib/push";
 
 const router = Router();
 
@@ -286,6 +287,14 @@ router.post("/payments/mpesa/callback", async (req, res): Promise<void> => {
           receipt: parsed.mpesaReceiptNumber,
           source: "callback",
         });
+        void sendUserPush(payment.userId, {
+          title: "✅ Payment Confirmed!",
+          body: parsed.mpesaReceiptNumber
+            ? `KES ${parseFloat(String(payment.amount)).toLocaleString()} received. Receipt: ${parsed.mpesaReceiptNumber}. Your ${activatedSub.daysSelected}-day subscription is now active.`
+            : `Your ${activatedSub.daysSelected}-day subscription is now active.`,
+          url: "/subscription",
+          tag: "pesamatrix-payment",
+        });
       }
 
       // Activate MT5 subscriptions linked to this payment
@@ -463,6 +472,12 @@ router.post("/payments/mpesa/verify/:checkoutRequestId", requireAuth, async (req
         daysSelected: activatedSub.daysSelected,
         receipt: null,
         source: "verify",
+      });
+      void sendUserPush(payment.userId, {
+        title: "✅ Payment Confirmed!",
+        body: `Your ${activatedSub.daysSelected}-day subscription is now active. Tap to view your signals.`,
+        url: "/subscription",
+        tag: "pesamatrix-payment",
       });
     }
 

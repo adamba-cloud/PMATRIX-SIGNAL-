@@ -141130,6 +141130,18 @@ async function broadcastPush(subs, payload) {
   }
   return { sent, failed, staleIds };
 }
+async function sendUserPush(userId, payload) {
+  try {
+    const subs = await db.select().from(pushSubscriptionsTable).where(eq(pushSubscriptionsTable.userId, userId));
+    if (subs.length === 0) return;
+    const { staleIds } = await broadcastPush(subs, payload);
+    if (staleIds.length > 0) {
+      await db.delete(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.id, staleIds));
+    }
+  } catch (err) {
+    logger.warn({ err, userId }, "sendUserPush: failed to send notification");
+  }
+}
 
 // src/routes/signals.ts
 var router4 = (0, import_express4.Router)();
@@ -141778,6 +141790,12 @@ router7.post("/payments/mpesa/callback", async (req, res) => {
           receipt: parsed.mpesaReceiptNumber,
           source: "callback"
         });
+        void sendUserPush(payment.userId, {
+          title: "\u2705 Payment Confirmed!",
+          body: parsed.mpesaReceiptNumber ? `KES ${parseFloat(String(payment.amount)).toLocaleString()} received. Receipt: ${parsed.mpesaReceiptNumber}. Your ${activatedSub.daysSelected}-day subscription is now active.` : `Your ${activatedSub.daysSelected}-day subscription is now active.`,
+          url: "/subscription",
+          tag: "pesamatrix-payment"
+        });
       }
       const pendingMt5Subs = await db.select().from(mt5AccountSubscriptionsTable).where(and(eq(mt5AccountSubscriptionsTable.paymentId, payment.id), eq(mt5AccountSubscriptionsTable.status, "PENDING")));
       if (pendingMt5Subs.length > 0) {
@@ -141893,6 +141911,12 @@ router7.post("/payments/mpesa/verify/:checkoutRequestId", requireAuth, async (re
         daysSelected: activatedSub.daysSelected,
         receipt: null,
         source: "verify"
+      });
+      void sendUserPush(payment.userId, {
+        title: "\u2705 Payment Confirmed!",
+        body: `Your ${activatedSub.daysSelected}-day subscription is now active. Tap to view your signals.`,
+        url: "/subscription",
+        tag: "pesamatrix-payment"
       });
     }
     broadcastAdminEvent("payment_completed", {
