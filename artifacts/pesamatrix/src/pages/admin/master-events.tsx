@@ -5,11 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Sheet, SheetContent, SheetHeader, SheetTitle,
+} from "@/components/ui/sheet";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
   Activity, RefreshCw, ChevronLeft, ChevronRight,
   TrendingUp, TrendingDown, PenLine, Loader2, Zap,
+  Copy, Check, Hash, Server, Clock, Briefcase,
+  DollarSign, ArrowUpDown, FileJson,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -32,6 +37,7 @@ type MasterTradeEvent = {
   profit: string | null;
   comment: string | null;
   changedFields: string | null;
+  rawPayload: string | null;
   jobId: string | null;
   jobStatus: string | null;
   createdAt: string;
@@ -50,7 +56,7 @@ type StatsResponse = {
   byType: Record<string, number>;
 };
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Badge helpers ───────────────────────────────────────────────────────────
 
 const EVENT_FILTERS: Array<{ label: string; value: EventType | "ALL" }> = [
   { label: "All", value: "ALL" },
@@ -130,9 +136,289 @@ function fmt(val: string | null, decimals = 5) {
   return isNaN(n) ? val : n.toFixed(decimals);
 }
 
-const PAGE_SIZE = 50;
+// ─── Copy button ─────────────────────────────────────────────────────────────
+
+function CopyButton({ value, className = "" }: { value: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      title="Copy to clipboard"
+      className={`inline-flex items-center justify-center w-6 h-6 rounded text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-colors shrink-0 ${className}`}
+    >
+      {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+    </button>
+  );
+}
+
+// ─── Detail row inside drawer ─────────────────────────────────────────────────
+
+function DetailRow({
+  label,
+  children,
+  mono = false,
+}: {
+  label: string;
+  children: React.ReactNode;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5 py-2.5 border-b border-slate-800 last:border-0">
+      <span className="text-xs text-slate-500 uppercase tracking-wider">{label}</span>
+      <div className={`text-sm text-slate-200 break-all ${mono ? "font-mono" : ""}`}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─── Changed Fields display ───────────────────────────────────────────────────
+
+function ChangedFieldsList({ raw }: { raw: string | null }) {
+  if (!raw) return <span className="text-slate-600 text-sm">—</span>;
+
+  let fields: string[] = [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) fields = parsed.map(String);
+    else if (typeof parsed === "object" && parsed !== null)
+      fields = Object.keys(parsed);
+    else fields = [String(parsed)];
+  } catch {
+    fields = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+
+  if (fields.length === 0) return <span className="text-slate-600 text-sm">—</span>;
+
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-1">
+      {fields.map((f) => (
+        <span
+          key={f}
+          className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-300 border border-yellow-500/20 font-mono"
+        >
+          {f}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ─── Raw Payload viewer ───────────────────────────────────────────────────────
+
+function RawPayloadBlock({ raw }: { raw: string | null }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!raw) return <span className="text-slate-600 text-sm">—</span>;
+
+  let pretty = raw;
+  try {
+    pretty = JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {}
+
+  const lines = pretty.split("\n");
+  const PREVIEW_LINES = 10;
+  const isLong = lines.length > PREVIEW_LINES;
+  const displayed = expanded || !isLong ? pretty : lines.slice(0, PREVIEW_LINES).join("\n") + "\n…";
+
+  return (
+    <div className="mt-1 rounded-lg border border-slate-700 bg-slate-950 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-800 bg-slate-900/60">
+        <span className="text-xs text-slate-500 font-mono">JSON payload</span>
+        <CopyButton value={pretty} />
+      </div>
+      <pre className="text-xs text-slate-300 font-mono p-3 overflow-x-auto leading-relaxed whitespace-pre-wrap break-all max-h-80 overflow-y-auto">
+        {displayed}
+      </pre>
+      {isLong && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full py-1.5 text-xs text-slate-500 hover:text-slate-300 bg-slate-900/40 hover:bg-slate-800 border-t border-slate-800 transition-colors"
+        >
+          {expanded ? "Collapse ↑" : `Show all ${lines.length} lines ↓`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Event Detail Drawer ──────────────────────────────────────────────────────
+
+function EventDetailDrawer({
+  event,
+  onClose,
+}: {
+  event: MasterTradeEvent | null;
+  onClose: () => void;
+}) {
+  const ev = event;
+
+  return (
+    <Sheet open={ev !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-lg bg-slate-950 border-slate-800 text-slate-200 overflow-y-auto p-0"
+      >
+        {ev && (
+          <>
+            {/* Drawer header */}
+            <SheetHeader className="px-5 pt-5 pb-4 border-b border-slate-800 sticky top-0 bg-slate-950 z-10">
+              <SheetTitle asChild>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <EventTypeBadge type={ev.eventType} />
+                    <DirectionBadge direction={ev.direction} />
+                    <span className="font-mono font-bold text-slate-100 text-base tracking-wide">
+                      {ev.symbol}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                    <Clock className="w-3 h-3" />
+                    {format(new Date(ev.createdAt), "MMM dd, yyyy · HH:mm:ss")}
+                    <span className="text-slate-700">·</span>
+                    {formatDistanceToNow(new Date(ev.createdAt), { addSuffix: true })}
+                  </p>
+                </div>
+              </SheetTitle>
+            </SheetHeader>
+
+            <div className="px-5 py-4 space-y-6">
+
+              {/* ── Identity ── */}
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1 flex items-center gap-1.5">
+                  <Hash className="w-3 h-3" /> Identity
+                </h3>
+                <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 divide-y divide-slate-800">
+                  <DetailRow label="Event ID" mono>
+                    <div className="flex items-center gap-1.5">
+                      <span>#{ev.id}</span>
+                    </div>
+                  </DetailRow>
+                  <DetailRow label="Position ID" mono>
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate">{ev.positionId}</span>
+                      <CopyButton value={ev.positionId} />
+                    </div>
+                  </DetailRow>
+                  <DetailRow label="MetaApi Account ID" mono>
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-xs">{ev.metaApiAccountId}</span>
+                      <CopyButton value={ev.metaApiAccountId} />
+                    </div>
+                  </DetailRow>
+                </div>
+              </section>
+
+              {/* ── Price Data ── */}
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1 flex items-center gap-1.5">
+                  <DollarSign className="w-3 h-3" /> Price Data
+                </h3>
+                <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 divide-y divide-slate-800">
+                  <DetailRow label="Direction">
+                    <DirectionBadge direction={ev.direction} />
+                  </DetailRow>
+                  <DetailRow label="Volume" mono>
+                    {ev.volume ? parseFloat(ev.volume).toFixed(2) : "—"}
+                  </DetailRow>
+                  <DetailRow label="Open Price" mono>
+                    <span className="text-slate-300">{fmt(ev.openPrice)}</span>
+                  </DetailRow>
+                  <DetailRow label="Current Price" mono>
+                    <span className="text-slate-300">{fmt(ev.currentPrice)}</span>
+                  </DetailRow>
+                  <DetailRow label="Stop Loss" mono>
+                    <span className="text-red-400/90">{fmt(ev.stopLoss)}</span>
+                  </DetailRow>
+                  <DetailRow label="Take Profit" mono>
+                    <span className="text-green-400/90">{fmt(ev.takeProfit)}</span>
+                  </DetailRow>
+                  <DetailRow label="Profit" mono>
+                    {ev.profit ? (
+                      <span className={parseFloat(ev.profit) >= 0 ? "text-green-400" : "text-red-400"}>
+                        {parseFloat(ev.profit) >= 0 ? "+" : ""}
+                        {parseFloat(ev.profit).toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-600">—</span>
+                    )}
+                  </DetailRow>
+                  {ev.comment && (
+                    <DetailRow label="Comment">{ev.comment}</DetailRow>
+                  )}
+                </div>
+              </section>
+
+              {/* ── Job Info ── */}
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1 flex items-center gap-1.5">
+                  <Briefcase className="w-3 h-3" /> Job Execution
+                </h3>
+                <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 divide-y divide-slate-800">
+                  <DetailRow label="Status">
+                    <JobStatusBadge status={ev.jobStatus} />
+                  </DetailRow>
+                  <DetailRow label="Job ID" mono>
+                    {ev.jobId ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs break-all">{ev.jobId}</span>
+                        <CopyButton value={ev.jobId} />
+                      </div>
+                    ) : (
+                      <span className="text-slate-600">—</span>
+                    )}
+                  </DetailRow>
+                </div>
+              </section>
+
+              {/* ── Changed Fields ── */}
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1 flex items-center gap-1.5">
+                  <ArrowUpDown className="w-3 h-3" /> Changed Fields
+                </h3>
+                <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-3">
+                  <ChangedFieldsList raw={ev.changedFields} />
+                </div>
+              </section>
+
+              {/* ── Raw Payload ── */}
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1 flex items-center gap-1.5">
+                  <FileJson className="w-3 h-3" /> Raw Payload
+                </h3>
+                <RawPayloadBlock raw={ev.rawPayload} />
+              </section>
+
+              {/* ── MetaApi account card ── */}
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1 flex items-center gap-1.5">
+                  <Server className="w-3 h-3" /> Source
+                </h3>
+                <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 divide-y divide-slate-800">
+                  <DetailRow label="Detected at">
+                    {format(new Date(ev.createdAt), "yyyy-MM-dd HH:mm:ss 'UTC'")}
+                  </DetailRow>
+                </div>
+              </section>
+
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
 
 // ─── Stats Bar ──────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 50;
 
 function StatsBar({ stats, liveCount }: { stats: StatsResponse | undefined; liveCount: number }) {
   return (
@@ -186,6 +472,7 @@ export default function AdminMasterEvents() {
   const [page, setPage] = useState(0);
   const [liveCount, setLiveCount] = useState(0);
   const [lastLiveEvent, setLastLiveEvent] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<MasterTradeEvent | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   const offset = page * PAGE_SIZE;
@@ -238,7 +525,7 @@ export default function AdminMasterEvents() {
     };
 
     return () => ws.close();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter, page]);
 
   const handleRefresh = () => {
@@ -253,6 +540,12 @@ export default function AdminMasterEvents() {
 
   return (
     <div className="space-y-6">
+      {/* Detail Drawer */}
+      <EventDetailDrawer
+        event={selectedEvent}
+        onClose={() => setSelectedEvent(null)}
+      />
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -261,7 +554,7 @@ export default function AdminMasterEvents() {
             Master Events
           </h2>
           <p className="text-slate-400 mt-1">
-            Live trade event log — every detected and executed action in real time.
+            Live trade event log — click any row to inspect the full payload.
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -284,7 +577,7 @@ export default function AdminMasterEvents() {
         </div>
       </div>
 
-      {/* Last live event toast-style indicator */}
+      {/* Last live event indicator */}
       {lastLiveEvent && (
         <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 text-sm w-fit">
           <Zap className="w-3.5 h-3.5 shrink-0" />
@@ -299,7 +592,10 @@ export default function AdminMasterEvents() {
       <Card className="bg-slate-900 border-slate-800">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <CardTitle className="text-slate-50 text-base">Event Log</CardTitle>
+            <CardTitle className="text-slate-50 text-base">
+              Event Log
+              <span className="ml-2 text-xs font-normal text-slate-500">· click a row to inspect</span>
+            </CardTitle>
             <div className="flex items-center gap-1.5 p-1 rounded-lg bg-slate-950/60 border border-slate-800">
               {EVENT_FILTERS.map((f) => (
                 <button
@@ -313,9 +609,7 @@ export default function AdminMasterEvents() {
                 >
                   {f.label}
                   {f.value !== "ALL" && stats?.byType[f.value] != null && (
-                    <span className="ml-1.5 text-slate-500">
-                      {stats.byType[f.value]}
-                    </span>
+                    <span className="ml-1.5 text-slate-500">{stats.byType[f.value]}</span>
                   )}
                 </button>
               ))}
@@ -356,7 +650,10 @@ export default function AdminMasterEvents() {
                     {eventsData.events.map((ev) => (
                       <TableRow
                         key={ev.id}
-                        className="border-slate-800 hover:bg-slate-800/40 transition-colors"
+                        onClick={() => setSelectedEvent(ev)}
+                        className={`border-slate-800 hover:bg-slate-800/60 transition-colors cursor-pointer ${
+                          selectedEvent?.id === ev.id ? "bg-slate-800/40 ring-1 ring-inset ring-blue-500/30" : ""
+                        }`}
                       >
                         <TableCell>
                           <EventTypeBadge type={ev.eventType} />
