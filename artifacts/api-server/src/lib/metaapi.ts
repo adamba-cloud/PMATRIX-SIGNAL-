@@ -3,10 +3,10 @@
 // metaapi.cloud is the marketing website — it does NOT serve REST API requests.
 const TRADING_BASE = `https://mt-client-api-v1.${process.env.METAAPI_REGION ?? "london"}.agiliumtrade.ai`;
 
-// Management API: create/deploy/undeploy/delete accounts
-// This is the legacy management plane — may not be needed if accounts are
-// pre-provisioned via the MetaApi dashboard.
-const MANAGEMENT_BASE = "https://metaapi.cloud";
+// Management/Provisioning API: create/deploy/undeploy/delete accounts
+// metaapi.cloud is NOT the API — it is the Next.js marketing site and returns HTML.
+// The real provisioning endpoint is mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai.
+const MANAGEMENT_BASE = "https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai";
 
 function token(): string {
   const t = process.env.METAAPI_TOKEN;

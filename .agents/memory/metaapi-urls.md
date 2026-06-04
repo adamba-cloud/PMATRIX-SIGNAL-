@@ -12,7 +12,7 @@ The actual REST APIs are at:
 | API | Base URL | Confirmed endpoints |
 |-----|----------|-------------------|
 | **Trading API** | `https://mt-client-api-v1.{region}.agiliumtrade.ai` | `/users/current/accounts/{id}/accountInformation` → 200 ✅, `/users/current/accounts/{id}/positions` → 200 ✅, `/users/current/accounts/{id}/trade` → 200 ✅ |
-| **Management API** | `https://metaapi.cloud` | deploy/undeploy/create/delete — these may or may not work; not confirmed |
+| **Management API** | `https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai` | `/users/current/accounts` (POST create), `/{id}/deploy`, `/{id}/undeploy`, `/{id}` (DELETE) |
 
 The confirmed working region for the user's account (`99a2b763-0528-4b0e-91ea-79c0be291d5b`, Exness KE, cloud-g2 tag) is **london**.
 

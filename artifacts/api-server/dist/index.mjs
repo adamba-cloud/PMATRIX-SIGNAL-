@@ -142048,7 +142048,7 @@ function encryptPassword(plaintext) {
 
 // src/lib/metaapi.ts
 var TRADING_BASE = `https://mt-client-api-v1.${process.env.METAAPI_REGION ?? "london"}.agiliumtrade.ai`;
-var MANAGEMENT_BASE = "https://metaapi.cloud";
+var MANAGEMENT_BASE = "https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai";
 function token() {
   const t = process.env.METAAPI_TOKEN;
   if (!t) throw new Error("METAAPI_TOKEN environment variable is not set");
