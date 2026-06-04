@@ -13,7 +13,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -34,7 +33,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Cpu,
   Plus,
   Trash2,
   RefreshCw,
@@ -48,6 +46,8 @@ import {
   DollarSign,
   Shield,
   ChevronDown,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 
 // ─── Broker server list ───────────────────────────────────────────────────────
@@ -254,34 +254,113 @@ function StatusBadge({ status }: { status: Mt5Status }) {
   );
 }
 
-function ProvisioningBanner({ message }: { message: string }) {
-  const [progress, setProgress] = useState(5);
+// ─── Provisioning step inference ─────────────────────────────────────────────
+// Derive which step we're on from the data already stored on the account row.
+// 0 = Registered, 1 = Terminal Created, 2 = Deploying, 3 = Connecting, 4 = Done
+function getProvisioningStep(account: SlaveAccount): number {
+  if (account.status === "CONNECTED") return 4;
+  const msg = (account.statusMessage ?? "").toLowerCase();
+  const hasId = !!account.metaApiAccountId;
+
+  if (!hasId) return 0;
+  if (msg.includes("connecting") || msg.includes("synchronizing account")) return 3;
+  if (msg.includes("deployed") || msg.includes("synchroniz")) return 2;
+  return 1; // has ID but still deploying
+}
+
+interface ProvisioningStep {
+  label: string;
+  detail: string;
+}
+
+const STEPS: ProvisioningStep[] = [
+  { label: "Account registered", detail: "Your MT5 credentials have been securely stored." },
+  { label: "Cloud terminal created", detail: "MetaApi has allocated a cloud container for your account." },
+  { label: "Deploying terminal", detail: "The cloud MT5 terminal is starting up — this takes ~30 seconds." },
+  { label: "Connecting to broker", detail: "The terminal is logging in to your broker server." },
+  { label: "Synchronized", detail: "Connected and ready. Balance and trades are now live." },
+];
+
+function ProvisioningTimeline({ account }: { account: SlaveAccount }) {
+  const currentStep = getProvisioningStep(account);
+  const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setProgress((p) => (p >= 90 ? 90 : p + 2));
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
+    const start = new Date(account.createdAt).getTime();
+    const tick = () => setElapsed(Math.floor((Date.now() - start) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [account.createdAt]);
+
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  const elapsedStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 
   return (
-    <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="relative">
-          <Cloud className="w-6 h-6 text-yellow-400" />
-          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-yellow-400 rounded-full animate-ping" />
-        </div>
-        <div>
+    <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Cloud className="w-5 h-5 text-yellow-400" />
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-yellow-400 rounded-full animate-ping" />
+          </div>
           <p className="text-sm font-semibold text-yellow-300">Provisioning Cloud Terminal</p>
-          <p className="text-xs text-yellow-400/70 mt-0.5">
-            Please wait while synchronization completes — usually 1–2 minutes.
-          </p>
         </div>
+        <span className="text-xs text-slate-500 tabular-nums">{elapsedStr}</span>
       </div>
-      <Progress value={progress} className="h-1.5 bg-yellow-500/10 [&>div]:bg-yellow-400" />
-      {message && (
-        <p className="text-xs text-slate-400">{message}</p>
-      )}
+
+      <div className="space-y-0">
+        {STEPS.map((step, i) => {
+          const done = i < currentStep;
+          const active = i === currentStep;
+
+          return (
+            <div key={i} className="flex gap-3">
+              {/* Track line + node column */}
+              <div className="flex flex-col items-center">
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${
+                  done
+                    ? "bg-green-500/20 text-green-400"
+                    : active
+                    ? "bg-yellow-500/20 text-yellow-400"
+                    : "bg-slate-800 text-slate-600"
+                }`}>
+                  {done ? (
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  ) : active ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Circle className="w-3 h-3" />
+                  )}
+                </div>
+                {/* Connector line between steps */}
+                {i < STEPS.length - 1 && (
+                  <div className={`w-px flex-1 min-h-[20px] my-1 ${
+                    done ? "bg-green-500/30" : "bg-slate-700"
+                  }`} />
+                )}
+              </div>
+
+              {/* Step label + detail */}
+              <div className={`pb-4 ${i === STEPS.length - 1 ? "pb-0" : ""}`}>
+                <p className={`text-xs font-semibold leading-tight ${
+                  done ? "text-green-400" : active ? "text-yellow-300" : "text-slate-600"
+                }`}>
+                  {step.label}
+                </p>
+                {(done || active) && (
+                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{step.detail}</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-xs text-slate-500 border-t border-slate-800 pt-3">
+        Usually completes in 1–2 minutes. The status will update automatically.
+      </p>
     </div>
   );
 }
@@ -371,7 +450,7 @@ function AccountCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {isSyncing && (
-          <ProvisioningBanner message={account.statusMessage ?? "Initialising cloud connection…"} />
+          <ProvisioningTimeline account={account} />
         )}
 
         {status === "ERROR" && account.statusMessage && (
@@ -696,10 +775,10 @@ export default function Mt5Accounts() {
   };
 
   const counts = {
-    connected: accounts.filter((a) => a.status === "CONNECTED").length,
-    syncing: accounts.filter((a) => a.status === "SYNCING").length,
-    disconnected: accounts.filter((a) => a.status === "DISCONNECTED").length,
-    error: accounts.filter((a) => a.status === "ERROR").length,
+    connected: accounts.filter((a: SlaveAccount) => a.status === "CONNECTED").length,
+    syncing: accounts.filter((a: SlaveAccount) => a.status === "SYNCING").length,
+    disconnected: accounts.filter((a: SlaveAccount) => a.status === "DISCONNECTED").length,
+    error: accounts.filter((a: SlaveAccount) => a.status === "ERROR").length,
   };
 
   return (
@@ -754,7 +833,7 @@ export default function Mt5Accounts() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {accounts.map((account) => (
+          {accounts.map((account: SlaveAccount) => (
             <AccountCard
               key={account.id}
               account={account as AccountWithTelemetry}
