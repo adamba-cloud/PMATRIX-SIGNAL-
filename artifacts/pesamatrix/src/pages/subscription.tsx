@@ -113,8 +113,8 @@ export default function Subscription() {
   const poll = useCallback(async (count: number) => {
     if (!checkoutRequestId) return;
 
-    // At 60 seconds trigger server-side Daraja verification
-    if (count === 12 && !verifyTriggered.current) {
+    // At 20 seconds trigger server-side Daraja verification (was 60s)
+    if (count === 4 && !verifyTriggered.current) {
       void triggerVerify();
       // Keep polling in parallel for callback
       const next = count + 1;
@@ -359,7 +359,18 @@ export default function Subscription() {
                   <Clock className="w-3.5 h-3.5" />
                   Waiting for confirmation… ({remainingSeconds}s)
                 </div>
-                <Button variant="ghost" size="sm" onClick={reset} className="text-slate-500 hover:text-slate-300 hover:bg-slate-800 mt-2">
+                <Button
+                  className="w-full bg-green-700 hover:bg-green-600 text-white font-semibold"
+                  onClick={() => { verifyTriggered.current = false; void triggerVerify(); }}
+                  disabled={verifyMutation.isPending}
+                >
+                  {verifyMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Checking…</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4 mr-2" /> I've Already Paid — Verify Now</>
+                  )}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={reset} className="text-slate-500 hover:text-slate-300 hover:bg-slate-800">
                   Cancel
                 </Button>
               </div>
