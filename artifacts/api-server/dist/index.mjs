@@ -144248,11 +144248,13 @@ function getMasterTradeExecutionQueue() {
 
 // src/routes/queue-monitor.ts
 var router26 = (0, import_express26.Router)();
+var EMERGENCY_KEY = "watchdog:emergency:paused";
+var EMERGENCY_TTL_SECONDS = 3600;
 router26.get("/admin/queue-monitor", requireAdmin, async (_req, res) => {
   const checkedAt = (/* @__PURE__ */ new Date()).toISOString();
   let redisStatus = "not_configured";
   let redisLatencyMs = null;
-  let redisUrl2 = (process.env.REDIS_URL ?? "redis://localhost:6379").replace(/:\/\/([^@]+)@/, "://<credentials>@");
+  const redisUrl2 = (process.env.REDIS_URL ?? "redis://localhost:6379").replace(/:\/\/([^@]+)@/, "://<credentials>@");
   try {
     if (!isRedisAvailable()) {
       redisStatus = "error";
@@ -144265,6 +144267,35 @@ router26.get("/admin/queue-monitor", requireAdmin, async (_req, res) => {
     }
   } catch {
     redisStatus = "error";
+  }
+  const killSwitch = {
+    active: false,
+    activatedAt: null,
+    ttlSeconds: null,
+    activatedBy: null
+  };
+  if (isRedisAvailable()) {
+    try {
+      const redis = getRedis();
+      const [val, ttl, meta] = await Promise.all([
+        redis.get(EMERGENCY_KEY),
+        redis.ttl(EMERGENCY_KEY),
+        redis.get(`${EMERGENCY_KEY}:meta`)
+      ]);
+      if (val !== null) {
+        killSwitch.active = true;
+        killSwitch.ttlSeconds = ttl > 0 ? ttl : null;
+        if (meta) {
+          try {
+            const parsed = JSON.parse(meta);
+            killSwitch.activatedAt = parsed.activatedAt ?? null;
+            killSwitch.activatedBy = parsed.activatedBy ?? null;
+          } catch {
+          }
+        }
+      }
+    } catch {
+    }
   }
   const QUEUE_DEFS = [
     { name: COPY_TRADE_QUEUE, label: "Copy Trade" },
@@ -144301,16 +144332,7 @@ router26.get("/admin/queue-monitor", requireAdmin, async (_req, res) => {
         }
         await q.close();
       } catch {
-        queues.push({
-          name,
-          label,
-          waiting: 0,
-          active: 0,
-          completed: 0,
-          failed: 0,
-          delayed: 0,
-          paused: 0
-        });
+        queues.push({ name, label, waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, paused: 0 });
       }
     }
   } else {
@@ -144322,9 +144344,62 @@ router26.get("/admin/queue-monitor", requireAdmin, async (_req, res) => {
   res.json({
     checkedAt,
     redis: { status: redisStatus, latencyMs: redisLatencyMs, url: redisUrl2 },
+    killSwitch,
     queues,
     recentFailed: recentFailed.slice(0, 20)
   });
+});
+router26.post("/admin/kill-switch", requireAdmin, async (req, res) => {
+  const { active, reason } = req.body;
+  let adminEmail = "unknown";
+  try {
+    const userId = req.userId;
+    if (userId) {
+      const [user] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, userId));
+      if (user) adminEmail = user.email;
+    }
+  } catch {
+  }
+  if (!isRedisAvailable()) {
+    res.status(503).json({ error: "Redis is not available \u2014 kill switch requires Redis" });
+    return;
+  }
+  const redis = getRedis();
+  const queue = getCopyTradeQueue();
+  if (active) {
+    const meta = JSON.stringify({
+      activatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      activatedBy: adminEmail,
+      reason: reason ?? "Manual admin action"
+    });
+    await redis.set(EMERGENCY_KEY, "1", "EX", EMERGENCY_TTL_SECONDS);
+    await redis.set(`${EMERGENCY_KEY}:meta`, meta, "EX", EMERGENCY_TTL_SECONDS + 60);
+    await queue.pause();
+    logger.warn(
+      { activatedBy: adminEmail, reason },
+      "Kill switch ACTIVATED \u2014 copy-trade queue paused by admin"
+    );
+    await writeAuditLog(
+      "KILL_SWITCH_ACTIVATED",
+      { activatedBy: adminEmail, reason: reason ?? "Manual admin action", ttlSeconds: EMERGENCY_TTL_SECONDS },
+      "WARN"
+    );
+    res.json({ active: true, message: "Kill switch activated \u2014 copy-trade queue paused" });
+  } else {
+    await redis.del(EMERGENCY_KEY);
+    await redis.del(`${EMERGENCY_KEY}:meta`);
+    await queue.resume();
+    logger.info(
+      { deactivatedBy: adminEmail },
+      "Kill switch DEACTIVATED \u2014 copy-trade queue resumed by admin"
+    );
+    await writeAuditLog(
+      "KILL_SWITCH_DEACTIVATED",
+      { deactivatedBy: adminEmail },
+      "INFO"
+    );
+    res.json({ active: false, message: "Kill switch deactivated \u2014 copy-trade queue resumed" });
+  }
 });
 var queue_monitor_default = router26;
 
@@ -144558,7 +144633,7 @@ async function checkSpreadGuard(metaApiId, symbol2) {
 
 // src/lib/copy-trade-worker.ts
 var CONCURRENCY = 10;
-var EMERGENCY_KEY = "watchdog:emergency:paused";
+var EMERGENCY_KEY2 = "watchdog:emergency:paused";
 function startCopyTradeWorker() {
   const worker = new import_bullmq4.Worker(
     COPY_TRADE_QUEUE,
@@ -144569,7 +144644,7 @@ function startCopyTradeWorker() {
         "Copy trade worker: processing job"
       );
       const redis = getRedis();
-      const emergency = await redis.get(EMERGENCY_KEY);
+      const emergency = await redis.get(EMERGENCY_KEY2);
       if (emergency) {
         logger.warn(
           { logId, symbol: trade.symbol },
@@ -144661,7 +144736,7 @@ var CHECK_INTERVAL_MS = 1e4;
 var DISCONNECT_THRESHOLD_MS = 6e4;
 var HEARTBEAT_KEY = (metaApiId) => `watchdog:heartbeat:${metaApiId}`;
 var ABSENT_SINCE_KEY = (metaApiId) => `watchdog:absent_since:${metaApiId}`;
-var EMERGENCY_KEY2 = "watchdog:emergency:paused";
+var EMERGENCY_KEY3 = "watchdog:emergency:paused";
 async function updateMasterHeartbeat(metaApiId) {
   let redis;
   try {
@@ -144715,9 +144790,9 @@ async function runWatchdogCycle() {
       );
     }
   }
-  const emergencyActive = await redis.get(EMERGENCY_KEY2);
+  const emergencyActive = await redis.get(EMERGENCY_KEY3);
   if (anyDisconnected && !emergencyActive) {
-    await redis.set(EMERGENCY_KEY2, "1", "EX", 3600);
+    await redis.set(EMERGENCY_KEY3, "1", "EX", 3600);
     await queue.pause();
     logger.error("Watchdog: EMERGENCY \u2014 queue paused due to master disconnection");
     await writeAuditLog(
@@ -144726,7 +144801,7 @@ async function runWatchdogCycle() {
       "ERROR"
     );
   } else if (!anyDisconnected && emergencyActive) {
-    await redis.del(EMERGENCY_KEY2);
+    await redis.del(EMERGENCY_KEY3);
     await queue.resume();
     logger.info("Watchdog: all masters recovered \u2014 queue resumed");
     await writeAuditLog("EMERGENCY_RESOLVED", { masterIds }, "INFO");

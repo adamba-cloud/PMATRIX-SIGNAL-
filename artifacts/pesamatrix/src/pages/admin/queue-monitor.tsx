@@ -1,8 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -12,9 +23,10 @@ import {
 import {
   Activity, RefreshCw, Loader2, CheckCircle2, XCircle,
   Clock, AlertTriangle, Zap, ServerCrash, ListTodo, Play,
-  CheckCheck, Ban, Timer,
+  CheckCheck, Ban, Timer, ShieldAlert, ShieldCheck, User,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +34,13 @@ type RedisInfo = {
   status: "ok" | "error" | "not_configured";
   latencyMs: number | null;
   url: string;
+};
+
+type KillSwitchStatus = {
+  active: boolean;
+  activatedAt: string | null;
+  ttlSeconds: number | null;
+  activatedBy: string | null;
 };
 
 type QueueStats = {
@@ -47,19 +66,176 @@ type FailedJob = {
 type QueueMonitorData = {
   checkedAt: string;
   redis: RedisInfo;
+  killSwitch: KillSwitchStatus;
   queues: QueueStats[];
   recentFailed: FailedJob[];
 };
 
-// ─── Throughput tracker ────────────────────────────────────────────────────────
-// We record completed-job counts from each poll and compute deltas to draw a
-// bar chart showing jobs completed per 5-second interval (last 60 samples = 5 min).
+// ─── Throughput tracker ───────────────────────────────────────────────────────
 
 const MAX_SAMPLES = 60;
-
 type Sample = { ts: number; completed: Record<string, number> };
 
-// ─── Redis health badge ────────────────────────────────────────────────────────
+// ─── Kill switch panel ────────────────────────────────────────────────────────
+
+function KillSwitchPanel({
+  killSwitch,
+  onToggle,
+  isToggling,
+}: {
+  killSwitch: KillSwitchStatus;
+  onToggle: (active: boolean, reason?: string) => void;
+  isToggling: boolean;
+}) {
+  const [reason, setReason] = useState("");
+  const active = killSwitch.active;
+
+  // Reset reason when dialog closes
+  const handleActivate = () => {
+    onToggle(true, reason || undefined);
+    setReason("");
+  };
+
+  const handleDeactivate = () => {
+    onToggle(false);
+  };
+
+  return (
+    <Card className={`border-2 transition-colors ${active ? "border-red-500/50 bg-red-500/5" : "border-slate-700 bg-slate-900"}`}>
+      <CardContent className="pt-5 pb-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* Status side */}
+          <div className="flex items-start gap-4">
+            <div className={`rounded-xl p-3 shrink-0 ${active ? "bg-red-500/15 text-red-400" : "bg-green-500/10 text-green-400"}`}>
+              {active ? <ShieldAlert className="w-6 h-6" /> : <ShieldCheck className="w-6 h-6" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <h3 className="text-base font-semibold text-slate-100">Copy Trade Kill Switch</h3>
+                {active ? (
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 animate-pulse">
+                    ⏸ PAUSED
+                  </span>
+                ) : (
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-green-500/15 text-green-400 border border-green-500/30">
+                    ▶ RUNNING
+                  </span>
+                )}
+              </div>
+              {active ? (
+                <div className="space-y-0.5">
+                  <p className="text-sm text-red-300/80">
+                    All copy trades are paused. New jobs are delayed until the switch is released.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3 mt-2">
+                    {killSwitch.activatedBy && (
+                      <span className="flex items-center gap-1 text-xs text-slate-500">
+                        <User className="w-3 h-3" />
+                        {killSwitch.activatedBy}
+                      </span>
+                    )}
+                    {killSwitch.activatedAt && (
+                      <span className="flex items-center gap-1 text-xs text-slate-500">
+                        <Clock className="w-3 h-3" />
+                        {formatDistanceToNow(new Date(killSwitch.activatedAt), { addSuffix: true })}
+                      </span>
+                    )}
+                    {killSwitch.ttlSeconds !== null && (
+                      <span className="flex items-center gap-1 text-xs text-yellow-500/80">
+                        <Timer className="w-3 h-3" />
+                        Auto-resumes in {Math.floor(killSwitch.ttlSeconds / 60)}m {killSwitch.ttlSeconds % 60}s
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400">
+                  Copy trade queue is running normally. Use this to instantly halt all trade execution.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Action button side */}
+          <div className="shrink-0 self-center">
+            {active ? (
+              // Resume — no confirmation needed
+              <Button
+                onClick={handleDeactivate}
+                disabled={isToggling}
+                className="bg-green-600 hover:bg-green-500 text-white font-semibold px-6 gap-2 min-w-[160px]"
+              >
+                {isToggling ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4" />
+                )}
+                Resume Trading
+              </Button>
+            ) : (
+              // Pause — requires confirmation
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    disabled={isToggling}
+                    className="font-semibold px-6 gap-2 min-w-[160px]"
+                  >
+                    {isToggling ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ShieldAlert className="w-4 h-4" />
+                    )}
+                    Pause All Trades
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-slate-900 border-slate-700 text-slate-100">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2 text-red-400">
+                      <ShieldAlert className="w-5 h-5" />
+                      Activate Kill Switch?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-slate-400">
+                      This will immediately <strong className="text-slate-200">pause all copy trade jobs</strong> and delay any new ones by 30 seconds. The queue auto-resumes after 1 hour, or you can release it manually.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <div className="mt-1">
+                    <label className="text-xs text-slate-400 block mb-1.5">
+                      Reason <span className="text-slate-600">(optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="e.g. High spread event, MetaApi issue…"
+                      className="w-full rounded-md border border-slate-700 bg-slate-800 text-slate-100 text-sm px-3 py-2 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                    />
+                  </div>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel
+                      className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800"
+                      onClick={() => setReason("")}
+                    >
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleActivate}
+                      className="bg-red-600 hover:bg-red-500 text-white font-semibold"
+                    >
+                      Yes, Pause All Trades
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Redis health card ────────────────────────────────────────────────────────
 
 function RedisCard({ redis, checkedAt }: { redis: RedisInfo; checkedAt: string }) {
   const ok = redis.status === "ok";
@@ -102,7 +278,7 @@ function RedisCard({ redis, checkedAt }: { redis: RedisInfo; checkedAt: string }
   );
 }
 
-// ─── Single metric chip ────────────────────────────────────────────────────────
+// ─── Metric chip ──────────────────────────────────────────────────────────────
 
 function MetricChip({
   icon: Icon,
@@ -115,13 +291,13 @@ function MetricChip({
   value: number;
   color: "slate" | "blue" | "green" | "red" | "yellow" | "orange";
 }) {
-  const colorMap = {
-    slate: "bg-slate-700/40 text-slate-400",
-    blue:  "bg-blue-500/10 text-blue-400",
-    green: "bg-green-500/10 text-green-400",
-    red:   "bg-red-500/10 text-red-400",
-    yellow:"bg-yellow-500/10 text-yellow-400",
-    orange:"bg-orange-500/10 text-orange-400",
+  const colorMap: Record<string, string> = {
+    slate:  "bg-slate-700/40 text-slate-400",
+    blue:   "bg-blue-500/10 text-blue-400",
+    green:  "bg-green-500/10 text-green-400",
+    red:    "bg-red-500/10 text-red-400",
+    yellow: "bg-yellow-500/10 text-yellow-400",
+    orange: "bg-orange-500/10 text-orange-400",
   };
 
   return (
@@ -138,51 +314,47 @@ function MetricChip({
 // ─── Queue depth card ─────────────────────────────────────────────────────────
 
 function QueueCard({ queue }: { queue: QueueStats }) {
-  const hasIssues = queue.failed > 0 || queue.active > 0;
-
   return (
     <Card className={`border ${queue.failed > 0 ? "border-red-500/20" : "border-slate-800"} bg-slate-900`}>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-semibold text-slate-200">{queue.label}</CardTitle>
-          {hasIssues && queue.failed > 0 && (
-            <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">
-              <AlertTriangle className="w-3 h-3" />
-              {queue.failed} failed
-            </span>
-          )}
-          {queue.active > 0 && (
-            <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 animate-pulse">
-              <Play className="w-3 h-3" />
-              {queue.active} active
-            </span>
-          )}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <CardTitle className="text-sm font-semibold text-slate-200">{queue.label}</CardTitle>
+            <p className="text-xs text-slate-600 font-mono mt-0.5">{queue.name}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {queue.failed > 0 && (
+              <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">
+                <AlertTriangle className="w-3 h-3" />
+                {queue.failed} failed
+              </span>
+            )}
+            {queue.active > 0 && (
+              <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 animate-pulse">
+                <Play className="w-3 h-3" />
+                {queue.active} active
+              </span>
+            )}
+          </div>
         </div>
-        <p className="text-xs text-slate-600 font-mono">{queue.name}</p>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 gap-2">
-          <MetricChip icon={ListTodo}  label="Waiting"   value={queue.waiting}   color="slate" />
-          <MetricChip icon={Play}      label="Active"    value={queue.active}    color="blue" />
-          <MetricChip icon={CheckCheck}label="Completed" value={queue.completed} color="green" />
-          <MetricChip icon={Ban}       label="Failed"    value={queue.failed}    color={queue.failed > 0 ? "red" : "slate"} />
-          <MetricChip icon={Timer}     label="Delayed"   value={queue.delayed}   color={queue.delayed > 0 ? "yellow" : "slate"} />
-          <MetricChip icon={ServerCrash} label="Paused" value={queue.paused}    color={queue.paused > 0 ? "orange" : "slate"} />
+          <MetricChip icon={ListTodo}    label="Waiting"   value={queue.waiting}   color="slate" />
+          <MetricChip icon={Play}        label="Active"    value={queue.active}    color="blue" />
+          <MetricChip icon={CheckCheck}  label="Completed" value={queue.completed} color="green" />
+          <MetricChip icon={Ban}         label="Failed"    value={queue.failed}    color={queue.failed > 0 ? "red" : "slate"} />
+          <MetricChip icon={Timer}       label="Delayed"   value={queue.delayed}   color={queue.delayed > 0 ? "yellow" : "slate"} />
+          <MetricChip icon={ServerCrash} label="Paused"    value={queue.paused}    color={queue.paused > 0 ? "orange" : "slate"} />
         </div>
       </CardContent>
     </Card>
   );
 }
 
-// ─── Throughput chart ──────────────────────────────────────────────────────────
+// ─── Throughput chart ─────────────────────────────────────────────────────────
 
-function ThroughputChart({
-  samples,
-  queues,
-}: {
-  samples: Sample[];
-  queues: QueueStats[];
-}) {
+function ThroughputChart({ samples, queues }: { samples: Sample[]; queues: QueueStats[] }) {
   if (samples.length < 2) {
     return (
       <div className="flex items-center justify-center h-40 text-slate-600 text-sm gap-2">
@@ -192,37 +364,22 @@ function ThroughputChart({
     );
   }
 
+  const COLORS = ["#22c55e", "#60a5fa", "#f59e0b", "#f87171"];
+
   const chartData = samples.slice(1).map((s, i) => {
     const prev = samples[i];
-    const entry: Record<string, number | string> = {
-      ts: format(new Date(s.ts), "HH:mm:ss"),
-    };
+    const entry: Record<string, number | string> = { ts: format(new Date(s.ts), "HH:mm:ss") };
     for (const q of queues) {
-      const curr = s.completed[q.name] ?? 0;
-      const p = prev.completed[q.name] ?? 0;
-      entry[q.label] = Math.max(0, curr - p);
+      entry[q.label] = Math.max(0, (s.completed[q.name] ?? 0) - (prev.completed[q.name] ?? 0));
     }
     return entry;
   });
 
-  const COLORS = ["#22c55e", "#60a5fa", "#f59e0b", "#f87171"];
-
   return (
     <ResponsiveContainer width="100%" height={160}>
       <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-        <XAxis
-          dataKey="ts"
-          tick={{ fill: "#64748b", fontSize: 10 }}
-          tickLine={false}
-          axisLine={false}
-          interval="preserveStartEnd"
-        />
-        <YAxis
-          tick={{ fill: "#64748b", fontSize: 10 }}
-          tickLine={false}
-          axisLine={false}
-          allowDecimals={false}
-        />
+        <XAxis dataKey="ts" tick={{ fill: "#64748b", fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+        <YAxis tick={{ fill: "#64748b", fontSize: 10 }} tickLine={false} axisLine={false} allowDecimals={false} />
         <Tooltip
           contentStyle={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 8, fontSize: 12 }}
           labelStyle={{ color: "#94a3b8" }}
@@ -230,9 +387,7 @@ function ThroughputChart({
         />
         {queues.map((q, i) => (
           <Bar key={q.name} dataKey={q.label} stackId="a" fill={COLORS[i % COLORS.length]} radius={i === queues.length - 1 ? [3, 3, 0, 0] : undefined}>
-            {chartData.map((_entry, idx) => (
-              <Cell key={idx} fill={COLORS[i % COLORS.length]} />
-            ))}
+            {chartData.map((_e, idx) => <Cell key={idx} fill={COLORS[i % COLORS.length]} />)}
           </Bar>
         ))}
       </BarChart>
@@ -257,7 +412,7 @@ function FailedJobsTable({ jobs }: { jobs: FailedJob[] }) {
       <Table>
         <TableHeader className="bg-slate-950/50">
           <TableRow className="border-slate-800 hover:bg-transparent">
-            <TableHead className="text-slate-400 w-32">Queue</TableHead>
+            <TableHead className="text-slate-400 w-36">Queue</TableHead>
             <TableHead className="text-slate-400">Job Name</TableHead>
             <TableHead className="text-slate-400">Error</TableHead>
             <TableHead className="text-slate-400 w-16 text-center">Attempts</TableHead>
@@ -272,21 +427,13 @@ function FailedJobsTable({ jobs }: { jobs: FailedJob[] }) {
                   {job.queue}
                 </span>
               </TableCell>
-              <TableCell className="font-mono text-xs text-slate-300 max-w-[200px] truncate">
-                {job.name}
-              </TableCell>
+              <TableCell className="font-mono text-xs text-slate-300 max-w-[200px] truncate">{job.name}</TableCell>
               <TableCell className="text-xs text-red-400 max-w-[300px]">
-                <span className="line-clamp-2" title={job.failedReason}>
-                  {job.failedReason}
-                </span>
+                <span className="line-clamp-2" title={job.failedReason}>{job.failedReason}</span>
               </TableCell>
-              <TableCell className="text-center text-xs text-slate-500">
-                {job.attemptsMade}
-              </TableCell>
+              <TableCell className="text-center text-xs text-slate-500">{job.attemptsMade}</TableCell>
               <TableCell className="text-right text-xs text-slate-500">
-                {job.finishedOn
-                  ? formatDistanceToNow(new Date(job.finishedOn), { addSuffix: true })
-                  : "—"}
+                {job.finishedOn ? formatDistanceToNow(new Date(job.finishedOn), { addSuffix: true }) : "—"}
               </TableCell>
             </TableRow>
           ))}
@@ -301,29 +448,62 @@ function FailedJobsTable({ jobs }: { jobs: FailedJob[] }) {
 export default function QueueMonitor() {
   const [samples, setSamples] = useState<Sample[]>([]);
   const samplesRef = useRef<Sample[]>([]);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const QUERY_KEY = ["admin-queue-monitor"];
 
   const { data, isLoading, isFetching, refetch, dataUpdatedAt } = useQuery<QueueMonitorData>({
-    queryKey: ["admin-queue-monitor"],
+    queryKey: QUERY_KEY,
     queryFn: () => customFetch<QueueMonitorData>("/api/admin/queue-monitor"),
     refetchInterval: 5_000,
     staleTime: 4_000,
   });
 
-  // Record sample on every successful fetch
+  // Record throughput samples
   useEffect(() => {
     if (!data) return;
     const completed: Record<string, number> = {};
     for (const q of data.queues) completed[q.name] = q.completed;
-
     const next = [...samplesRef.current, { ts: Date.now(), completed }];
     if (next.length > MAX_SAMPLES) next.splice(0, next.length - MAX_SAMPLES);
     samplesRef.current = next;
     setSamples([...next]);
   }, [data]);
 
-  const totalActive = data?.queues.reduce((s, q) => s + q.active, 0) ?? 0;
-  const totalFailed = data?.queues.reduce((s, q) => s + q.failed, 0) ?? 0;
+  // Kill switch mutation
+  const toggleMutation = useMutation({
+    mutationFn: ({ active, reason }: { active: boolean; reason?: string }) =>
+      customFetch<{ active: boolean; message: string }>("/api/admin/kill-switch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active, reason }),
+      }),
+    onSuccess: (result, vars) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast({
+        title: vars.active ? "Kill switch activated" : "Kill switch released",
+        description: result.message,
+        variant: vars.active ? "destructive" : "default",
+      });
+    },
+    onError: (err) => {
+      toast({
+        title: "Kill switch error",
+        description: err instanceof Error ? err.message : "Failed to toggle kill switch",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleKillSwitchToggle = (active: boolean, reason?: string) => {
+    toggleMutation.mutate({ active, reason });
+  };
+
+  const totalActive  = data?.queues.reduce((s, q) => s + q.active,  0) ?? 0;
+  const totalFailed  = data?.queues.reduce((s, q) => s + q.failed,  0) ?? 0;
   const totalWaiting = data?.queues.reduce((s, q) => s + q.waiting, 0) ?? 0;
+  const killActive   = data?.killSwitch.active ?? false;
 
   return (
     <div className="space-y-6">
@@ -335,11 +515,17 @@ export default function QueueMonitor() {
             Queue Monitor
           </h2>
           <p className="text-slate-400 mt-1">
-            Live BullMQ queue depth, job throughput, and Redis health.
+            Live BullMQ queue depth, job throughput, Redis health, and emergency kill switch.
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          {totalActive > 0 && (
+          {killActive && (
+            <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 animate-pulse">
+              <ShieldAlert className="w-3 h-3" />
+              PAUSED
+            </span>
+          )}
+          {!killActive && totalActive > 0 && (
             <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/25 animate-pulse">
               <Play className="w-3 h-3" />
               {totalActive} active
@@ -375,6 +561,13 @@ export default function QueueMonitor() {
         </Card>
       ) : (
         <>
+          {/* Kill switch — always at top */}
+          <KillSwitchPanel
+            killSwitch={data.killSwitch}
+            onToggle={handleKillSwitchToggle}
+            isToggling={toggleMutation.isPending}
+          />
+
           {/* Summary chips */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <Card className="bg-slate-900 border-slate-800">
@@ -410,9 +603,7 @@ export default function QueueMonitor() {
 
           {/* Queue depth cards */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {data.queues.map((q) => (
-              <QueueCard key={q.name} queue={q} />
-            ))}
+            {data.queues.map((q) => <QueueCard key={q.name} queue={q} />)}
           </div>
 
           {/* Throughput chart */}
@@ -428,7 +619,6 @@ export default function QueueMonitor() {
             </CardHeader>
             <CardContent>
               <ThroughputChart samples={samples} queues={data.queues} />
-              {/* Legend */}
               <div className="flex gap-4 mt-3 flex-wrap">
                 {data.queues.map((q, i) => {
                   const COLORS = ["#22c55e", "#60a5fa", "#f59e0b", "#f87171"];
