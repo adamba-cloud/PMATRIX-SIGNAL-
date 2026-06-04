@@ -15,6 +15,9 @@ import { startMasterTradeListener } from "./lib/master-trade-listener";
 import { startMasterTradeExecutionWorker } from "./lib/master-trade-execution-worker";
 import { waitForRedis } from "./lib/redis";
 
+const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
+logger.info({ redisUrl: redisUrl.replace(/:\/\/([^@]+)@/, "://<credentials>@") }, "Redis: REDIS_URL resolved");
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {

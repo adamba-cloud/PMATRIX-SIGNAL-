@@ -145508,6 +145508,8 @@ function startMasterTradeExecutionWorker() {
 }
 
 // src/index.ts
+var redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
+logger.info({ redisUrl: redisUrl.replace(/:\/\/([^@]+)@/, "://<credentials>@") }, "Redis: REDIS_URL resolved");
 var rawPort = process.env["PORT"];
 if (!rawPort) {
   throw new Error(
