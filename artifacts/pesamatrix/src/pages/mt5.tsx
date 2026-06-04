@@ -52,63 +52,164 @@ import {
 
 // ─── Broker server list ───────────────────────────────────────────────────────
 // Common MT5 broker servers, especially popular in Kenya / East Africa.
-// Users can always type any server name not in this list.
+// Includes both live and demo/trial servers. Users can also type any server
+// name not in this list (free-text entry is always allowed).
 const BROKER_SERVERS: { broker: string; servers: string[] }[] = [
   {
     broker: "Exness",
     servers: [
+      // Live
       "Exness-MT5Real",
       "Exness-MT5Real2",
+      "Exness-MT5Real3",
       "Exness-MT5Real4",
+      "Exness-MT5Real5",
       "Exness-MT5Real6",
+      "Exness-MT5Real7",
       "Exness-MT5Real8",
+      "Exness-MT5Real9",
       "Exness-MT5Real10",
+      // Demo / Trial
       "Exness-MT5Trial1",
+      "Exness-MT5Trial2",
+      "Exness-MT5Trial3",
+      "Exness-MT5Trial4",
+      "Exness-MT5Trial5",
+      "Exness-MT5Trial6",
+      "Exness-MT5Trial7",
+      "Exness-MT5Trial8",
+      "Exness-MT5Trial9",
     ],
   },
   {
     broker: "XM / XMTrading",
-    servers: ["XMTrading-MT5 1", "XMTrading-MT5 2", "XMTrading-MT5 3", "XM-Real", "XM-Demo"],
+    servers: [
+      "XMTrading-MT5 1",
+      "XMTrading-MT5 2",
+      "XMTrading-MT5 3",
+      "XMTrading-MT5 4",
+      "XM-Real",
+      "XM-Demo",
+      "XM-Demo 2",
+    ],
   },
   {
     broker: "ICMarkets",
-    servers: ["ICMarkets-MT5-2", "ICMarkets-Live02", "ICMarkets-Demo01", "ICMarketsSC-MT5-2"],
+    servers: [
+      "ICMarkets-MT5-2",
+      "ICMarkets-Live02",
+      "ICMarkets-Live03",
+      "ICMarkets-Demo01",
+      "ICMarkets-Demo02",
+      "ICMarketsSC-MT5-2",
+      "ICMarketsSC-Demo-1",
+    ],
   },
   {
     broker: "Pepperstone",
-    servers: ["Pepperstone-MT5-Live01", "Pepperstone-Demo01", "PepperstoneSC-MT5-Live01"],
+    servers: [
+      "Pepperstone-MT5-Live01",
+      "Pepperstone-MT5-Live02",
+      "Pepperstone-Demo01",
+      "Pepperstone-Demo02",
+      "PepperstoneSC-MT5-Live01",
+      "PepperstoneSC-Demo-1",
+    ],
   },
   {
     broker: "HFM / HotForex",
-    servers: ["HFMarkets-MT5Live", "HFMarkets-MT5Demo", "HFMarketsKE-MT5Live"],
+    servers: [
+      "HFMarkets-MT5Live",
+      "HFMarkets-MT5Live 2",
+      "HFMarkets-MT5Demo",
+      "HFMarketsKE-MT5Live",
+      "HFMarketsKE-MT5Demo",
+    ],
   },
   {
     broker: "FXTM / ForexTime",
-    servers: ["FXTM-Real11", "FXTM-MT5 Demo", "ForexTimeFXTM-Server"],
+    servers: [
+      "FXTM-Real11",
+      "FXTM-Real13",
+      "FXTM-MT5 Demo",
+      "FXTM-MT5 Demo 2",
+      "ForexTimeFXTM-Server",
+    ],
   },
   {
     broker: "OctaFX",
-    servers: ["OctaFX-MT5", "OctaFX-Demo"],
+    servers: ["OctaFX-MT5", "OctaFX-MT5 2", "OctaFX-Demo", "OctaFX-Demo 2"],
   },
   {
     broker: "Deriv",
-    servers: ["DerivSVG-Server", "Deriv-Server", "DerivFX-Server"],
+    servers: [
+      "DerivSVG-Server",
+      "Deriv-Server",
+      "DerivFX-Server",
+      "Deriv-Demo",
+      "DerivSVG-Demo",
+    ],
   },
   {
     broker: "FBS",
-    servers: ["FBS-Real", "FBS-Demo", "FBSPrime-Real"],
+    servers: ["FBS-Real", "FBS-Real 2", "FBS-Demo", "FBSPrime-Real", "FBSPrime-Demo"],
   },
   {
     broker: "Avatrade",
-    servers: ["AvaTrade-MT5", "AvaTrade-MT5 1"],
+    servers: ["AvaTrade-MT5", "AvaTrade-MT5 1", "AvaTrade-MT5 Demo"],
   },
   {
     broker: "OANDA",
-    servers: ["OANDA-v20 Live-1", "OANDA-v20 Practice-1"],
+    servers: ["OANDA-v20 Live-1", "OANDA-v20 Live-2", "OANDA-v20 Practice-1"],
   },
   {
     broker: "FxPro",
-    servers: ["FxPro-MT5-Trial", "FxPro-MT5Real7"],
+    servers: [
+      "FxPro-MT5Real2",
+      "FxPro-MT5Real7",
+      "FxPro-MT5-Trial",
+      "FxPro-MT5-Trial2",
+    ],
+  },
+  {
+    broker: "FTMO",
+    servers: ["FTMO-Server", "FTMO-Server 2", "FTMO-Demo", "FTMO-Demo 2"],
+  },
+  {
+    broker: "MyFundedFx",
+    servers: ["MyFundedFX-Live", "MyFundedFX-Demo"],
+  },
+  {
+    broker: "The5ers",
+    servers: ["The5ers-Server", "The5ers-Demo"],
+  },
+  {
+    broker: "Eightcap",
+    servers: ["Eightcap-Live", "Eightcap-Live 2", "Eightcap-Demo"],
+  },
+  {
+    broker: "Tickmill",
+    servers: ["Tickmill-Live", "Tickmill-Demo"],
+  },
+  {
+    broker: "Alpari",
+    servers: ["Alpari-MT5", "Alpari-Demo", "AlpariGroup-MT5"],
+  },
+  {
+    broker: "LiteFinance",
+    servers: ["LiteFinance-MT5", "LiteFinance-MT5-Demo"],
+  },
+  {
+    broker: "InstaForex",
+    servers: ["InstaForex-Server", "InstaForex-Demo"],
+  },
+  {
+    broker: "Amarkets",
+    servers: ["AMarkets-MT5-Real", "AMarkets-MT5-Demo"],
+  },
+  {
+    broker: "EasyMarkets",
+    servers: ["easyMarkets-MT5", "easyMarkets-MT5-Demo"],
   },
 ];
 
