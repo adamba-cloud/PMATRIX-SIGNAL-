@@ -138212,8 +138212,16 @@ function getRedis() {
   }
   if (!_redis) {
     const url2 = process.env.REDIS_URL ?? "redis://localhost:6379";
+    const isLocalhost = url2.includes("localhost") || url2.includes("127.0.0.1");
     const displayUrl = url2.replace(/:\/\/([^@]+)@/, "://<credentials>@");
-    logger.info({ url: displayUrl }, "Redis: connecting");
+    if (isLocalhost) {
+      logger.warn(
+        { url: displayUrl },
+        "Redis: connecting to localhost \u2014 set REDIS_URL to an external instance (e.g. Upstash) for reliability"
+      );
+    } else {
+      logger.info({ url: displayUrl }, "Redis: connecting to external instance \u2713");
+    }
     _redis = new import_ioredis.default(url2, {
       // Required by BullMQ
       maxRetriesPerRequest: null,
@@ -144223,6 +144231,7 @@ function getCopyTradeQueue() {
         removeOnFail: { count: 500 }
       }
     });
+    logger.info({ queue: COPY_TRADE_QUEUE }, "Queue: copy-trade queue initialised \u2713");
   }
   return _queue;
 }
@@ -144242,6 +144251,7 @@ function getMasterTradeExecutionQueue() {
         removeOnFail: { count: 200 }
       }
     });
+    logger.info({ queue: MASTER_TRADE_EXECUTION_QUEUE }, "Queue: master-trade-execution queue initialised \u2713");
   }
   return _queue2;
 }

@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import { getRedis } from "./redis";
+import { logger } from "./logger";
 
 export const COPY_TRADE_QUEUE = "copy-trade";
 
@@ -32,6 +33,7 @@ export function getCopyTradeQueue(): Queue<CopyTradeJobData> {
         removeOnFail: { count: 500 },
       },
     });
+    logger.info({ queue: COPY_TRADE_QUEUE }, "Queue: copy-trade queue initialised ✓");
   }
   return _queue;
 }

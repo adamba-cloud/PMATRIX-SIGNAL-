@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "export NODE_ENV=development && redis-server --daemonize yes --logfile /tmp/redis.log && pnpm run build && pnpm run start",
+    "dev": "export NODE_ENV=development && if [ -z \"$REDIS_URL\" ]; then redis-server --daemonize yes --logfile /tmp/redis.log && until redis-cli ping 2>/dev/null | grep -q PONG; do sleep 0.3; done && echo '[Redis] Local Redis ready'; else echo '[Redis] Using external REDIS_URL'; fi && pnpm run build && node --enable-source-maps ./dist/index.mjs",
     "build": "node ./build.mjs",
-    "start": "redis-server --daemonize yes --logfile /tmp/redis.log; until redis-cli ping 2>/dev/null | grep -q PONG; do echo '[Redis] Waiting for Redis to be ready...'; sleep 0.3; done && echo '[Redis] Redis is ready' && node --enable-source-maps ./dist/index.mjs",
+    "start": "if [ -z \"$REDIS_URL\" ]; then redis-server --daemonize yes --logfile /tmp/redis.log && until redis-cli ping 2>/dev/null | grep -q PONG; do sleep 0.3; done && echo '[Redis] Local Redis ready'; else echo '[Redis] Using external REDIS_URL'; fi && node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

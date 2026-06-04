@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import { getRedis } from "./redis";
+import { logger } from "./logger";
 
 export const MASTER_TRADE_EXECUTION_QUEUE = "master-trade-execution";
 
@@ -30,6 +31,7 @@ export function getMasterTradeExecutionQueue(): Queue<MasterTradeExecutionJobDat
         removeOnFail: { count: 200 },
       },
     });
+    logger.info({ queue: MASTER_TRADE_EXECUTION_QUEUE }, "Queue: master-trade-execution queue initialised ✓");
   }
   return _queue;
 }

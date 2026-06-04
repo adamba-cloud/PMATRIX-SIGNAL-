@@ -15,10 +15,18 @@ export function getRedis(): Redis {
 
   if (!_redis) {
     const url = process.env.REDIS_URL ?? "redis://localhost:6379";
+    const isLocalhost = url.includes("localhost") || url.includes("127.0.0.1");
     // Mask credentials in log output
     const displayUrl = url.replace(/:\/\/([^@]+)@/, "://<credentials>@");
 
-    logger.info({ url: displayUrl }, "Redis: connecting");
+    if (isLocalhost) {
+      logger.warn(
+        { url: displayUrl },
+        "Redis: connecting to localhost — set REDIS_URL to an external instance (e.g. Upstash) for reliability"
+      );
+    } else {
+      logger.info({ url: displayUrl }, "Redis: connecting to external instance ✓");
+    }
 
     _redis = new Redis(url, {
       // Required by BullMQ
