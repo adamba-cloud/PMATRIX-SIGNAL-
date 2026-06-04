@@ -142344,14 +142344,15 @@ router10.post("/mt5/accounts", requireAuth, async (req, res) => {
     setImmediate(async () => {
       let metaApiId;
       try {
-        const domain2 = process.env.REPLIT_DEV_DOMAIN;
-        const webhookUrl = domain2 ? `https://${domain2}/api/metaapi/webhook` : void 0;
+        logger.info(
+          { mt5Login, brokerServer, name: `PESAMATRIX-${mt5Login}` },
+          "[MT5] Creating MetaApi account \u2014 payload logged"
+        );
         const created = await createMetaApiAccount({
           login: mt5Login,
           password: mt5Password,
           server: brokerServer,
-          name: `PESAMATRIX-${mt5Login}`,
-          webhookUrl
+          name: `PESAMATRIX-${mt5Login}`
         });
         metaApiId = created.id;
         await db.update(slaveAccountsTable).set({
@@ -142367,7 +142368,11 @@ router10.post("/mt5/accounts", requireAuth, async (req, res) => {
           updatedAt: /* @__PURE__ */ new Date()
         }).where(eq(slaveAccountsTable.id, account.id));
       } catch (err) {
-        logger.error({ err, accountId: account.id, metaApiId }, "Failed to provision MetaApi cloud terminal");
+        const rawMessage = err instanceof Error ? err.message : String(err);
+        logger.error(
+          { err, accountId: account.id, metaApiId, rawMessage },
+          "[MT5] Failed to provision MetaApi cloud terminal \u2014 full error above"
+        );
         await db.update(slaveAccountsTable).set({
           status: "ERROR",
           statusMessage: parseMetaApiError(err),

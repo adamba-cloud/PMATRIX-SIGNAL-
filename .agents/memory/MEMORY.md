@@ -5,3 +5,4 @@
 - [Reliability layer patterns](reliability-patterns.md) — BullMQ kill switch via queue.pause/resume + Redis emergency key; spread guard via EWMA avg in Redis + job.moveToDelayed; payment reconciler via Daraja STK query endpoint.
 - [Drizzle unique on populated table](drizzle-unique-populated.md) — drizzle-kit push on a table with existing rows + new UNIQUE column needs interactive TTY confirmation; bypass with raw SQL via executeSql (partial unique index `WHERE col IS NOT NULL` allows multiple NULLs).
 - [MetaApi correct REST API URLs](metaapi-urls.md) — metaapi.cloud is the marketing website; trading API is at mt-client-api-v1.{region}.agiliumtrade.ai.
+- [MetaApi webhookUrl rejection](metaapi-webhook-rejection.md) — Replit dev-tunnel URLs are rejected by MetaApi validation (HTTP 400), killing all slave account creation; never send webhookUrl from REPLIT_DEV_DOMAIN.
