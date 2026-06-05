@@ -11,7 +11,8 @@ import {
 import { logger } from "../lib/logger";
 
 const router = Router();
-const STRATEGY_ID = "pesamatrix";
+// CopyFactory strategy IDs must be exactly 4 alphanumeric characters.
+const STRATEGY_ID = "pesm";
 
 // ── GET /api/admin/copyfactory/diagnostic ─────────────────────────────────────
 // Returns the full state of:

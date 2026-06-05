@@ -10,9 +10,9 @@ import {
 } from "../lib/metaapi";
 import { logger } from "../lib/logger";
 
-// Fixed strategy ID — we always PUT to the same strategy so it's idempotent.
-// Stored in system_config as "copyFactoryStrategyId" after first creation.
-const STRATEGY_ID = "pesamatrix";
+// Fixed strategy ID — CopyFactory requires exactly 4 alphanumeric characters.
+// We use "pesm" (short for PESAMATRIX). Stored in system_config after first creation.
+const STRATEGY_ID = "pesm";
 
 const router = Router();
 

@@ -142073,7 +142073,7 @@ function encryptPassword(plaintext) {
 // src/lib/metaapi.ts
 var TRADING_BASE = `https://mt-client-api-v1.${process.env.METAAPI_REGION ?? "london"}.agiliumtrade.ai`;
 var MANAGEMENT_BASE = "https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai";
-var COPYFACTORY_BASE = "https://copyfactory-api-v1.agiliumtrade.agiliumtrade.ai";
+var COPYFACTORY_BASE = `https://copyfactory-api-v1.${process.env.METAAPI_REGION ?? "london"}.agiliumtrade.ai`;
 function token() {
   const t = process.env.METAAPI_TOKEN;
   if (!t) throw new Error("METAAPI_TOKEN environment variable is not set");
@@ -142286,8 +142286,7 @@ async function createOrUpdateCopyFactoryStrategy(strategyId, masterMetaApiId, na
   const body = {
     name,
     description: "Automated copy trading strategy managed by PESAMATRIX Signal",
-    positionLifecycle: "auto",
-    connectionId: masterMetaApiId,
+    accountId: masterMetaApiId,
     timeSettings: {
       lifetimeInHours: 876e3,
       // ~100 years — never expires
@@ -144277,7 +144276,7 @@ var smtp_default = router23;
 
 // src/routes/master.ts
 var import_express24 = __toESM(require_express2(), 1);
-var STRATEGY_ID = "pesamatrix";
+var STRATEGY_ID = "pesm";
 var router24 = (0, import_express24.Router)();
 async function getSystemConfigMap() {
   const rows = await db.select().from(systemConfigTable);
@@ -144660,7 +144659,7 @@ var queue_monitor_default = router26;
 // src/routes/copyfactory.ts
 var import_express27 = __toESM(require_express2(), 1);
 var router27 = (0, import_express27.Router)();
-var STRATEGY_ID2 = "pesamatrix";
+var STRATEGY_ID2 = "pesm";
 router27.get("/admin/copyfactory/diagnostic", requireAdmin, async (_req, res) => {
   const errors = {};
   const configRows = await db.select().from(systemConfigTable);

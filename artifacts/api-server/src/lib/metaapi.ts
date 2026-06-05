@@ -9,8 +9,9 @@ const TRADING_BASE = `https://mt-client-api-v1.${process.env.METAAPI_REGION ?? "
 const MANAGEMENT_BASE = "https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai";
 
 // CopyFactory API: strategy configuration and subscriber management
-// This is separate from the trading and management APIs.
-const COPYFACTORY_BASE = "https://copyfactory-api-v1.agiliumtrade.agiliumtrade.ai";
+// Must use region-based URL — the non-region hostname (agiliumtrade.agiliumtrade.ai)
+// has no DNS records and returns "fetch failed" (HTTP 000). Region-based URLs resolve fine.
+const COPYFACTORY_BASE = `https://copyfactory-api-v1.${process.env.METAAPI_REGION ?? "london"}.agiliumtrade.ai`;
 
 function token(): string {
   const t = process.env.METAAPI_TOKEN;
@@ -425,8 +426,7 @@ export async function deleteMetaApiAccount(metaApiId: string): Promise<void> {
 export interface CopyFactoryStrategyBody {
   name: string;
   description: string;
-  positionLifecycle: string;
-  connectionId: string;
+  accountId: string;
   timeSettings: {
     lifetimeInHours: number;
     openingIntervalInMinutes: number;
@@ -453,8 +453,7 @@ export async function createOrUpdateCopyFactoryStrategy(
   const body: CopyFactoryStrategyBody = {
     name,
     description: "Automated copy trading strategy managed by PESAMATRIX Signal",
-    positionLifecycle: "auto",
-    connectionId: masterMetaApiId,
+    accountId: masterMetaApiId,
     timeSettings: {
       lifetimeInHours: 876000,   // ~100 years — never expires
       openingIntervalInMinutes: 5,
