@@ -146214,6 +146214,11 @@ function startCopyTradeWorker() {
       "Copy trade worker: job permanently failed after all retries"
     );
   });
+  worker.pause().then(() => {
+    logger.info("Copy trade worker: paused \u2014 CopyFactory handles replication; queue polls suppressed");
+  }).catch((err) => {
+    logger.warn({ err }, "Copy trade worker: pause failed");
+  });
   logger.info({ concurrency: CONCURRENCY }, "Copy trade worker started");
   return worker;
 }

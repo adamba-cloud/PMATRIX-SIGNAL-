@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivitySquare, TrendingUp, ShieldCheck, Target, Loader2 } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { useForexPrices } from "@/hooks/useForexPrices";
+import { DashboardAdSection } from "@/components/dashboard-ad-section";
 
 const MARKET_PAIRS = ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSDT"];
 
@@ -72,6 +73,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <DashboardAdSection />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-4 bg-slate-900 border-slate-800">

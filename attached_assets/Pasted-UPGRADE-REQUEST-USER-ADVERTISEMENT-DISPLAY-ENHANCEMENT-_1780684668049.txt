@@ -1,0 +1,105 @@
+UPGRADE REQUEST: USER ADVERTISEMENT DISPLAY ENHANCEMENT
+
+IMPORTANT:
+
+This is an enhancement to the existing Advertisement System.
+
+Do NOT redesign or remove any existing advertisement functionality.
+
+The current advertisement workflow must remain unchanged:
+
+1. Users create and submit advertisements.
+2. Users pay the advertisement fee already configured by the Admin.
+3. Users select advertisement duration within the Admin-configured minimum and maximum days.
+4. Submitted advertisements remain pending until approved.
+5. Administrators review and approve or reject advertisements.
+6. Only approved advertisements are displayed.
+
+The existing advertisement fee settings, minimum days settings, maximum days settings, approval workflow, payment workflow, and advertisement creation process must remain exactly as they are.
+
+OBJECTIVE
+
+Improve the visibility and effectiveness of approved advertisements by creating a dedicated Advertisement Display Section on the User Dashboard.
+
+DASHBOARD LAYOUT UPDATE
+
+Current Layout:
+
+1. Dashboard Statistics Cards
+2. Performance Overview
+3. Live Market Overview
+
+New Layout:
+
+1. Dashboard Statistics Cards
+2. Advertisement Display Section
+3. Performance Overview
+4. Live Market Overview
+5. Existing Dashboard Sections
+
+Move the Performance Overview section below the Advertisement Display Section without changing its design or functionality.
+
+ADVERTISEMENT DISPLAY SECTION
+
+Create a professional advertisement section above Performance Overview.
+
+Display only:
+
+- Approved advertisements
+- Active advertisements
+- Paid advertisements
+- Non-expired advertisements
+
+The section should support:
+
+- Advertisement images
+- Advertisement videos
+- Promotional banners
+- Clickable advertisements
+
+ADVERTISEMENT CAROUSEL
+
+If multiple approved advertisements exist:
+
+- Display them in a carousel/slider.
+- Rotate automatically.
+- Use smooth transitions.
+- Support swipe gestures on mobile devices.
+- Display advertisements according to their configured settings.
+
+VIDEO SUPPORT
+
+For video advertisements:
+
+- Autoplay
+- Muted by default
+- Responsive sizing
+- Mobile friendly
+- Optimized loading
+
+ADVERTISEMENT VALIDATION
+
+The dashboard should only display advertisements that meet all of the following conditions:
+
+- Approved by Admin
+- Payment completed
+- Start date reached
+- Not expired
+- Active status enabled
+
+Expired or rejected advertisements must never appear on the dashboard.
+
+PERFORMANCE
+
+- Lazy-load advertisement media.
+- Optimize image loading.
+- Optimize video loading.
+- Prevent dashboard slowdown.
+
+FINAL REQUIREMENT
+
+This upgrade must only improve advertisement visibility and placement on the dashboard.
+
+The existing advertisement creation process, payment process, approval process, advertisement fees, minimum days settings, and maximum days settings must remain unchanged.
+
+Only add a professional Advertisement Display Section above the Performance Overview section so approved user advertisements become clearly visible to all users visiting the dashboard.

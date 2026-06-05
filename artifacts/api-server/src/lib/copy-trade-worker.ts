@@ -140,6 +140,16 @@ export function startCopyTradeWorker(): Worker<CopyTradeJobData> {
     );
   });
 
+  // CopyFactory is the primary trade-replication mechanism. Pause this worker
+  // immediately to prevent it from hammering Redis with bzpopmin polls while
+  // the queue is idle. It can be resumed via the queue-monitor admin panel if
+  // manual copy-trade job processing is ever needed.
+  worker.pause().then(() => {
+    logger.info("Copy trade worker: paused — CopyFactory handles replication; queue polls suppressed");
+  }).catch((err) => {
+    logger.warn({ err }, "Copy trade worker: pause failed");
+  });
+
   logger.info({ concurrency: CONCURRENCY }, "Copy trade worker started");
   return worker;
 }
