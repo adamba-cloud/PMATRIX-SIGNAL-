@@ -144339,33 +144339,45 @@ router24.get("/admin/master", requireAdmin, async (_req, res) => {
 router24.put("/admin/master", requireAdmin, async (req, res) => {
   const { accountId, enabled } = req.body;
   if (accountId !== void 0) {
-    if (typeof accountId !== "string" || accountId.trim().length === 0) {
-      res.status(400).json({ error: "accountId must be a non-empty string" });
+    if (typeof accountId !== "string") {
+      res.status(400).json({ error: "accountId must be a string" });
       return;
     }
     const trimmedId = accountId.trim();
-    await upsertConfig("masterMetaApiAccountId", trimmedId);
-    logger.info({ accountId: trimmedId }, "[Master] masterMetaApiAccountId updated");
-    if (process.env.METAAPI_TOKEN) {
+    let masterMetaApiIdForStrategy = null;
+    if (trimmedId.length > 0) {
+      await upsertConfig("masterMetaApiAccountId", trimmedId);
+      logger.info({ accountId: trimmedId }, "[Master] masterMetaApiAccountId updated");
+      masterMetaApiIdForStrategy = trimmedId;
+    } else {
+      const existingRows = await db.select().from(systemConfigTable).where(eq(systemConfigTable.key, "masterMetaApiAccountId"));
+      masterMetaApiIdForStrategy = existingRows[0]?.value ?? null;
+      if (masterMetaApiIdForStrategy) {
+        logger.info({ accountId: masterMetaApiIdForStrategy }, "[Master] Empty accountId in body \u2014 re-triggering CopyFactory with existing stored ID");
+      } else {
+        logger.warn("[Master] Empty accountId and no stored masterMetaApiAccountId \u2014 nothing to do");
+      }
+    }
+    if (masterMetaApiIdForStrategy && process.env.METAAPI_TOKEN) {
       try {
         logger.info(
-          { strategyId: STRATEGY_ID, masterMetaApiId: trimmedId },
+          { strategyId: STRATEGY_ID, masterMetaApiId: masterMetaApiIdForStrategy },
           "[CopyFactory] Creating/updating strategy for master account"
         );
-        await createOrUpdateCopyFactoryStrategy(STRATEGY_ID, trimmedId);
+        await createOrUpdateCopyFactoryStrategy(STRATEGY_ID, masterMetaApiIdForStrategy);
         await upsertConfig("copyFactoryStrategyId", STRATEGY_ID);
         logger.info(
-          { strategyId: STRATEGY_ID, masterMetaApiId: trimmedId },
+          { strategyId: STRATEGY_ID, masterMetaApiId: masterMetaApiIdForStrategy },
           "[CopyFactory] Strategy created/updated successfully \u2014 strategyId saved to system_config"
         );
       } catch (err) {
         const rawMessage = err instanceof Error ? err.message : String(err);
         logger.error(
-          { err, strategyId: STRATEGY_ID, masterMetaApiId: trimmedId, rawMessage },
+          { err, strategyId: STRATEGY_ID, masterMetaApiId: masterMetaApiIdForStrategy, rawMessage },
           "[CopyFactory] Failed to create/update strategy \u2014 check raw error above"
         );
       }
-    } else {
+    } else if (!process.env.METAAPI_TOKEN) {
       logger.warn("[CopyFactory] METAAPI_TOKEN not set \u2014 skipping strategy setup");
     }
   }
