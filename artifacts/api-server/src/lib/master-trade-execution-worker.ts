@@ -1,5 +1,5 @@
 import { Worker, type Job } from "bullmq";
-import { db, masterTradeEventsTable, slaveAccountsTable, copyTradeLinksTable, copyTradeLogsTable, mt5AccountSubscriptionsTable } from "@workspace/db";
+import { db, masterTradeEventsTable, slaveAccountsTable, copyTradeLogsTable, mt5AccountSubscriptionsTable, systemConfigTable } from "@workspace/db";
 import { and, eq, gt, isNotNull } from "drizzle-orm";
 import { getRedis } from "./redis";
 import {
@@ -205,6 +205,11 @@ async function executeOnSlave(params: {
 }
 
 // ── Fan-out to all active slaves ──────────────────────────────────────────────
+// BUG FIX: The original code looked up the master in slave_accounts table but
+// the master account lives in system_config (key: masterMetaApiAccountId), not
+// slave_accounts. This caused masterAccount to always be null and fan-out to
+// never execute. Fixed to read from system_config + fan out to all connected
+// slave_accounts directly (no copy_trade_links table needed for single-master).
 async function fanOutToSlaves(
   data: MasterTradeExecutionJobData
 ): Promise<void> {
@@ -222,53 +227,55 @@ async function fanOutToSlaves(
 
   const masterLots = volume ?? MIN_LOT_SIZE;
 
-  // 1. Resolve master account DB row
-  const [masterAccount] = await db
-    .select({ id: slaveAccountsTable.id })
-    .from(slaveAccountsTable)
-    .where(eq(slaveAccountsTable.metaApiAccountId, metaApiAccountId))
+  // 1. Verify this event is from the configured master account
+  const [masterConfigRow] = await db
+    .select({ value: systemConfigTable.value })
+    .from(systemConfigTable)
+    .where(eq(systemConfigTable.key, "masterMetaApiAccountId"))
     .limit(1);
 
-  if (!masterAccount) {
+  const configuredMasterId = masterConfigRow?.value ?? null;
+
+  if (!configuredMasterId) {
     logger.warn(
       { eventId, metaApiAccountId },
-      "[MasterTradeExecution] Master account not found in slave_accounts — no slave fan-out"
+      "[MasterTradeExecution] masterMetaApiAccountId not set in system_config — configure master account in Admin panel"
     );
     return;
   }
 
-  // 2. Find all active, connected slaves linked to this master
-  const links = await db
+  if (configuredMasterId !== metaApiAccountId) {
+    logger.warn(
+      { eventId, metaApiAccountId, configuredMasterId },
+      "[MasterTradeExecution] Event metaApiAccountId does not match configured master — skipping fan-out"
+    );
+    return;
+  }
+
+  // 2. Find all connected slave accounts directly (no copy_trade_links needed)
+  const slaves = await db
     .select({
-      slaveAccountId: copyTradeLinksTable.slaveAccountId,
-      slaveMetaApiId: slaveAccountsTable.metaApiAccountId,
+      id: slaveAccountsTable.id,
+      metaApiAccountId: slaveAccountsTable.metaApiAccountId,
     })
-    .from(copyTradeLinksTable)
-    .innerJoin(
-      slaveAccountsTable,
+    .from(slaveAccountsTable)
+    .where(
       and(
-        eq(copyTradeLinksTable.slaveAccountId, slaveAccountsTable.id),
         eq(slaveAccountsTable.status, "CONNECTED"),
         isNotNull(slaveAccountsTable.metaApiAccountId)
       )
-    )
-    .where(
-      and(
-        eq(copyTradeLinksTable.masterAccountId, masterAccount.id),
-        eq(copyTradeLinksTable.isActive, true)
-      )
     );
 
-  if (links.length === 0) {
+  if (slaves.length === 0) {
     logger.info(
-      { eventId, masterAccountId: masterAccount.id, symbol },
-      "[MasterTradeExecution] No active connected slave links — nothing to execute"
+      { eventId, configuredMasterId, symbol },
+      "[MasterTradeExecution] No connected slave accounts — nothing to execute"
     );
     return;
   }
 
   logger.info(
-    { eventId, masterAccountId: masterAccount.id, slaveCount: links.length, symbol, direction },
+    { eventId, configuredMasterId, slaveCount: slaves.length, symbol, direction },
     "[MasterTradeExecution] Fanning out to slaves"
   );
 
@@ -287,9 +294,12 @@ async function fanOutToSlaves(
     );
   }
 
+  // Use 0 as a virtual masterAccountId since master isn't in slave_accounts
+  const VIRTUAL_MASTER_ID = 0;
+
   // 4. Execute on all slaves concurrently; capture all outcomes
   const results = await Promise.allSettled(
-    links.map((link) =>
+    slaves.map((slave) =>
       executeOnSlave({
         eventId,
         positionId,
@@ -299,9 +309,9 @@ async function fanOutToSlaves(
         openPrice,
         stopLoss,
         takeProfit,
-        masterAccountId: masterAccount.id,
-        slaveAccountId: link.slaveAccountId,
-        slaveMetaApiId: link.slaveMetaApiId!,
+        masterAccountId: VIRTUAL_MASTER_ID,
+        slaveAccountId: slave.id,
+        slaveMetaApiId: slave.metaApiAccountId!,
         masterBalance,
       })
     )

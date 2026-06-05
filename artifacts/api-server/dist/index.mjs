@@ -20502,27 +20502,27 @@ var require_router = __commonJS({
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var methods = METHODS.map((method) => method.toLowerCase());
-    module.exports = Router28;
+    module.exports = Router29;
     module.exports.Route = Route;
-    function Router28(options) {
-      if (!(this instanceof Router28)) {
-        return new Router28(options);
+    function Router29(options) {
+      if (!(this instanceof Router29)) {
+        return new Router29(options);
       }
       const opts = options || {};
-      function router28(req, res, next) {
-        router28.handle(req, res, next);
+      function router29(req, res, next) {
+        router29.handle(req, res, next);
       }
-      Object.setPrototypeOf(router28, this);
-      router28.caseSensitive = opts.caseSensitive;
-      router28.mergeParams = opts.mergeParams;
-      router28.params = {};
-      router28.strict = opts.strict;
-      router28.stack = [];
-      return router28;
+      Object.setPrototypeOf(router29, this);
+      router29.caseSensitive = opts.caseSensitive;
+      router29.mergeParams = opts.mergeParams;
+      router29.params = {};
+      router29.strict = opts.strict;
+      router29.stack = [];
+      return router29;
     }
-    Router28.prototype = function() {
+    Router29.prototype = function() {
     };
-    Router28.prototype.param = function param(name, fn) {
+    Router29.prototype.param = function param(name, fn) {
       if (!name) {
         throw new TypeError("argument name is required");
       }
@@ -20542,7 +20542,7 @@ var require_router = __commonJS({
       params.push(fn);
       return this;
     };
-    Router28.prototype.handle = function handle(req, res, callback) {
+    Router29.prototype.handle = function handle(req, res, callback) {
       if (!callback) {
         throw new TypeError("argument callback is required");
       }
@@ -20669,7 +20669,7 @@ var require_router = __commonJS({
         }
       }
     };
-    Router28.prototype.use = function use(handler) {
+    Router29.prototype.use = function use(handler) {
       let offset = 0;
       let path6 = "/";
       if (typeof handler !== "function") {
@@ -20702,7 +20702,7 @@ var require_router = __commonJS({
       }
       return this;
     };
-    Router28.prototype.route = function route(path6) {
+    Router29.prototype.route = function route(path6) {
       const route2 = new Route(path6);
       const layer = new Layer(path6, {
         sensitive: this.caseSensitive,
@@ -20717,7 +20717,7 @@ var require_router = __commonJS({
       return route2;
     };
     methods.concat("all").forEach(function(method) {
-      Router28.prototype[method] = function(path6) {
+      Router29.prototype[method] = function(path6) {
         const route = this.route(path6);
         route[method].apply(route, slice.call(arguments, 1));
         return this;
@@ -20900,13 +20900,13 @@ var require_application = __commonJS({
     var compileTrust = require_utils3().compileTrust;
     var resolve = __require("node:path").resolve;
     var once = require_once();
-    var Router28 = require_router();
+    var Router29 = require_router();
     var slice = Array.prototype.slice;
     var flatten = Array.prototype.flat;
     var app2 = exports = module.exports = {};
     var trustProxyDefaultSymbol = "@@symbol:trust_proxy_default";
     app2.init = function init2() {
-      var router28 = null;
+      var router29 = null;
       this.cache = /* @__PURE__ */ Object.create(null);
       this.engines = /* @__PURE__ */ Object.create(null);
       this.settings = /* @__PURE__ */ Object.create(null);
@@ -20915,13 +20915,13 @@ var require_application = __commonJS({
         configurable: true,
         enumerable: true,
         get: function getrouter() {
-          if (router28 === null) {
-            router28 = new Router28({
+          if (router29 === null) {
+            router29 = new Router29({
               caseSensitive: this.enabled("case sensitive routing"),
               strict: this.enabled("strict routing")
             });
           }
-          return router28;
+          return router29;
         }
       });
     };
@@ -20992,15 +20992,15 @@ var require_application = __commonJS({
       if (fns.length === 0) {
         throw new TypeError("app.use() requires a middleware function");
       }
-      var router28 = this.router;
+      var router29 = this.router;
       fns.forEach(function(fn2) {
         if (!fn2 || !fn2.handle || !fn2.set) {
-          return router28.use(path6, fn2);
+          return router29.use(path6, fn2);
         }
         debug(".use app under %s", path6);
         fn2.mountpath = path6;
         fn2.parent = this;
-        router28.use(path6, function mounted_app(req, res, next) {
+        router29.use(path6, function mounted_app(req, res, next) {
           var orig = req.app;
           fn2.handle(req, res, function(err) {
             Object.setPrototypeOf(req, orig.request);
@@ -23573,7 +23573,7 @@ var require_express = __commonJS({
     var EventEmitter = __require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
-    var Router28 = require_router();
+    var Router29 = require_router();
     var req = require_request();
     var res = require_response();
     exports = module.exports = createApplication;
@@ -23595,8 +23595,8 @@ var require_express = __commonJS({
     exports.application = proto;
     exports.request = req;
     exports.response = res;
-    exports.Route = Router28.Route;
-    exports.Router = Router28;
+    exports.Route = Router29.Route;
+    exports.Router = Router29;
     exports.json = bodyParser.json;
     exports.raw = bodyParser.raw;
     exports.static = require_serve_static();
@@ -25883,7 +25883,7 @@ var require_thread_stream = __commonJS({
     "use strict";
     var { version: version3 } = require_package();
     var { EventEmitter } = __require("events");
-    var { Worker: Worker3 } = __require("worker_threads");
+    var { Worker: Worker2 } = __require("worker_threads");
     var { join } = __require("path");
     var { pathToFileURL } = __require("url");
     var { wait } = require_wait();
@@ -25921,7 +25921,7 @@ var require_thread_stream = __commonJS({
       const { filename, workerData } = opts;
       const bundlerOverrides = "__bundlerPathsOverrides" in globalThis ? globalThis.__bundlerPathsOverrides : {};
       const toExecute = bundlerOverrides["thread-stream-worker"] || join(__dirname, "lib", "worker.js");
-      const worker = new Worker3(toExecute, {
+      const worker = new Worker2(toExecute, {
         ...opts.workerOpts,
         trackUnmanagedFds: false,
         workerData: {
@@ -113813,7 +113813,7 @@ var require_worker = __commonJS({
     var job_scheduler_1 = require_job_scheduler();
     var lock_manager_1 = require_lock_manager();
     var maximumBlockTimeout = 10;
-    var Worker3 = class extends queue_base_1.QueueBase {
+    var Worker2 = class extends queue_base_1.QueueBase {
       static RateLimitError() {
         return new errors_1.RateLimitError();
       }
@@ -114601,7 +114601,7 @@ var require_worker = __commonJS({
         return job.moveToWait(token2);
       }
     };
-    exports.Worker = Worker3;
+    exports.Worker = Worker2;
   }
 });
 
@@ -115095,14 +115095,14 @@ var require_cjs = __commonJS({
 import { createServer } from "http";
 
 // src/app.ts
-var import_express28 = __toESM(require_express2(), 1);
+var import_express29 = __toESM(require_express2(), 1);
 var import_cors = __toESM(require_lib3(), 1);
 var import_pino_http = __toESM(require_logger(), 1);
 import path5 from "path";
 import fs5 from "fs";
 
 // src/routes/index.ts
-var import_express27 = __toESM(require_express2(), 1);
+var import_express28 = __toESM(require_express2(), 1);
 
 // src/routes/health.ts
 var import_express = __toESM(require_express2(), 1);
@@ -142073,6 +142073,7 @@ function encryptPassword(plaintext) {
 // src/lib/metaapi.ts
 var TRADING_BASE = `https://mt-client-api-v1.${process.env.METAAPI_REGION ?? "london"}.agiliumtrade.ai`;
 var MANAGEMENT_BASE = "https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai";
+var COPYFACTORY_BASE = "https://copyfactory-api-v1.agiliumtrade.agiliumtrade.ai";
 function token() {
   const t = process.env.METAAPI_TOKEN;
   if (!t) throw new Error("METAAPI_TOKEN environment variable is not set");
@@ -142248,10 +142249,6 @@ async function undeployMetaApiAccount(metaApiId) {
     throw new Error(`MetaApi undeploy failed (${res.status}): ${text2}`);
   }
 }
-async function getAccountBalance(metaApiId) {
-  const account = await getMetaApiAccount(metaApiId);
-  return account.balance ?? null;
-}
 async function getAccountPositions(metaApiId) {
   const res = await fetch(
     `${TRADING_BASE}/users/current/accounts/${metaApiId}/positions`,
@@ -142285,8 +142282,91 @@ async function deleteMetaApiAccount(metaApiId) {
     throw new Error(`MetaApi deleteAccount failed (${res.status}): ${text2}`);
   }
 }
+async function createOrUpdateCopyFactoryStrategy(strategyId, masterMetaApiId, name = "PESAMATRIX Master Strategy") {
+  const body = {
+    name,
+    description: "Automated copy trading strategy managed by PESAMATRIX Signal",
+    positionLifecycle: "auto",
+    connectionId: masterMetaApiId,
+    timeSettings: {
+      lifetimeInHours: 876e3,
+      // ~100 years — never expires
+      openingIntervalInMinutes: 5
+    }
+  };
+  const url2 = `${COPYFACTORY_BASE}/users/current/configuration/strategies/${strategyId}`;
+  console.log("[CopyFactory] createOrUpdateStrategy \u2014 REQUEST", JSON.stringify({ url: url2, body }, null, 2));
+  const res = await fetch(url2, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify(body)
+  });
+  const responseText = await res.text();
+  console.log("[CopyFactory] createOrUpdateStrategy \u2014 RESPONSE", res.status, responseText);
+  if (!res.ok) {
+    throw new Error(`CopyFactory createStrategy failed (${res.status}): ${responseText}`);
+  }
+}
+async function createOrUpdateCopyFactorySubscriber(subscriberId, strategyId, name) {
+  const body = {
+    name,
+    subscriptions: [
+      {
+        strategyId,
+        multiplier: 1
+      }
+    ]
+  };
+  const url2 = `${COPYFACTORY_BASE}/users/current/configuration/subscribers/${subscriberId}`;
+  console.log("[CopyFactory] createOrUpdateSubscriber \u2014 REQUEST", JSON.stringify({ url: url2, strategyId, body }, null, 2));
+  const res = await fetch(url2, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify(body)
+  });
+  const responseText = await res.text();
+  console.log("[CopyFactory] createOrUpdateSubscriber \u2014 RESPONSE", res.status, responseText);
+  if (!res.ok) {
+    throw new Error(`CopyFactory updateSubscriber failed (${res.status}): ${responseText}`);
+  }
+}
+async function deleteCopyFactorySubscriber(subscriberId) {
+  const url2 = `${COPYFACTORY_BASE}/users/current/configuration/subscribers/${subscriberId}`;
+  console.log("[CopyFactory] deleteSubscriber \u2014 REQUEST", url2);
+  const res = await fetch(url2, {
+    method: "DELETE",
+    headers: headers()
+  });
+  const responseText = await res.text();
+  console.log("[CopyFactory] deleteSubscriber \u2014 RESPONSE", res.status, responseText);
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`CopyFactory deleteSubscriber failed (${res.status}): ${responseText}`);
+  }
+}
+async function listCopyFactoryStrategies() {
+  const url2 = `${COPYFACTORY_BASE}/users/current/configuration/strategies`;
+  const res = await fetch(url2, { headers: headers() });
+  const text2 = await res.text();
+  if (!res.ok) {
+    throw new Error(`CopyFactory listStrategies failed (${res.status}): ${text2}`);
+  }
+  return JSON.parse(text2);
+}
+async function listCopyFactorySubscribers() {
+  const url2 = `${COPYFACTORY_BASE}/users/current/configuration/subscribers`;
+  const res = await fetch(url2, { headers: headers() });
+  const text2 = await res.text();
+  if (!res.ok) {
+    throw new Error(`CopyFactory listSubscribers failed (${res.status}): ${text2}`);
+  }
+  return JSON.parse(text2);
+}
 
 // src/routes/mt5.ts
+async function getCopyFactoryStrategyId() {
+  const [row] = await db.select({ value: systemConfigTable.value }).from(systemConfigTable).where(eq(systemConfigTable.key, "copyFactoryStrategyId")).limit(1);
+  return row?.value ?? null;
+}
 var router10 = (0, import_express10.Router)();
 function str(v) {
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : void 0;
@@ -142362,11 +142442,41 @@ router10.post("/mt5/accounts", requireAuth, async (req, res) => {
         }).where(eq(slaveAccountsTable.id, account.id));
         logger.info({ accountId: account.id, metaApiId }, "MetaApi account created");
         await deployMetaApiAccount(metaApiId);
-        logger.info({ accountId: account.id, metaApiId }, "MetaApi account deployed");
+        logger.info({ accountId: account.id, metaApiId }, "[MT5] MetaApi account deployed");
         await db.update(slaveAccountsTable).set({
           statusMessage: "Cloud terminal deployed. Synchronizing account data \u2014 this usually takes 1\u20132 minutes.",
           updatedAt: /* @__PURE__ */ new Date()
         }).where(eq(slaveAccountsTable.id, account.id));
+        const strategyId = await getCopyFactoryStrategyId();
+        if (strategyId) {
+          try {
+            const subscriberName = `PESAMATRIX-${mt5Login}`;
+            logger.info(
+              { accountId: account.id, metaApiId, strategyId, subscriberName },
+              "[CopyFactory] Registering slave as subscriber \u2014 REQUEST"
+            );
+            await createOrUpdateCopyFactorySubscriber(metaApiId, strategyId, subscriberName);
+            logger.info(
+              { accountId: account.id, metaApiId, strategyId },
+              "[CopyFactory] Subscriber registered successfully \u2014 slave will receive copied trades"
+            );
+            await db.update(slaveAccountsTable).set({
+              statusMessage: "Cloud terminal deployed and registered with CopyFactory. Synchronizing \u2014 1\u20132 minutes.",
+              updatedAt: /* @__PURE__ */ new Date()
+            }).where(eq(slaveAccountsTable.id, account.id));
+          } catch (cfErr) {
+            const rawCfMessage = cfErr instanceof Error ? cfErr.message : String(cfErr);
+            logger.error(
+              { err: cfErr, accountId: account.id, metaApiId, strategyId, rawMessage: rawCfMessage },
+              "[CopyFactory] Failed to register subscriber \u2014 slave deployed but NOT receiving copied trades"
+            );
+          }
+        } else {
+          logger.warn(
+            { accountId: account.id, metaApiId },
+            "[CopyFactory] copyFactoryStrategyId not set in system_config \u2014 slave will NOT receive copied trades. Go to Admin \u2192 Master Account and save the master account ID to trigger strategy creation."
+          );
+        }
       } catch (err) {
         const rawMessage = err instanceof Error ? err.message : String(err);
         logger.error(
@@ -142482,10 +142592,17 @@ router10.delete("/mt5/accounts/:id", requireAuth, async (req, res) => {
   if (existing.metaApiAccountId && process.env.METAAPI_TOKEN) {
     setImmediate(async () => {
       try {
-        await deleteMetaApiAccount(existing.metaApiAccountId);
-        logger.info({ metaApiId: existing.metaApiAccountId }, "MetaApi account deleted");
+        logger.info({ metaApiId: existing.metaApiAccountId }, "[CopyFactory] Removing subscriber on account delete");
+        await deleteCopyFactorySubscriber(existing.metaApiAccountId);
+        logger.info({ metaApiId: existing.metaApiAccountId }, "[CopyFactory] Subscriber removed");
       } catch (err) {
-        logger.warn({ err, metaApiId: existing.metaApiAccountId }, "Failed to delete MetaApi account");
+        logger.warn({ err, metaApiId: existing.metaApiAccountId }, "[CopyFactory] Failed to remove subscriber");
+      }
+      try {
+        await deleteMetaApiAccount(existing.metaApiAccountId);
+        logger.info({ metaApiId: existing.metaApiAccountId }, "[MT5] MetaApi account deleted");
+      } catch (err) {
+        logger.warn({ err, metaApiId: existing.metaApiAccountId }, "[MT5] Failed to delete MetaApi account");
       }
     });
   }
@@ -144160,6 +144277,7 @@ var smtp_default = router23;
 
 // src/routes/master.ts
 var import_express24 = __toESM(require_express2(), 1);
+var STRATEGY_ID = "pesamatrix";
 var router24 = (0, import_express24.Router)();
 async function getSystemConfigMap() {
   const rows = await db.select().from(systemConfigTable);
@@ -144225,8 +144343,31 @@ router24.put("/admin/master", requireAdmin, async (req, res) => {
       res.status(400).json({ error: "accountId must be a non-empty string" });
       return;
     }
-    await upsertConfig("masterMetaApiAccountId", accountId.trim());
-    logger.info({ accountId }, "[Master] masterMetaApiAccountId updated");
+    const trimmedId = accountId.trim();
+    await upsertConfig("masterMetaApiAccountId", trimmedId);
+    logger.info({ accountId: trimmedId }, "[Master] masterMetaApiAccountId updated");
+    if (process.env.METAAPI_TOKEN) {
+      try {
+        logger.info(
+          { strategyId: STRATEGY_ID, masterMetaApiId: trimmedId },
+          "[CopyFactory] Creating/updating strategy for master account"
+        );
+        await createOrUpdateCopyFactoryStrategy(STRATEGY_ID, trimmedId);
+        await upsertConfig("copyFactoryStrategyId", STRATEGY_ID);
+        logger.info(
+          { strategyId: STRATEGY_ID, masterMetaApiId: trimmedId },
+          "[CopyFactory] Strategy created/updated successfully \u2014 strategyId saved to system_config"
+        );
+      } catch (err) {
+        const rawMessage = err instanceof Error ? err.message : String(err);
+        logger.error(
+          { err, strategyId: STRATEGY_ID, masterMetaApiId: trimmedId, rawMessage },
+          "[CopyFactory] Failed to create/update strategy \u2014 check raw error above"
+        );
+      }
+    } else {
+      logger.warn("[CopyFactory] METAAPI_TOKEN not set \u2014 skipping strategy setup");
+    }
   }
   if (enabled !== void 0) {
     await upsertConfig("masterEnabled", String(!!enabled));
@@ -144504,38 +144645,178 @@ router26.post("/admin/kill-switch", requireAdmin, async (req, res) => {
 });
 var queue_monitor_default = router26;
 
-// src/routes/index.ts
+// src/routes/copyfactory.ts
+var import_express27 = __toESM(require_express2(), 1);
 var router27 = (0, import_express27.Router)();
-router27.use(health_default);
-router27.use(auth_default);
-router27.use(users_default);
-router27.use(signals_default);
-router27.use(subscriptions_default);
-router27.use(mpesa_default);
-router27.use(payments_default);
-router27.use(config_default);
-router27.use(dashboard_default);
-router27.use(mt5_default);
-router27.use(metaapi_webhook_default);
-router27.use(copy_trading_default);
-router27.use(media_default);
-router27.use(news_default);
-router27.use(resources_default);
-router27.use(announcements_default);
-router27.use(push_default);
-router27.use(referrals_default);
-router27.use(journal_default);
-router27.use(advertisements_default);
-router27.use(mt5_billing_default);
-router27.use(logo_default);
-router27.use(smtp_default);
-router27.use(master_default);
-router27.use(master_trade_events_default);
-router27.use(queue_monitor_default);
-var routes_default = router27;
+var STRATEGY_ID2 = "pesamatrix";
+router27.get("/admin/copyfactory/diagnostic", requireAdmin, async (_req, res) => {
+  const errors = {};
+  const configRows = await db.select().from(systemConfigTable);
+  const configMap = Object.fromEntries(configRows.map((r) => [r.key, r.value]));
+  const masterMetaApiAccountId = configMap["masterMetaApiAccountId"] ?? null;
+  const copyFactoryStrategyId = configMap["copyFactoryStrategyId"] ?? null;
+  const masterEnabled = configMap["masterEnabled"] ?? "true";
+  let strategies = [];
+  try {
+    strategies = await listCopyFactoryStrategies();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors["listStrategies"] = msg;
+    logger.error({ err }, "[CopyFactory Diagnostic] listStrategies failed");
+  }
+  let subscribers = [];
+  try {
+    subscribers = await listCopyFactorySubscribers();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors["listSubscribers"] = msg;
+    logger.error({ err }, "[CopyFactory Diagnostic] listSubscribers failed");
+  }
+  const slaveAccounts = await db.select({
+    id: slaveAccountsTable.id,
+    mt5Login: slaveAccountsTable.mt5Login,
+    brokerServer: slaveAccountsTable.brokerServer,
+    status: slaveAccountsTable.status,
+    statusMessage: slaveAccountsTable.statusMessage,
+    metaApiAccountId: slaveAccountsTable.metaApiAccountId,
+    lastSyncAt: slaveAccountsTable.lastSyncAt,
+    createdAt: slaveAccountsTable.createdAt
+  }).from(slaveAccountsTable).orderBy(slaveAccountsTable.createdAt);
+  const subscriberIds = new Set(
+    subscribers.map((s) => s._id ?? s.id).filter(Boolean)
+  );
+  const slaveAccountsWithCopyFactoryStatus = slaveAccounts.map((s) => ({
+    ...s,
+    lastSyncAt: s.lastSyncAt?.toISOString() ?? null,
+    createdAt: s.createdAt.toISOString(),
+    registeredInCopyFactory: s.metaApiAccountId != null ? subscriberIds.has(s.metaApiAccountId) : false
+  }));
+  res.json({
+    systemConfig: {
+      masterMetaApiAccountId,
+      copyFactoryStrategyId,
+      masterEnabled
+    },
+    copyFactory: {
+      strategyCount: strategies.length,
+      subscriberCount: subscribers.length,
+      strategies,
+      subscribers
+    },
+    slaveAccounts: slaveAccountsWithCopyFactoryStatus,
+    errors,
+    diagnosis: {
+      strategyExists: strategies.length > 0,
+      masterIdConfigured: !!masterMetaApiAccountId,
+      strategyIdSaved: !!copyFactoryStrategyId,
+      slavesWithoutSubscription: slaveAccountsWithCopyFactoryStatus.filter((s) => s.metaApiAccountId && !s.registeredInCopyFactory).map((s) => ({ id: s.id, mt5Login: s.mt5Login, metaApiAccountId: s.metaApiAccountId }))
+    }
+  });
+});
+router27.post("/admin/copyfactory/setup", requireAdmin, async (_req, res) => {
+  if (!process.env.METAAPI_TOKEN) {
+    res.status(503).json({ error: "METAAPI_TOKEN is not configured" });
+    return;
+  }
+  const configRows = await db.select().from(systemConfigTable);
+  const configMap = Object.fromEntries(configRows.map((r) => [r.key, r.value]));
+  const masterMetaApiId = configMap["masterMetaApiAccountId"] ?? null;
+  if (!masterMetaApiId) {
+    res.status(400).json({
+      error: "masterMetaApiAccountId is not set in system_config. Go to Admin \u2192 Master Account and save the MetaApi Account ID first."
+    });
+    return;
+  }
+  const results = {
+    strategy: { ok: false },
+    subscribers: []
+  };
+  try {
+    logger.info({ strategyId: STRATEGY_ID2, masterMetaApiId }, "[CopyFactory Setup] Creating strategy");
+    await createOrUpdateCopyFactoryStrategy(STRATEGY_ID2, masterMetaApiId);
+    const existing = await db.select().from(systemConfigTable).where(eq(systemConfigTable.key, "copyFactoryStrategyId"));
+    if (existing.length > 0) {
+      await db.update(systemConfigTable).set({ value: STRATEGY_ID2, updatedAt: /* @__PURE__ */ new Date() }).where(eq(systemConfigTable.key, "copyFactoryStrategyId"));
+    } else {
+      await db.insert(systemConfigTable).values({ key: "copyFactoryStrategyId", value: STRATEGY_ID2 });
+    }
+    results.strategy = { ok: true };
+    logger.info({ strategyId: STRATEGY_ID2 }, "[CopyFactory Setup] Strategy created/updated \u2713");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    results.strategy = { ok: false, error: msg };
+    logger.error({ err }, "[CopyFactory Setup] Strategy creation failed");
+  }
+  const slaves = await db.select({
+    id: slaveAccountsTable.id,
+    mt5Login: slaveAccountsTable.mt5Login,
+    metaApiAccountId: slaveAccountsTable.metaApiAccountId
+  }).from(slaveAccountsTable).where(isNotNull(slaveAccountsTable.metaApiAccountId));
+  for (const slave of slaves) {
+    const metaApiId = slave.metaApiAccountId;
+    try {
+      const name = `PESAMATRIX-${slave.mt5Login}`;
+      logger.info({ metaApiId, strategyId: STRATEGY_ID2, name }, "[CopyFactory Setup] Subscribing slave");
+      await createOrUpdateCopyFactorySubscriber(metaApiId, STRATEGY_ID2, name);
+      results.subscribers.push({ metaApiAccountId: metaApiId, mt5Login: slave.mt5Login, ok: true });
+      logger.info({ metaApiId }, "[CopyFactory Setup] Subscriber registered \u2713");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      results.subscribers.push({
+        metaApiAccountId: metaApiId,
+        mt5Login: slave.mt5Login,
+        ok: false,
+        error: msg
+      });
+      logger.error({ err, metaApiId }, "[CopyFactory Setup] Subscriber registration failed");
+    }
+  }
+  res.json({
+    ok: results.strategy.ok,
+    results,
+    summary: {
+      strategyCreated: results.strategy.ok,
+      subscribersAttempted: results.subscribers.length,
+      subscribersSucceeded: results.subscribers.filter((s) => s.ok).length,
+      subscribersFailed: results.subscribers.filter((s) => !s.ok).length
+    }
+  });
+});
+var copyfactory_default = router27;
+
+// src/routes/index.ts
+var router28 = (0, import_express28.Router)();
+router28.use(health_default);
+router28.use(auth_default);
+router28.use(users_default);
+router28.use(signals_default);
+router28.use(subscriptions_default);
+router28.use(mpesa_default);
+router28.use(payments_default);
+router28.use(config_default);
+router28.use(dashboard_default);
+router28.use(mt5_default);
+router28.use(metaapi_webhook_default);
+router28.use(copy_trading_default);
+router28.use(media_default);
+router28.use(news_default);
+router28.use(resources_default);
+router28.use(announcements_default);
+router28.use(push_default);
+router28.use(referrals_default);
+router28.use(journal_default);
+router28.use(advertisements_default);
+router28.use(mt5_billing_default);
+router28.use(logo_default);
+router28.use(smtp_default);
+router28.use(master_default);
+router28.use(master_trade_events_default);
+router28.use(queue_monitor_default);
+router28.use(copyfactory_default);
+var routes_default = router28;
 
 // src/app.ts
-var app = (0, import_express28.default)();
+var app = (0, import_express29.default)();
 app.use(
   (0, import_pino_http.default)({
     logger,
@@ -144556,14 +144837,14 @@ app.use(
   })
 );
 app.use((0, import_cors.default)());
-app.use(import_express28.default.json({ limit: "100mb" }));
-app.use(import_express28.default.urlencoded({ limit: "100mb", extended: true }));
-app.use("/uploads", import_express28.default.static(path5.resolve("public/uploads")));
+app.use(import_express29.default.json({ limit: "100mb" }));
+app.use(import_express29.default.urlencoded({ limit: "100mb", extended: true }));
+app.use("/uploads", import_express29.default.static(path5.resolve("public/uploads")));
 app.use("/api", routes_default);
 if (process.env.NODE_ENV === "production") {
   const frontendDist = path5.resolve("artifacts/pesamatrix/dist/public");
   if (fs5.existsSync(frontendDist)) {
-    app.use(import_express28.default.static(frontendDist, {
+    app.use(import_express29.default.static(frontendDist, {
       setHeaders(res, filePath) {
         if (filePath.endsWith("index.html")) {
           res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -144878,15 +145159,6 @@ var DISCONNECT_THRESHOLD_MS = 6e4;
 var HEARTBEAT_KEY = (metaApiId) => `watchdog:heartbeat:${metaApiId}`;
 var ABSENT_SINCE_KEY = (metaApiId) => `watchdog:absent_since:${metaApiId}`;
 var EMERGENCY_KEY3 = "watchdog:emergency:paused";
-async function updateMasterHeartbeat(metaApiId) {
-  let redis;
-  try {
-    redis = getRedis();
-  } catch {
-    return;
-  }
-  await redis.set(HEARTBEAT_KEY(metaApiId), Date.now().toString(), "EX", 30);
-}
 async function getActiveMasterMetaApiIds() {
   const rows = await db.selectDistinct({ metaApiId: slaveAccountsTable.metaApiAccountId }).from(copyTradeLinksTable).innerJoin(
     slaveAccountsTable,
@@ -144963,227 +145235,6 @@ function startConnectionWatchdog() {
   tick();
   setInterval(tick, CHECK_INTERVAL_MS);
   logger.info({ intervalMs: CHECK_INTERVAL_MS, thresholdMs: DISCONNECT_THRESHOLD_MS }, "Connection watchdog started");
-}
-
-// src/lib/master-poller.ts
-var POLL_INTERVAL_MS = 5e3;
-var POSITION_KEY = (metaApiId) => `master:positions:${metaApiId}`;
-var MIN_LOT_SIZE = 0.01;
-function positionDirection(type) {
-  return type === "POSITION_TYPE_BUY" ? "BUY" : "SELL";
-}
-function applyLotProtection(raw) {
-  return Math.max(MIN_LOT_SIZE, parseFloat(raw.toFixed(2)));
-}
-async function calculateVolume(masterLots, slave, masterMetaApiId) {
-  if (slave.lotSizeType === "PROPORTIONAL") {
-    try {
-      const [masterBalance, slaveBalance] = await Promise.all([
-        getAccountBalance(masterMetaApiId),
-        getAccountBalance(slave.metaApiId)
-      ]);
-      if (masterBalance != null && masterBalance > 0 && slaveBalance != null) {
-        const riskMultiplier = slaveBalance / masterBalance;
-        const volume = applyLotProtection(masterLots * riskMultiplier);
-        return { volume, masterBalance, slaveBalance };
-      }
-      logger.warn(
-        { masterMetaApiId, slaveMetaApiId: slave.metaApiId, masterBalance, slaveBalance },
-        "Master poller: balance unavailable for PROPORTIONAL \u2014 falling back to FIXED"
-      );
-      return {
-        volume: applyLotProtection(masterLots * slave.volumeMultiplier),
-        masterBalance,
-        slaveBalance
-      };
-    } catch (err) {
-      logger.warn(
-        { err, masterMetaApiId, slaveMetaApiId: slave.metaApiId },
-        "Master poller: failed to fetch balances for PROPORTIONAL \u2014 falling back to FIXED"
-      );
-      return {
-        volume: applyLotProtection(masterLots * slave.volumeMultiplier),
-        masterBalance: null,
-        slaveBalance: null
-      };
-    }
-  }
-  return {
-    volume: applyLotProtection(masterLots * slave.volumeMultiplier),
-    masterBalance: null,
-    slaveBalance: null
-  };
-}
-async function pollMaster(master) {
-  const redis = getRedis();
-  const queue = getCopyTradeQueue();
-  const posKey = POSITION_KEY(master.metaApiId);
-  let positions;
-  try {
-    positions = await getAccountPositions(master.metaApiId);
-    await updateMasterHeartbeat(master.metaApiId);
-  } catch (err) {
-    logger.warn({ err, masterMetaApiId: master.metaApiId }, "Master poller: failed to fetch positions");
-    return;
-  }
-  const currentIds = new Set(positions.map((p) => p.id));
-  const stored = await redis.smembers(posKey);
-  const knownIds = new Set(stored);
-  const newPositions = positions.filter((p) => !knownIds.has(p.id));
-  if (currentIds.size > 0) {
-    await redis.del(posKey);
-    await redis.sadd(posKey, ...Array.from(currentIds));
-  } else {
-    await redis.del(posKey);
-  }
-  if (newPositions.length === 0) return;
-  logger.info(
-    { masterAccountId: master.id, newCount: newPositions.length },
-    "Master poller: new positions detected"
-  );
-  await Promise.allSettled(
-    newPositions.flatMap(
-      (position) => master.slaves.map(async (slave) => {
-        try {
-          const direction = positionDirection(position.type);
-          const masterLots = position.volume;
-          const { volume, masterBalance, slaveBalance } = await calculateVolume(
-            masterLots,
-            slave,
-            master.metaApiId
-          );
-          logger.info(
-            {
-              mode: slave.lotSizeType,
-              masterLots,
-              calculatedLots: volume,
-              masterBalance,
-              slaveBalance,
-              slaveAccountId: slave.accountId
-            },
-            "Master poller: lot size calculated"
-          );
-          const [log] = await db.insert(copyTradeLogsTable).values({
-            masterAccountId: master.id,
-            slaveAccountId: slave.accountId,
-            masterTicket: position.id,
-            symbol: position.symbol,
-            direction,
-            volume: String(volume),
-            entryPrice: String(position.openPrice),
-            stopLoss: position.stopLoss != null ? String(position.stopLoss) : null,
-            takeProfit: position.takeProfit != null ? String(position.takeProfit) : null,
-            status: "PENDING",
-            masterBalance: masterBalance != null ? String(masterBalance) : null,
-            slaveBalance: slaveBalance != null ? String(slaveBalance) : null,
-            masterLots: String(masterLots),
-            calculatedLots: String(volume)
-          }).returning();
-          const job = await queue.add(
-            `copy:${position.id}:${slave.accountId}`,
-            {
-              logId: log.id,
-              masterAccountId: master.id,
-              slaveAccountId: slave.accountId,
-              slaveMetaApiId: slave.metaApiId,
-              trade: {
-                ticket: position.id,
-                symbol: position.symbol,
-                direction,
-                volume,
-                openPrice: position.openPrice,
-                stopLoss: position.stopLoss ?? null,
-                takeProfit: position.takeProfit ?? null
-              }
-            }
-          );
-          await db.update(copyTradeLogsTable).set({ jobId: job.id ?? null, updatedAt: /* @__PURE__ */ new Date() }).where(eq(copyTradeLogsTable.id, log.id));
-          logger.info(
-            { logId: log.id, jobId: job.id, slaveAccountId: slave.accountId },
-            "Master poller: copy job queued"
-          );
-        } catch (err) {
-          logger.error(
-            { err, masterAccountId: master.id, slaveAccountId: slave.accountId, ticket: position.id },
-            "Master poller: failed to queue copy job for slave \u2014 continuing remaining accounts"
-          );
-        }
-      })
-    )
-  );
-}
-async function runPollCycle() {
-  if (!process.env.METAAPI_TOKEN) return;
-  const links = await db.select({
-    linkId: copyTradeLinksTable.id,
-    masterAccountId: copyTradeLinksTable.masterAccountId,
-    masterMetaApiId: slaveAccountsTable.metaApiAccountId,
-    slaveAccountId: copyTradeLinksTable.slaveAccountId,
-    volumeMultiplier: copyTradeLinksTable.volumeMultiplier,
-    lotSizeType: copyTradeLinksTable.lotSizeType,
-    userId: copyTradeLinksTable.userId
-  }).from(copyTradeLinksTable).innerJoin(
-    slaveAccountsTable,
-    and(
-      eq(copyTradeLinksTable.masterAccountId, slaveAccountsTable.id),
-      eq(slaveAccountsTable.status, "CONNECTED"),
-      isNotNull(slaveAccountsTable.metaApiAccountId)
-    )
-  ).where(eq(copyTradeLinksTable.isActive, true));
-  if (links.length === 0) return;
-  const slaveAccounts = await db.select({ id: slaveAccountsTable.id, metaApiAccountId: slaveAccountsTable.metaApiAccountId }).from(slaveAccountsTable).where(
-    and(
-      eq(slaveAccountsTable.status, "CONNECTED"),
-      isNotNull(slaveAccountsTable.metaApiAccountId)
-    )
-  );
-  const slaveMetaApiMap = new Map(
-    slaveAccounts.map((s) => [s.id, s.metaApiAccountId])
-  );
-  const masterMap = /* @__PURE__ */ new Map();
-  for (const link of links) {
-    if (!link.masterMetaApiId) continue;
-    const slaveMetaApi = slaveMetaApiMap.get(link.slaveAccountId);
-    if (!slaveMetaApi) continue;
-    if (!masterMap.has(link.masterAccountId)) {
-      masterMap.set(link.masterAccountId, {
-        id: link.masterAccountId,
-        metaApiId: link.masterMetaApiId,
-        slaves: []
-      });
-    }
-    masterMap.get(link.masterAccountId).slaves.push({
-      linkId: link.linkId,
-      accountId: link.slaveAccountId,
-      metaApiId: slaveMetaApi,
-      volumeMultiplier: parseFloat(link.volumeMultiplier ?? "1"),
-      lotSizeType: link.lotSizeType ?? "FIXED",
-      userId: link.userId
-    });
-  }
-  await Promise.allSettled(
-    Array.from(masterMap.values()).map(
-      (master) => pollMaster(master).catch(
-        (err) => logger.error({ err, masterAccountId: master.id }, "Master poller: unhandled error")
-      )
-    )
-  );
-}
-function startMasterPoller() {
-  if (!process.env.METAAPI_TOKEN) {
-    logger.warn("METAAPI_TOKEN not set \u2014 master poller will not start");
-    return;
-  }
-  const tick = async () => {
-    try {
-      await runPollCycle();
-    } catch (err) {
-      logger.error({ err }, "Master poller: poll cycle error");
-    }
-  };
-  tick();
-  setInterval(tick, POLL_INTERVAL_MS);
-  logger.info({ intervalMs: POLL_INTERVAL_MS }, "Master poller started");
 }
 
 // src/lib/payment-reconciler.ts
@@ -145385,7 +145436,7 @@ function startMt5SubscriptionExpiryJob() {
 }
 
 // src/lib/master-trade-listener.ts
-var POLL_INTERVAL_MS2 = 1e4;
+var POLL_INTERVAL_MS = 1e4;
 var previousSnapshot = /* @__PURE__ */ new Map();
 var isRunning = false;
 async function resolveAccountId() {
@@ -145531,287 +145582,8 @@ function startMasterTradeListener() {
   if (isRunning) return;
   isRunning = true;
   poll();
-  setInterval(poll, POLL_INTERVAL_MS2);
-  logger.info({ intervalMs: POLL_INTERVAL_MS2 }, "[MasterTradeListener] Started");
-}
-
-// src/lib/master-trade-execution-worker.ts
-var import_bullmq5 = __toESM(require_cjs(), 1);
-var CONCURRENCY2 = 5;
-var MIN_LOT_SIZE2 = 0.01;
-function calculateProportionalLots(masterLots, masterBalance, slaveBalance) {
-  if (masterBalance != null && masterBalance > 0 && slaveBalance != null) {
-    const raw = slaveBalance / masterBalance * masterLots;
-    return Math.max(MIN_LOT_SIZE2, parseFloat(raw.toFixed(2)));
-  }
-  return Math.max(MIN_LOT_SIZE2, parseFloat(masterLots.toFixed(2)));
-}
-async function executeOnSlave(params) {
-  const {
-    eventId,
-    positionId,
-    symbol: symbol2,
-    direction,
-    masterLots,
-    openPrice,
-    stopLoss,
-    takeProfit,
-    masterAccountId,
-    slaveAccountId,
-    slaveMetaApiId,
-    masterBalance
-  } = params;
-  const now = /* @__PURE__ */ new Date();
-  const [activeSub] = await db.select({ id: mt5AccountSubscriptionsTable.id }).from(mt5AccountSubscriptionsTable).where(
-    and(
-      eq(mt5AccountSubscriptionsTable.slaveAccountId, slaveAccountId),
-      eq(mt5AccountSubscriptionsTable.status, "ACTIVE"),
-      gt(mt5AccountSubscriptionsTable.expiryDate, now)
-    )
-  ).limit(1);
-  if (!activeSub) {
-    logger.warn(
-      { eventId, slaveAccountId, slaveMetaApiId, symbol: symbol2 },
-      "[MasterTradeExecution] Slave skipped \u2014 no active MT5 subscription"
-    );
-    await db.insert(copyTradeLogsTable).values({
-      masterAccountId,
-      slaveAccountId,
-      masterTicket: positionId,
-      symbol: symbol2,
-      direction,
-      volume: String(masterLots),
-      entryPrice: openPrice != null ? String(openPrice) : null,
-      stopLoss: stopLoss != null ? String(stopLoss) : null,
-      takeProfit: takeProfit != null ? String(takeProfit) : null,
-      masterLots: String(masterLots),
-      calculatedLots: String(masterLots),
-      status: "SKIPPED",
-      errorMessage: "No active MT5 account subscription"
-    });
-    return;
-  }
-  let slaveBalance = null;
-  try {
-    slaveBalance = await getAccountBalance(slaveMetaApiId);
-  } catch (err) {
-    logger.warn(
-      { err, slaveMetaApiId, symbol: symbol2 },
-      "[MasterTradeExecution] Failed to fetch slave balance \u2014 using masterLots as-is"
-    );
-  }
-  const calculatedLots = calculateProportionalLots(masterLots, masterBalance, slaveBalance);
-  logger.info(
-    {
-      eventId,
-      slaveMetaApiId,
-      slaveAccountId,
-      symbol: symbol2,
-      direction,
-      masterLots,
-      calculatedLots,
-      masterBalance,
-      slaveBalance
-    },
-    "[MasterTradeExecution] Proportional sizing applied"
-  );
-  const [log] = await db.insert(copyTradeLogsTable).values({
-    masterAccountId,
-    slaveAccountId,
-    masterTicket: positionId,
-    symbol: symbol2,
-    direction,
-    volume: String(calculatedLots),
-    entryPrice: openPrice != null ? String(openPrice) : null,
-    stopLoss: stopLoss != null ? String(stopLoss) : null,
-    takeProfit: takeProfit != null ? String(takeProfit) : null,
-    masterBalance: masterBalance != null ? String(masterBalance) : null,
-    slaveBalance: slaveBalance != null ? String(slaveBalance) : null,
-    masterLots: String(masterLots),
-    calculatedLots: String(calculatedLots),
-    status: "PENDING"
-  }).returning({ id: copyTradeLogsTable.id });
-  try {
-    const result = await placeTrade(slaveMetaApiId, {
-      actionType: direction === "BUY" ? "ORDER_TYPE_BUY" : "ORDER_TYPE_SELL",
-      symbol: symbol2,
-      volume: calculatedLots,
-      stopLoss: stopLoss ?? void 0,
-      takeProfit: takeProfit ?? void 0,
-      comment: `MTE:${positionId}`
-    });
-    const success2 = result.stringCode === "TRADE_RETCODE_DONE" || result.numericCode === 10009;
-    if (!success2) {
-      throw new Error(`Trade rejected: ${result.stringCode} \u2014 ${result.message}`);
-    }
-    await db.update(copyTradeLogsTable).set({
-      status: "SUCCESS",
-      slaveTicket: result.orderId ?? null,
-      executedAt: /* @__PURE__ */ new Date(),
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq(copyTradeLogsTable.id, log.id));
-    logger.info(
-      {
-        logId: log.id,
-        slaveMetaApiId,
-        slaveAccountId,
-        slaveTicket: result.orderId,
-        symbol: symbol2,
-        direction,
-        calculatedLots,
-        masterLots,
-        masterBalance,
-        slaveBalance
-      },
-      "[MasterTradeExecution] Trade executed successfully on slave"
-    );
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : "Unknown error";
-    await db.update(copyTradeLogsTable).set({
-      status: "FAILED",
-      errorMessage,
-      executedAt: /* @__PURE__ */ new Date(),
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq(copyTradeLogsTable.id, log.id));
-    logger.error(
-      { err, logId: log.id, slaveMetaApiId, slaveAccountId, symbol: symbol2 },
-      "[MasterTradeExecution] Trade execution failed on slave"
-    );
-    throw err;
-  }
-}
-async function fanOutToSlaves(data) {
-  const {
-    eventId,
-    metaApiAccountId,
-    positionId,
-    symbol: symbol2,
-    direction,
-    volume,
-    openPrice,
-    stopLoss,
-    takeProfit
-  } = data;
-  const masterLots = volume ?? MIN_LOT_SIZE2;
-  const [masterAccount] = await db.select({ id: slaveAccountsTable.id }).from(slaveAccountsTable).where(eq(slaveAccountsTable.metaApiAccountId, metaApiAccountId)).limit(1);
-  if (!masterAccount) {
-    logger.warn(
-      { eventId, metaApiAccountId },
-      "[MasterTradeExecution] Master account not found in slave_accounts \u2014 no slave fan-out"
-    );
-    return;
-  }
-  const links = await db.select({
-    slaveAccountId: copyTradeLinksTable.slaveAccountId,
-    slaveMetaApiId: slaveAccountsTable.metaApiAccountId
-  }).from(copyTradeLinksTable).innerJoin(
-    slaveAccountsTable,
-    and(
-      eq(copyTradeLinksTable.slaveAccountId, slaveAccountsTable.id),
-      eq(slaveAccountsTable.status, "CONNECTED"),
-      isNotNull(slaveAccountsTable.metaApiAccountId)
-    )
-  ).where(
-    and(
-      eq(copyTradeLinksTable.masterAccountId, masterAccount.id),
-      eq(copyTradeLinksTable.isActive, true)
-    )
-  );
-  if (links.length === 0) {
-    logger.info(
-      { eventId, masterAccountId: masterAccount.id, symbol: symbol2 },
-      "[MasterTradeExecution] No active connected slave links \u2014 nothing to execute"
-    );
-    return;
-  }
-  logger.info(
-    { eventId, masterAccountId: masterAccount.id, slaveCount: links.length, symbol: symbol2, direction },
-    "[MasterTradeExecution] Fanning out to slaves"
-  );
-  let masterBalance = null;
-  try {
-    masterBalance = await getAccountBalance(metaApiAccountId);
-    logger.info(
-      { eventId, metaApiAccountId, masterBalance },
-      "[MasterTradeExecution] Master balance fetched"
-    );
-  } catch (err) {
-    logger.warn(
-      { err, metaApiAccountId },
-      "[MasterTradeExecution] Could not fetch master balance \u2014 proportional sizing will use masterLots as-is"
-    );
-  }
-  const results = await Promise.allSettled(
-    links.map(
-      (link) => executeOnSlave({
-        eventId,
-        positionId,
-        symbol: symbol2,
-        direction,
-        masterLots,
-        openPrice,
-        stopLoss,
-        takeProfit,
-        masterAccountId: masterAccount.id,
-        slaveAccountId: link.slaveAccountId,
-        slaveMetaApiId: link.slaveMetaApiId,
-        masterBalance
-      })
-    )
-  );
-  const succeeded = results.filter((r) => r.status === "fulfilled").length;
-  const failed = results.filter((r) => r.status === "rejected").length;
-  logger.info(
-    {
-      eventId,
-      symbol: symbol2,
-      direction,
-      masterLots,
-      masterBalance,
-      totalSlaves: links.length,
-      succeeded,
-      failed
-    },
-    "[MasterTradeExecution] Slave fan-out complete"
-  );
-}
-function startMasterTradeExecutionWorker() {
-  const worker = new import_bullmq5.Worker(
-    MASTER_TRADE_EXECUTION_QUEUE,
-    async (job) => {
-      const { eventId, eventType, positionId, symbol: symbol2, direction } = job.data;
-      logger.info(
-        { jobId: job.id, eventId, eventType, positionId, symbol: symbol2, direction },
-        "[MasterTradeExecution] Queue Processed"
-      );
-      if (eventType === "POSITION_OPENED") {
-        await fanOutToSlaves(job.data);
-      } else {
-        logger.info(
-          { jobId: job.id, eventId, eventType, positionId, symbol: symbol2 },
-          "[MasterTradeExecution] Slave-side modify/close execution deferred \u2014 event recorded"
-        );
-      }
-      await db.update(masterTradeEventsTable).set({ jobStatus: "PROCESSED" }).where(eq(masterTradeEventsTable.id, eventId));
-    },
-    {
-      connection: getRedis(),
-      concurrency: CONCURRENCY2,
-      skipVersionCheck: true
-    }
-  );
-  worker.on("failed", (job, err) => {
-    logger.error(
-      { jobId: job?.id, eventId: job?.data.eventId, err: err.message },
-      "[MasterTradeExecution] Job permanently failed after all retries"
-    );
-    if (job?.data.eventId) {
-      db.update(masterTradeEventsTable).set({ jobStatus: "FAILED" }).where(eq(masterTradeEventsTable.id, job.data.eventId)).catch(() => {
-      });
-    }
-  });
-  logger.info({ concurrency: CONCURRENCY2 }, "[MasterTradeExecution] Worker started");
-  return worker;
+  setInterval(poll, POLL_INTERVAL_MS);
+  logger.info({ intervalMs: POLL_INTERVAL_MS }, "[MasterTradeListener] Started");
 }
 
 // src/index.ts
@@ -145853,24 +145625,14 @@ async function startRedisServices() {
   } catch (err) {
     logger.warn({ err }, "Queue: copy-trade worker failed to start");
   }
-  try {
-    startMasterPoller();
-    logger.info("Queue: master poller initialised \u2713");
-  } catch (err) {
-    logger.warn({ err }, "Queue: master poller failed to start");
-  }
+  logger.info("Queue: master poller DISABLED \u2014 CopyFactory handles trade replication");
   try {
     startConnectionWatchdog();
     logger.info("Queue: connection watchdog initialised \u2713");
   } catch (err) {
     logger.warn({ err }, "Queue: connection watchdog failed to start");
   }
-  try {
-    startMasterTradeExecutionWorker();
-    logger.info("Queue: master-trade execution worker initialised \u2713");
-  } catch (err) {
-    logger.warn({ err }, "Queue: master-trade execution worker failed to start");
-  }
+  logger.info("Queue: master-trade execution worker DISABLED \u2014 CopyFactory handles trade replication");
   logger.info("Redis: all queue workers running \u2713");
 }
 server.listen(port, () => {

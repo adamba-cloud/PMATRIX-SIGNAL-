@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, slaveAccountsTable, usersTable } from "@workspace/db";
+import { db, slaveAccountsTable, usersTable, systemConfigTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { encryptPassword, decryptPassword } from "../lib/encryption";
@@ -11,8 +11,20 @@ import {
   getMetaApiAccount,
   mapMetaApiStatus,
   parseMetaApiError,
+  createOrUpdateCopyFactorySubscriber,
+  deleteCopyFactorySubscriber,
 } from "../lib/metaapi";
 import { logger } from "../lib/logger";
+
+/** Read copyFactoryStrategyId from system_config. Returns null if not yet set. */
+async function getCopyFactoryStrategyId(): Promise<string | null> {
+  const [row] = await db
+    .select({ value: systemConfigTable.value })
+    .from(systemConfigTable)
+    .where(eq(systemConfigTable.key, "copyFactoryStrategyId"))
+    .limit(1);
+  return row?.value ?? null;
+}
 
 const router = Router();
 
@@ -126,7 +138,7 @@ router.post("/mt5/accounts", requireAuth, async (req, res): Promise<void> => {
 
         // Step 2: Explicitly deploy the cloud terminal
         await deployMetaApiAccount(metaApiId);
-        logger.info({ accountId: account.id, metaApiId }, "MetaApi account deployed");
+        logger.info({ accountId: account.id, metaApiId }, "[MT5] MetaApi account deployed");
 
         await db
           .update(slaveAccountsTable)
@@ -135,6 +147,42 @@ router.post("/mt5/accounts", requireAuth, async (req, res): Promise<void> => {
             updatedAt: new Date(),
           })
           .where(eq(slaveAccountsTable.id, account.id));
+
+        // Step 3: Register as CopyFactory subscriber so MetaApi starts copying trades
+        const strategyId = await getCopyFactoryStrategyId();
+        if (strategyId) {
+          try {
+            const subscriberName = `PESAMATRIX-${mt5Login}`;
+            logger.info(
+              { accountId: account.id, metaApiId, strategyId, subscriberName },
+              "[CopyFactory] Registering slave as subscriber — REQUEST"
+            );
+            await createOrUpdateCopyFactorySubscriber(metaApiId, strategyId, subscriberName);
+            logger.info(
+              { accountId: account.id, metaApiId, strategyId },
+              "[CopyFactory] Subscriber registered successfully — slave will receive copied trades"
+            );
+            await db
+              .update(slaveAccountsTable)
+              .set({
+                statusMessage: "Cloud terminal deployed and registered with CopyFactory. Synchronizing — 1–2 minutes.",
+                updatedAt: new Date(),
+              })
+              .where(eq(slaveAccountsTable.id, account.id));
+          } catch (cfErr) {
+            const rawCfMessage = cfErr instanceof Error ? cfErr.message : String(cfErr);
+            logger.error(
+              { err: cfErr, accountId: account.id, metaApiId, strategyId, rawMessage: rawCfMessage },
+              "[CopyFactory] Failed to register subscriber — slave deployed but NOT receiving copied trades"
+            );
+          }
+        } else {
+          logger.warn(
+            { accountId: account.id, metaApiId },
+            "[CopyFactory] copyFactoryStrategyId not set in system_config — slave will NOT receive copied trades. " +
+            "Go to Admin → Master Account and save the master account ID to trigger strategy creation."
+          );
+        }
       } catch (err) {
         const rawMessage = err instanceof Error ? err.message : String(err);
         logger.error(
@@ -296,14 +344,24 @@ router.delete("/mt5/accounts/:id", requireAuth, async (req, res): Promise<void> 
   await db.delete(slaveAccountsTable).where(eq(slaveAccountsTable.id, id));
   res.status(204).send();
 
-  // Clean up MetaApi account in background
+  // Clean up MetaApi account + CopyFactory subscriber in background
   if (existing.metaApiAccountId && process.env.METAAPI_TOKEN) {
     setImmediate(async () => {
+      // Remove from CopyFactory first so trade copying stops immediately
+      try {
+        logger.info({ metaApiId: existing.metaApiAccountId }, "[CopyFactory] Removing subscriber on account delete");
+        await deleteCopyFactorySubscriber(existing.metaApiAccountId!);
+        logger.info({ metaApiId: existing.metaApiAccountId }, "[CopyFactory] Subscriber removed");
+      } catch (err) {
+        logger.warn({ err, metaApiId: existing.metaApiAccountId }, "[CopyFactory] Failed to remove subscriber");
+      }
+
+      // Then delete the MetaApi cloud account
       try {
         await deleteMetaApiAccount(existing.metaApiAccountId!);
-        logger.info({ metaApiId: existing.metaApiAccountId }, "MetaApi account deleted");
+        logger.info({ metaApiId: existing.metaApiAccountId }, "[MT5] MetaApi account deleted");
       } catch (err) {
-        logger.warn({ err, metaApiId: existing.metaApiAccountId }, "Failed to delete MetaApi account");
+        logger.warn({ err, metaApiId: existing.metaApiAccountId }, "[MT5] Failed to delete MetaApi account");
       }
     });
   }

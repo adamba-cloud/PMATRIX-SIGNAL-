@@ -25,6 +25,7 @@ import smtpRouter from "./smtp";
 import masterRouter from "./master";
 import masterTradeEventsRouter from "./master-trade-events";
 import queueMonitorRouter from "./queue-monitor";
+import copyFactoryRouter from "./copyfactory";
 
 const router: IRouter = Router();
 
@@ -54,5 +55,6 @@ router.use(smtpRouter);
 router.use(masterRouter);
 router.use(masterTradeEventsRouter);
 router.use(queueMonitorRouter);
+router.use(copyFactoryRouter);
 
 export default router;

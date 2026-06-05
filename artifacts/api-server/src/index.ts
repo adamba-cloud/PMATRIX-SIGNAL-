@@ -73,6 +73,12 @@ async function startRedisServices(): Promise<void> {
   logger.info("Redis: connection confirmed — initialising Redis-dependent services");
 
   // ── Copy trade queue worker ───────────────────────────────────────────────
+  // NOTE: CopyFactory (MetaApi-native) is now the primary trade-copying
+  // mechanism. The legacy copy-trade-worker and master-poller are DISABLED
+  // to prevent double-execution of trades on slave accounts. CopyFactory
+  // subscribes each slave to the master's strategy and copies trades
+  // automatically without any server-side polling.
+  // The copy-trade-worker queue is still initialised so queued jobs drain.
   try {
     startCopyTradeWorker();
     logger.info("Queue: copy-trade worker initialised ✓");
@@ -80,13 +86,11 @@ async function startRedisServices(): Promise<void> {
     logger.warn({ err }, "Queue: copy-trade worker failed to start");
   }
 
-  // ── Master position poller (MetaApi → queue) ──────────────────────────────
-  try {
-    startMasterPoller();
-    logger.info("Queue: master poller initialised ✓");
-  } catch (err) {
-    logger.warn({ err }, "Queue: master poller failed to start");
-  }
+  // ── Master position poller — DISABLED (replaced by CopyFactory) ───────────
+  // Keeping this disabled prevents double-execution: CopyFactory handles
+  // trade replication at the MetaApi level; running the poller on top would
+  // execute each trade twice on every slave account.
+  logger.info("Queue: master poller DISABLED — CopyFactory handles trade replication");
 
   // ── Connection watchdog (kill switch) ─────────────────────────────────────
   try {
@@ -97,12 +101,9 @@ async function startRedisServices(): Promise<void> {
   }
 
   // ── Master trade execution worker (fan-out to slaves) ────────────────────
-  try {
-    startMasterTradeExecutionWorker();
-    logger.info("Queue: master-trade execution worker initialised ✓");
-  } catch (err) {
-    logger.warn({ err }, "Queue: master-trade execution worker failed to start");
-  }
+  // NOTE: Also disabled — CopyFactory is the primary execution path.
+  // Re-enable only if you want server-side copy trading as a fallback.
+  logger.info("Queue: master-trade execution worker DISABLED — CopyFactory handles trade replication");
 
   logger.info("Redis: all queue workers running ✓");
 }

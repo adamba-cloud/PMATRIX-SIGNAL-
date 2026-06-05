@@ -8,6 +8,10 @@ const TRADING_BASE = `https://mt-client-api-v1.${process.env.METAAPI_REGION ?? "
 // The real provisioning endpoint is mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai.
 const MANAGEMENT_BASE = "https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai";
 
+// CopyFactory API: strategy configuration and subscriber management
+// This is separate from the trading and management APIs.
+const COPYFACTORY_BASE = "https://copyfactory-api-v1.agiliumtrade.agiliumtrade.ai";
+
 function token(): string {
   const t = process.env.METAAPI_TOKEN;
   if (!t) throw new Error("METAAPI_TOKEN environment variable is not set");
@@ -406,4 +410,154 @@ export async function deleteMetaApiAccount(metaApiId: string): Promise<void> {
     const text = await res.text();
     throw new Error(`MetaApi deleteAccount failed (${res.status}): ${text}`);
   }
+}
+
+// ── CopyFactory API ───────────────────────────────────────────────────────────
+// Manages trade-copying strategies and subscriber accounts.
+// Every slave account must be registered as a CopyFactory subscriber and
+// pointed at the master's strategy before MetaApi will copy trades.
+//
+// Strategy ID convention: we use a fixed, human-readable ID ("pesamatrix") so
+// the same strategy is updated idempotently on every master re-save. The API
+// uses PUT, so it creates or updates in one call.
+// Subscriber ID = the slave's MetaApi account ID (MetaApi requires this).
+
+export interface CopyFactoryStrategyBody {
+  name: string;
+  description: string;
+  positionLifecycle: string;
+  connectionId: string;
+  timeSettings: {
+    lifetimeInHours: number;
+    openingIntervalInMinutes: number;
+  };
+}
+
+export interface CopyFactorySubscriberBody {
+  name: string;
+  subscriptions: Array<{
+    strategyId: string;
+    multiplier: number;
+  }>;
+}
+
+/**
+ * Create or update the CopyFactory strategy that the master account publishes.
+ * Logs the full request payload and raw response for diagnostics.
+ */
+export async function createOrUpdateCopyFactoryStrategy(
+  strategyId: string,
+  masterMetaApiId: string,
+  name = "PESAMATRIX Master Strategy"
+): Promise<void> {
+  const body: CopyFactoryStrategyBody = {
+    name,
+    description: "Automated copy trading strategy managed by PESAMATRIX Signal",
+    positionLifecycle: "auto",
+    connectionId: masterMetaApiId,
+    timeSettings: {
+      lifetimeInHours: 876000,   // ~100 years — never expires
+      openingIntervalInMinutes: 5,
+    },
+  };
+
+  const url = `${COPYFACTORY_BASE}/users/current/configuration/strategies/${strategyId}`;
+  console.log("[CopyFactory] createOrUpdateStrategy — REQUEST", JSON.stringify({ url, body }, null, 2));
+
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+
+  const responseText = await res.text();
+  console.log("[CopyFactory] createOrUpdateStrategy — RESPONSE", res.status, responseText);
+
+  if (!res.ok) {
+    throw new Error(`CopyFactory createStrategy failed (${res.status}): ${responseText}`);
+  }
+}
+
+/**
+ * Register a slave account as a CopyFactory subscriber pointing at the given strategy.
+ * subscriberId MUST equal the slave's MetaApi account ID — MetaApi enforces this.
+ */
+export async function createOrUpdateCopyFactorySubscriber(
+  subscriberId: string,
+  strategyId: string,
+  name: string
+): Promise<void> {
+  const body: CopyFactorySubscriberBody = {
+    name,
+    subscriptions: [
+      {
+        strategyId,
+        multiplier: 1,
+      },
+    ],
+  };
+
+  const url = `${COPYFACTORY_BASE}/users/current/configuration/subscribers/${subscriberId}`;
+  console.log("[CopyFactory] createOrUpdateSubscriber — REQUEST", JSON.stringify({ url, strategyId, body }, null, 2));
+
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+
+  const responseText = await res.text();
+  console.log("[CopyFactory] createOrUpdateSubscriber — RESPONSE", res.status, responseText);
+
+  if (!res.ok) {
+    throw new Error(`CopyFactory updateSubscriber failed (${res.status}): ${responseText}`);
+  }
+}
+
+/**
+ * Remove a slave account from CopyFactory so it stops receiving copied trades.
+ * Called when a slave account is deleted or its subscription expires.
+ * 404 is treated as success (already gone).
+ */
+export async function deleteCopyFactorySubscriber(subscriberId: string): Promise<void> {
+  const url = `${COPYFACTORY_BASE}/users/current/configuration/subscribers/${subscriberId}`;
+  console.log("[CopyFactory] deleteSubscriber — REQUEST", url);
+
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: headers(),
+  });
+
+  const responseText = await res.text();
+  console.log("[CopyFactory] deleteSubscriber — RESPONSE", res.status, responseText);
+
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`CopyFactory deleteSubscriber failed (${res.status}): ${responseText}`);
+  }
+}
+
+/** List all CopyFactory strategies for the current MetaApi token. */
+export async function listCopyFactoryStrategies(): Promise<unknown[]> {
+  const url = `${COPYFACTORY_BASE}/users/current/configuration/strategies`;
+  const res = await fetch(url, { headers: headers() });
+
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`CopyFactory listStrategies failed (${res.status}): ${text}`);
+  }
+
+  return JSON.parse(text) as unknown[];
+}
+
+/** List all CopyFactory subscribers for the current MetaApi token. */
+export async function listCopyFactorySubscribers(): Promise<unknown[]> {
+  const url = `${COPYFACTORY_BASE}/users/current/configuration/subscribers`;
+  const res = await fetch(url, { headers: headers() });
+
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`CopyFactory listSubscribers failed (${res.status}): ${text}`);
+  }
+
+  return JSON.parse(text) as unknown[];
 }

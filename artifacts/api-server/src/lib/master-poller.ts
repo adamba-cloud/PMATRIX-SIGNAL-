@@ -2,8 +2,8 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import {
   db,
   slaveAccountsTable,
-  copyTradeLinksTable,
   copyTradeLogsTable,
+  systemConfigTable,
 } from "@workspace/db";
 import { getRedis } from "./redis";
 import { getCopyTradeQueue } from "./copy-trade-queue";
@@ -206,34 +206,34 @@ async function pollMaster(master: {
   );
 }
 
+// BUG FIX: The original code queried copy_trade_links which requires the master
+// account to be in slave_accounts. The master lives in system_config, so links
+// were always empty and the poller silently returned every cycle.
+// Fixed: read master from system_config, fan out to all connected slave_accounts
+// directly. The VIRTUAL_MASTER_ID (0) is used where masterAccountId is needed;
+// it will not match any real slave_accounts row (IDs are 1-based serials).
+const VIRTUAL_MASTER_ID = 0;
+
 async function runPollCycle(): Promise<void> {
   if (!process.env.METAAPI_TOKEN) return;
 
-  const links = await db
-    .select({
-      linkId: copyTradeLinksTable.id,
-      masterAccountId: copyTradeLinksTable.masterAccountId,
-      masterMetaApiId: slaveAccountsTable.metaApiAccountId,
-      slaveAccountId: copyTradeLinksTable.slaveAccountId,
-      volumeMultiplier: copyTradeLinksTable.volumeMultiplier,
-      lotSizeType: copyTradeLinksTable.lotSizeType,
-      userId: copyTradeLinksTable.userId,
-    })
-    .from(copyTradeLinksTable)
-    .innerJoin(
-      slaveAccountsTable,
-      and(
-        eq(copyTradeLinksTable.masterAccountId, slaveAccountsTable.id),
-        eq(slaveAccountsTable.status, "CONNECTED"),
-        isNotNull(slaveAccountsTable.metaApiAccountId)
-      )
-    )
-    .where(eq(copyTradeLinksTable.isActive, true));
+  // Read master MetaApi account ID from system_config
+  const [masterRow] = await db
+    .select({ value: systemConfigTable.value })
+    .from(systemConfigTable)
+    .where(eq(systemConfigTable.key, "masterMetaApiAccountId"))
+    .limit(1);
 
-  if (links.length === 0) return;
+  const masterMetaApiId = masterRow?.value ?? null;
+  if (!masterMetaApiId) return; // no master configured yet
 
+  // Find all connected slave accounts
   const slaveAccounts = await db
-    .select({ id: slaveAccountsTable.id, metaApiAccountId: slaveAccountsTable.metaApiAccountId })
+    .select({
+      id: slaveAccountsTable.id,
+      metaApiAccountId: slaveAccountsTable.metaApiAccountId,
+      userId: slaveAccountsTable.userId,
+    })
     .from(slaveAccountsTable)
     .where(
       and(
@@ -242,55 +242,23 @@ async function runPollCycle(): Promise<void> {
       )
     );
 
-  const slaveMetaApiMap = new Map(
-    slaveAccounts.map((s) => [s.id, s.metaApiAccountId!])
-  );
+  if (slaveAccounts.length === 0) return;
 
-  const masterMap = new Map<
-    number,
-    {
-      id: number;
-      metaApiId: string;
-      slaves: Array<{
-        linkId: number;
-        accountId: number;
-        metaApiId: string;
-        volumeMultiplier: number;
-        lotSizeType: "FIXED" | "PROPORTIONAL";
-        userId: number;
-      }>;
-    }
-  >();
+  const master = {
+    id: VIRTUAL_MASTER_ID,
+    metaApiId: masterMetaApiId,
+    slaves: slaveAccounts.map((s) => ({
+      linkId: s.id, // reuse account ID as linkId for logging
+      accountId: s.id,
+      metaApiId: s.metaApiAccountId!,
+      volumeMultiplier: 1,
+      lotSizeType: "FIXED" as const,
+      userId: s.userId,
+    })),
+  };
 
-  for (const link of links) {
-    if (!link.masterMetaApiId) continue;
-    const slaveMetaApi = slaveMetaApiMap.get(link.slaveAccountId);
-    if (!slaveMetaApi) continue;
-
-    if (!masterMap.has(link.masterAccountId)) {
-      masterMap.set(link.masterAccountId, {
-        id: link.masterAccountId,
-        metaApiId: link.masterMetaApiId,
-        slaves: [],
-      });
-    }
-
-    masterMap.get(link.masterAccountId)!.slaves.push({
-      linkId: link.linkId,
-      accountId: link.slaveAccountId,
-      metaApiId: slaveMetaApi,
-      volumeMultiplier: parseFloat(link.volumeMultiplier ?? "1"),
-      lotSizeType: (link.lotSizeType ?? "FIXED") as "FIXED" | "PROPORTIONAL",
-      userId: link.userId,
-    });
-  }
-
-  await Promise.allSettled(
-    Array.from(masterMap.values()).map((master) =>
-      pollMaster(master).catch((err) =>
-        logger.error({ err, masterAccountId: master.id }, "Master poller: unhandled error")
-      )
-    )
+  await pollMaster(master).catch((err) =>
+    logger.error({ err, masterMetaApiId }, "Master poller: unhandled error")
   );
 }
 

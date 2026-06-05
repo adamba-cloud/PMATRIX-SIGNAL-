@@ -2,8 +2,17 @@ import { Router } from "express";
 import { db, systemConfigTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth";
-import { getMetaApiAccount, deployMetaApiAccount, undeployMetaApiAccount } from "../lib/metaapi";
+import {
+  getMetaApiAccount,
+  deployMetaApiAccount,
+  undeployMetaApiAccount,
+  createOrUpdateCopyFactoryStrategy,
+} from "../lib/metaapi";
 import { logger } from "../lib/logger";
+
+// Fixed strategy ID — we always PUT to the same strategy so it's idempotent.
+// Stored in system_config as "copyFactoryStrategyId" after first creation.
+const STRATEGY_ID = "pesamatrix";
 
 const router = Router();
 
@@ -110,8 +119,37 @@ router.put("/admin/master", requireAdmin, async (req, res): Promise<void> => {
       res.status(400).json({ error: "accountId must be a non-empty string" });
       return;
     }
-    await upsertConfig("masterMetaApiAccountId", accountId.trim());
-    logger.info({ accountId }, "[Master] masterMetaApiAccountId updated");
+    const trimmedId = accountId.trim();
+    await upsertConfig("masterMetaApiAccountId", trimmedId);
+    logger.info({ accountId: trimmedId }, "[Master] masterMetaApiAccountId updated");
+
+    // ── CopyFactory strategy setup ────────────────────────────────────────────
+    // Create/update the CopyFactory strategy that points at this master account.
+    // Uses a fixed strategyId ("pesamatrix") so PUT is idempotent.
+    // Logs the full request and response — check server logs for exact payloads.
+    if (process.env.METAAPI_TOKEN) {
+      try {
+        logger.info(
+          { strategyId: STRATEGY_ID, masterMetaApiId: trimmedId },
+          "[CopyFactory] Creating/updating strategy for master account"
+        );
+        await createOrUpdateCopyFactoryStrategy(STRATEGY_ID, trimmedId);
+        await upsertConfig("copyFactoryStrategyId", STRATEGY_ID);
+        logger.info(
+          { strategyId: STRATEGY_ID, masterMetaApiId: trimmedId },
+          "[CopyFactory] Strategy created/updated successfully — strategyId saved to system_config"
+        );
+      } catch (err) {
+        const rawMessage = err instanceof Error ? err.message : String(err);
+        logger.error(
+          { err, strategyId: STRATEGY_ID, masterMetaApiId: trimmedId, rawMessage },
+          "[CopyFactory] Failed to create/update strategy — check raw error above"
+        );
+        // Don't fail the whole request — master ID is saved, strategy setup is best-effort
+      }
+    } else {
+      logger.warn("[CopyFactory] METAAPI_TOKEN not set — skipping strategy setup");
+    }
   }
 
   if (enabled !== undefined) {
