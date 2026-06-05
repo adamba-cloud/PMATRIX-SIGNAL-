@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth";
 import {
   getMetaApiAccount,
+  getMetaApiAccountManagementState,
   deployMetaApiAccount,
   undeployMetaApiAccount,
   createOrUpdateCopyFactoryStrategy,
@@ -71,12 +72,29 @@ router.get("/admin/master", requireAdmin, async (_req, res): Promise<void> => {
     leverage?: number;
   } | null = null;
 
+  // Management state is fetched from the provisioning API — always accurate
+  // regardless of whether the account is deployed or connected.
+  let managementState: {
+    state: string;
+    server?: string;
+    region?: string;
+    login?: string;
+    name?: string;
+  } | null = null;
+
   let lastChecked: string | null = null;
   let error: string | null = null;
 
   if (accountId) {
-    try {
-      const acct = await getMetaApiAccount(accountId);
+    // Run both APIs in parallel — management API always responds, trading API
+    // only responds when the account is DEPLOYED + CONNECTED.
+    const [tradingResult, mgmtResult] = await Promise.allSettled([
+      getMetaApiAccount(accountId),
+      getMetaApiAccountManagementState(accountId),
+    ]);
+
+    if (tradingResult.status === "fulfilled") {
+      const acct = tradingResult.value;
       accountStatus = {
         state: acct.state,
         connectionStatus: acct.connectionStatus,
@@ -91,9 +109,27 @@ router.get("/admin/master", requireAdmin, async (_req, res): Promise<void> => {
         leverage: acct.leverage,
       };
       lastChecked = new Date().toISOString();
-    } catch (err) {
-      error = extractMetaApiError(err);
-      logger.warn({ err, accountId }, "[Master] Failed to fetch account status");
+    } else {
+      error = extractMetaApiError(tradingResult.reason);
+      logger.warn({ err: tradingResult.reason, accountId }, "[Master] Trading API unavailable (account may be undeployed)");
+    }
+
+    if (mgmtResult.status === "fulfilled") {
+      const m = mgmtResult.value;
+      managementState = {
+        state: m.state,
+        server: m.server,
+        login: m.login,
+        name: m.name,
+      };
+      // Use management state as the authoritative deployment state even when
+      // the trading API fails (e.g. account is UNDEPLOYED).
+      if (accountStatus) {
+        accountStatus.state = m.state;
+      }
+      lastChecked = lastChecked ?? new Date().toISOString();
+    } else {
+      logger.warn({ err: mgmtResult.reason, accountId }, "[Master] Management API call failed");
     }
   }
 
@@ -101,6 +137,7 @@ router.get("/admin/master", requireAdmin, async (_req, res): Promise<void> => {
     accountId,
     enabled,
     accountStatus,
+    managementState,
     lastChecked,
     error,
   });

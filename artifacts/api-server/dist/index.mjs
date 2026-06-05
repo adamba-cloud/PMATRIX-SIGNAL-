@@ -144303,11 +144303,16 @@ router24.get("/admin/master", requireAdmin, async (_req, res) => {
   const accountId = map2["masterMetaApiAccountId"] ?? null;
   const enabled = map2["masterEnabled"] !== "false";
   let accountStatus = null;
+  let managementState = null;
   let lastChecked = null;
   let error40 = null;
   if (accountId) {
-    try {
-      const acct = await getMetaApiAccount(accountId);
+    const [tradingResult, mgmtResult] = await Promise.allSettled([
+      getMetaApiAccount(accountId),
+      getMetaApiAccountManagementState(accountId)
+    ]);
+    if (tradingResult.status === "fulfilled") {
+      const acct = tradingResult.value;
       accountStatus = {
         state: acct.state,
         connectionStatus: acct.connectionStatus,
@@ -144322,15 +144327,31 @@ router24.get("/admin/master", requireAdmin, async (_req, res) => {
         leverage: acct.leverage
       };
       lastChecked = (/* @__PURE__ */ new Date()).toISOString();
-    } catch (err) {
-      error40 = extractMetaApiError(err);
-      logger.warn({ err, accountId }, "[Master] Failed to fetch account status");
+    } else {
+      error40 = extractMetaApiError(tradingResult.reason);
+      logger.warn({ err: tradingResult.reason, accountId }, "[Master] Trading API unavailable (account may be undeployed)");
+    }
+    if (mgmtResult.status === "fulfilled") {
+      const m = mgmtResult.value;
+      managementState = {
+        state: m.state,
+        server: m.server,
+        login: m.login,
+        name: m.name
+      };
+      if (accountStatus) {
+        accountStatus.state = m.state;
+      }
+      lastChecked = lastChecked ?? (/* @__PURE__ */ new Date()).toISOString();
+    } else {
+      logger.warn({ err: mgmtResult.reason, accountId }, "[Master] Management API call failed");
     }
   }
   res.json({
     accountId,
     enabled,
     accountStatus,
+    managementState,
     lastChecked,
     error: error40
   });

@@ -25,10 +25,18 @@ interface MasterAccountStatus {
   leverage?: number;
 }
 
+interface ManagementState {
+  state: "DEPLOYED" | "UNDEPLOYED" | "DEPLOYING" | "UNDEPLOYING" | "ERROR";
+  server?: string;
+  login?: string;
+  name?: string;
+}
+
 interface MasterConfig {
   accountId: string | null;
   enabled: boolean;
   accountStatus: MasterAccountStatus | null;
+  managementState: ManagementState | null;
   lastChecked: string | null;
   error: string | null;
 }
@@ -109,6 +117,42 @@ function DeploymentBadge({ state }: { state: MasterAccountStatus["state"] }) {
       <Badge className="bg-yellow-500/10 text-yellow-400 border-yellow-500/30 gap-1.5">
         <Loader2 className="w-3 h-3 animate-spin" />
         {state === "DEPLOYING" ? "Deploying…" : "Undeploying…"}
+      </Badge>
+    );
+  }
+  if (state === "ERROR") {
+    return (
+      <Badge className="bg-red-500/10 text-red-400 border-red-500/30 gap-1.5">
+        <AlertTriangle className="w-3 h-3" /> Error
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="bg-slate-700/50 text-slate-400 border-slate-600 gap-1.5">
+      <Server className="w-3 h-3" /> Undeployed
+    </Badge>
+  );
+}
+
+function ManagementStateBadge({ state }: { state: ManagementState["state"] }) {
+  if (state === "DEPLOYED") {
+    return (
+      <Badge className="bg-green-500/10 text-green-400 border-green-500/30 gap-1.5">
+        <CheckCircle2 className="w-3 h-3" /> Deployed
+      </Badge>
+    );
+  }
+  if (state === "DEPLOYING") {
+    return (
+      <Badge className="bg-yellow-500/10 text-yellow-400 border-yellow-500/30 gap-1.5">
+        <Loader2 className="w-3 h-3 animate-spin" /> Deploying…
+      </Badge>
+    );
+  }
+  if (state === "UNDEPLOYING") {
+    return (
+      <Badge className="bg-yellow-500/10 text-yellow-400 border-yellow-500/30 gap-1.5">
+        <Loader2 className="w-3 h-3 animate-spin" /> Undeploying…
       </Badge>
     );
   }
@@ -234,6 +278,8 @@ export default function AdminMaster() {
   }, [queryClient]);
 
   const s = data?.accountStatus;
+  const ms = data?.managementState; // authoritative state from management API
+  const effectiveState = ms?.state ?? s?.state;
   const isDirty = accountId !== null && accountId !== data?.accountId;
 
   return (
@@ -470,9 +516,9 @@ export default function AdminMaster() {
                   Last heartbeat {formatDistanceToNow(new Date(data.lastChecked), { addSuffix: true })}
                 </span>
               )}
-              {s && !data?.error && (
+              {(s || ms) && (
                 <>
-                  {s.state === "DEPLOYED" ? (
+                  {effectiveState === "DEPLOYED" ? (
                     <Button
                       size="sm"
                       variant="outline"
@@ -494,12 +540,12 @@ export default function AdminMaster() {
                       disabled={
                         deployMutation.isPending ||
                         undeployMutation.isPending ||
-                        s.state === "DEPLOYING" ||
-                        s.state === "UNDEPLOYING"
+                        effectiveState === "DEPLOYING" ||
+                        effectiveState === "UNDEPLOYING"
                       }
                       className="gap-1.5 bg-green-700 hover:bg-green-600 text-white"
                     >
-                      {deployMutation.isPending || s.state === "DEPLOYING" ? (
+                      {deployMutation.isPending || effectiveState === "DEPLOYING" ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
                         <PlayCircle className="w-3.5 h-3.5" />
@@ -520,59 +566,93 @@ export default function AdminMaster() {
             <div className="flex justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-green-500" />
             </div>
-          ) : data?.error ? (
-            <div className="flex items-start gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-              <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-red-400 font-medium">Failed to reach MetaApi</p>
-                <p className="text-red-400/70 text-sm mt-1">{data.error}</p>
-              </div>
-            </div>
-          ) : s ? (
+          ) : (s || ms) ? (
             <div className="space-y-0 divide-y divide-slate-800">
-              <StatusRow label="Connection Status">
-                <ConnectionBadge status={s.connectionStatus} />
-              </StatusRow>
-              <StatusRow label="Deployment Status">
-                <DeploymentBadge state={s.state} />
-              </StatusRow>
-              <StatusRow label="Synchronization">
-                <Badge
-                  className={
-                    s.synchronizationStatus === "SYNCHRONIZED"
-                      ? "bg-green-500/10 text-green-400 border-green-500/30"
-                      : "bg-yellow-500/10 text-yellow-400 border-yellow-500/30 gap-1.5"
-                  }
-                >
-                  {s.synchronizationStatus === "SYNCHRONIZED" ? (
-                    "Synchronized"
-                  ) : (
-                    <><Loader2 className="w-3 h-3 animate-spin" /> Synchronizing</>
+
+              {/* ── Management API row — always shown, always accurate ── */}
+              {ms && (
+                <StatusRow label={
+                  <span className="flex items-center gap-1.5">
+                    Cloud Terminal
+                    <span className="text-[10px] text-green-600 font-semibold uppercase tracking-wide bg-green-500/10 border border-green-500/20 rounded px-1 py-0.5">live</span>
+                  </span>
+                }>
+                  <ManagementStateBadge state={ms.state} />
+                </StatusRow>
+              )}
+
+              {/* ── Trading API rows — only available when account is connected ── */}
+              {s ? (
+                <>
+                  <StatusRow label="Broker Connection">
+                    <ConnectionBadge status={s.connectionStatus} />
+                  </StatusRow>
+                  <StatusRow label="Synchronization">
+                    <Badge
+                      className={
+                        s.synchronizationStatus === "SYNCHRONIZED"
+                          ? "bg-green-500/10 text-green-400 border-green-500/30"
+                          : "bg-yellow-500/10 text-yellow-400 border-yellow-500/30 gap-1.5"
+                      }
+                    >
+                      {s.synchronizationStatus === "SYNCHRONIZED" ? (
+                        "Synchronized"
+                      ) : (
+                        <><Loader2 className="w-3 h-3 animate-spin" /> Synchronizing</>
+                      )}
+                    </Badge>
+                  </StatusRow>
+                  {s.name && <StatusRow label="Account Name"><span className="text-slate-200">{s.name}</span></StatusRow>}
+                  {s.login && <StatusRow label="Login"><span className="font-mono text-slate-200">{s.login}</span></StatusRow>}
+                  {s.server && <StatusRow label="Broker Server"><span className="text-slate-200">{s.server}</span></StatusRow>}
+                  {s.broker && <StatusRow label="Broker"><span className="text-slate-200">{s.broker}</span></StatusRow>}
+                  {s.platform && <StatusRow label="Platform"><span className="text-slate-300 uppercase text-xs font-semibold">{s.platform}</span></StatusRow>}
+                  {s.balance != null && (
+                    <StatusRow label="Balance">
+                      <span className="text-slate-200 font-semibold">{s.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </StatusRow>
                   )}
-                </Badge>
-              </StatusRow>
-              {s.name && <StatusRow label="Account Name"><span className="text-slate-200">{s.name}</span></StatusRow>}
-              {s.login && <StatusRow label="Login"><span className="font-mono text-slate-200">{s.login}</span></StatusRow>}
-              {s.server && <StatusRow label="Broker Server"><span className="text-slate-200">{s.server}</span></StatusRow>}
-              {s.broker && <StatusRow label="Broker"><span className="text-slate-200">{s.broker}</span></StatusRow>}
-              {s.platform && <StatusRow label="Platform"><span className="text-slate-300 uppercase text-xs font-semibold">{s.platform}</span></StatusRow>}
-              {s.balance != null && (
-                <StatusRow label="Balance">
-                  <span className="text-slate-200 font-semibold">{s.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </StatusRow>
+                  {s.equity != null && (
+                    <StatusRow label="Equity">
+                      <span className="text-slate-200">{s.equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </StatusRow>
+                  )}
+                  {s.leverage != null && (
+                    <StatusRow label="Leverage">
+                      <span className="text-slate-300">1:{s.leverage}</span>
+                    </StatusRow>
+                  )}
+                </>
+              ) : (
+                /* Trading API unavailable — account is offline */
+                <div className="py-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/60 border border-slate-700">
+                    <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-slate-300 text-sm font-medium">Broker data unavailable</p>
+                      <p className="text-slate-500 text-xs mt-0.5">
+                        {ms?.state === "UNDEPLOYED"
+                          ? "Account is undeployed. Click Deploy to start the cloud terminal."
+                          : "Balance, positions, and broker info load only when the account is connected."}
+                      </p>
+                      {data?.error && (
+                        <p className="text-yellow-400/60 text-xs mt-1.5 font-mono leading-relaxed">{data.error}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
-              {s.equity != null && (
-                <StatusRow label="Equity">
-                  <span className="text-slate-200">{s.equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </StatusRow>
+
+              {/* Server info from management API when trading API is down */}
+              {!s && ms?.server && (
+                <StatusRow label="Broker Server"><span className="text-slate-200">{ms.server}</span></StatusRow>
               )}
-              {s.leverage != null && (
-                <StatusRow label="Leverage">
-                  <span className="text-slate-300">1:{s.leverage}</span>
-                </StatusRow>
+              {!s && ms?.login && (
+                <StatusRow label="Login"><span className="font-mono text-slate-200">{ms.login}</span></StatusRow>
               )}
+
               {data?.lastChecked && (
-                <StatusRow label="Last Heartbeat">
+                <StatusRow label="Last Checked">
                   <span className="text-slate-300 text-sm">{new Date(data.lastChecked).toLocaleTimeString()}</span>
                 </StatusRow>
               )}
@@ -590,7 +670,7 @@ export default function AdminMaster() {
   );
 }
 
-function StatusRow({ label, children }: { label: string; children: React.ReactNode }) {
+function StatusRow({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between py-3">
       <span className="text-slate-400 text-sm">{label}</span>
