@@ -13,6 +13,7 @@ import { startAdvertisementExpiryJob } from "./lib/advertisement-expiry-job";
 import { startMt5SubscriptionExpiryJob } from "./lib/mt5-subscription-expiry-job";
 import { startMasterTradeListener } from "./lib/master-trade-listener";
 import { startMasterTradeExecutionWorker } from "./lib/master-trade-execution-worker";
+import { startAutoRedeployWatcher } from "./lib/auto-redeploy-watcher";
 import { waitForRedis } from "./lib/redis";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
@@ -42,6 +43,7 @@ startMt5SubscriptionExpiryJob();
 startMetaApiSyncJob();
 startPaymentReconciler();
 startMasterTradeListener();
+startAutoRedeployWatcher();
 
 // ── Redis-dependent services — wait until Redis is ready ─────────────────────
 //

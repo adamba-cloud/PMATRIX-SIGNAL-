@@ -145257,15 +145257,15 @@ function startConnectionWatchdog() {
     logger.warn("METAAPI_TOKEN not set \u2014 connection watchdog will not start");
     return;
   }
-  const tick = async () => {
+  const tick2 = async () => {
     try {
       await runWatchdogCycle();
     } catch (err) {
       logger.error({ err }, "Watchdog: cycle error");
     }
   };
-  tick();
-  setInterval(tick, CHECK_INTERVAL_MS);
+  tick2();
+  setInterval(tick2, CHECK_INTERVAL_MS);
   logger.info({ intervalMs: CHECK_INTERVAL_MS, thresholdMs: DISCONNECT_THRESHOLD_MS }, "Connection watchdog started");
 }
 
@@ -145363,7 +145363,7 @@ function startPaymentReconciler() {
     logger.warn("Daraja env vars not set \u2014 payment reconciler will not start");
     return;
   }
-  const tick = async () => {
+  const tick2 = async () => {
     try {
       await runReconcileCycle();
     } catch (err) {
@@ -145371,8 +145371,8 @@ function startPaymentReconciler() {
     }
   };
   setTimeout(() => {
-    tick();
-    setInterval(tick, RECONCILE_INTERVAL_MS);
+    tick2();
+    setInterval(tick2, RECONCILE_INTERVAL_MS);
   }, 6e4);
   logger.info({ intervalMs: RECONCILE_INTERVAL_MS }, "Payment reconciler started");
 }
@@ -145636,6 +145636,104 @@ function startMasterTradeListener() {
   logger.info({ intervalMs: POLL_INTERVAL_MS }, "[MasterTradeListener] Started");
 }
 
+// src/lib/auto-redeploy-watcher.ts
+var CHECK_INTERVAL_MS2 = 5 * 60 * 1e3;
+var BACKOFF_MS = [5e3, 3e4, 12e4, 6e5];
+var consecutiveErrors2 = 0;
+var backoffUntil = 0;
+var lastKnownState = null;
+var isStarted = false;
+async function readSystemConfig() {
+  const rows = await db.select().from(systemConfigTable);
+  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+}
+async function tick() {
+  if (Date.now() < backoffUntil) return;
+  let config2;
+  try {
+    config2 = await readSystemConfig();
+  } catch (err) {
+    logger.warn({ err }, "[AutoRedeploy] Failed to read system_config \u2014 skipping tick");
+    return;
+  }
+  const accountId = config2["masterMetaApiAccountId"] ?? null;
+  if (!accountId) {
+    return;
+  }
+  const masterEnabled = config2["masterEnabled"] !== "false";
+  if (!masterEnabled) {
+    logger.debug("[AutoRedeploy] masterEnabled=false \u2014 skipping auto-redeploy");
+    return;
+  }
+  let state;
+  try {
+    const ms = await getMetaApiAccountManagementState(accountId);
+    state = ms.state;
+    consecutiveErrors2 = 0;
+  } catch (err) {
+    consecutiveErrors2++;
+    const backoffMs = BACKOFF_MS[Math.min(consecutiveErrors2 - 1, BACKOFF_MS.length - 1)];
+    backoffUntil = Date.now() + backoffMs;
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err), consecutiveErrors: consecutiveErrors2, backoffMs },
+      "[AutoRedeploy] Management API error \u2014 backing off"
+    );
+    return;
+  }
+  const previousState = lastKnownState;
+  lastKnownState = state;
+  if (state === "UNDEPLOYED") {
+    const reason = previousState && previousState !== "UNDEPLOYED" ? `state transitioned ${previousState} \u2192 UNDEPLOYED` : "account is UNDEPLOYED";
+    logger.info(
+      { accountId, previousState, currentState: state },
+      `[AutoRedeploy] Detected ${reason} \u2014 triggering auto-redeploy`
+    );
+    try {
+      await deployMetaApiAccount(accountId);
+      logger.info(
+        { accountId },
+        "[AutoRedeploy] Deploy request sent \u2713 \u2014 MetaApi will bring the cloud terminal online"
+      );
+    } catch (err) {
+      consecutiveErrors2++;
+      const backoffMs = BACKOFF_MS[Math.min(consecutiveErrors2 - 1, BACKOFF_MS.length - 1)];
+      backoffUntil = Date.now() + backoffMs;
+      logger.error(
+        { err: err instanceof Error ? err.message : String(err), accountId, consecutiveErrors: consecutiveErrors2, backoffMs },
+        "[AutoRedeploy] Deploy request failed \u2014 will retry after backoff"
+      );
+    }
+  } else if (previousState === "UNDEPLOYED" && state !== "UNDEPLOYED") {
+    logger.info(
+      { accountId, previousState, currentState: state },
+      "[AutoRedeploy] Account recovered from UNDEPLOYED \u2192 now in state: " + state
+    );
+  } else {
+    logger.debug(
+      { accountId, state },
+      "[AutoRedeploy] Account state OK"
+    );
+  }
+}
+function startAutoRedeployWatcher() {
+  if (isStarted) return;
+  isStarted = true;
+  setTimeout(() => {
+    tick().catch(
+      (err) => logger.error({ err }, "[AutoRedeploy] Unexpected error in initial tick")
+    );
+  }, 3e4);
+  setInterval(() => {
+    tick().catch(
+      (err) => logger.error({ err }, "[AutoRedeploy] Unexpected error in interval tick")
+    );
+  }, CHECK_INTERVAL_MS2);
+  logger.info(
+    { checkIntervalMs: CHECK_INTERVAL_MS2, initialDelayMs: 3e4 },
+    "[AutoRedeploy] Watcher started \u2014 will auto-redeploy if account goes UNDEPLOYED"
+  );
+}
+
 // src/index.ts
 var redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
 logger.info({ redisUrl: redisUrl.replace(/:\/\/([^@]+)@/, "://<credentials>@") }, "Redis: REDIS_URL resolved");
@@ -145657,6 +145755,7 @@ startMt5SubscriptionExpiryJob();
 startMetaApiSyncJob();
 startPaymentReconciler();
 startMasterTradeListener();
+startAutoRedeployWatcher();
 async function startRedisServices() {
   logger.info("Redis: waiting for ready signal before initialising queues and workers\u2026");
   try {
