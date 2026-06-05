@@ -145448,6 +145448,9 @@ function startMt5SubscriptionExpiryJob() {
 
 // src/lib/master-trade-listener.ts
 var POLL_INTERVAL_MS = 1e4;
+var BACKOFF_SKIPS = [0, 3, 12, 30, 60];
+var consecutiveErrors = 0;
+var skipsRemaining = 0;
 var previousSnapshot = /* @__PURE__ */ new Map();
 var isRunning = false;
 async function resolveAccountId() {
@@ -145539,6 +145542,10 @@ function detectChanges(prev, curr) {
 }
 async function poll() {
   if (!process.env.METAAPI_TOKEN) return;
+  if (skipsRemaining > 0) {
+    skipsRemaining--;
+    return;
+  }
   const accountId = await resolveAccountId();
   if (!accountId) {
     return;
@@ -145546,15 +145553,26 @@ async function poll() {
   let positions;
   try {
     positions = await getAccountPositions(accountId);
+    if (consecutiveErrors > 0) {
+      logger.info({ accountId }, "[MasterTradeListener] Account reachable again \u2014 backoff reset");
+      consecutiveErrors = 0;
+    }
   } catch (err) {
+    consecutiveErrors++;
+    const level = Math.min(consecutiveErrors, BACKOFF_SKIPS.length - 1);
+    skipsRemaining = BACKOFF_SKIPS[level];
     const msg = err instanceof Error ? err.message : "";
-    if (msg.includes("(404)")) {
+    const isTransient = msg.includes("(504)") || msg.includes("TimeoutError") || msg.includes("not connected to broker") || msg.includes("does not match the account region") || msg.includes("UNDEPLOYED") || msg.includes("(404)");
+    if (isTransient) {
       logger.debug(
-        { accountId },
-        "[MasterTradeListener] Account not found on MetaApi (404) \u2014 deploy the account to start receiving positions"
+        { accountId, consecutiveErrors, backoffCycles: skipsRemaining },
+        "[MasterTradeListener] Account unreachable (transient) \u2014 backing off"
       );
     } else {
-      logger.warn({ err, accountId }, "[MasterTradeListener] Failed to fetch positions \u2014 will retry");
+      logger.warn(
+        { err, accountId, consecutiveErrors, backoffCycles: skipsRemaining },
+        "[MasterTradeListener] Failed to fetch positions \u2014 will retry with backoff"
+      );
     }
     return;
   }

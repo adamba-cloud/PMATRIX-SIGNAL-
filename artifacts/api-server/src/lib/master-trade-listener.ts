@@ -7,6 +7,13 @@ import { logger } from "./logger";
 
 const POLL_INTERVAL_MS = 10_000;
 
+// Backoff state — when the account is unreachable (504, UNDEPLOYED) we
+// skip poll cycles instead of hammering MetaApi every 10 s with doomed requests.
+// Backoff levels (in skipped cycles): 0→0, 1→3 (30s), 2→12 (2min), 3→30 (5min), 4+→60 (10min)
+const BACKOFF_SKIPS = [0, 3, 12, 30, 60];
+let consecutiveErrors = 0;
+let skipsRemaining = 0;
+
 type PositionSnapshot = Map<string, MetaApiPosition>;
 
 let previousSnapshot: PositionSnapshot = new Map();
@@ -137,6 +144,12 @@ function detectChanges(prev: MetaApiPosition, curr: MetaApiPosition): string[] {
 async function poll(): Promise<void> {
   if (!process.env.METAAPI_TOKEN) return;
 
+  // Backoff: skip this cycle if we're still waiting out previous errors
+  if (skipsRemaining > 0) {
+    skipsRemaining--;
+    return;
+  }
+
   const accountId = await resolveAccountId();
 
   if (!accountId) {
@@ -147,16 +160,36 @@ async function poll(): Promise<void> {
   let positions: MetaApiPosition[];
   try {
     positions = await getAccountPositions(accountId);
+    // Success — reset backoff
+    if (consecutiveErrors > 0) {
+      logger.info({ accountId }, "[MasterTradeListener] Account reachable again — backoff reset");
+      consecutiveErrors = 0;
+    }
   } catch (err) {
-    // Log 404 at debug to avoid flooding logs when the account isn't deployed
+    consecutiveErrors++;
+    const level = Math.min(consecutiveErrors, BACKOFF_SKIPS.length - 1);
+    skipsRemaining = BACKOFF_SKIPS[level];
+
     const msg = err instanceof Error ? err.message : "";
-    if (msg.includes("(404)")) {
+    const isTransient =
+      msg.includes("(504)") ||
+      msg.includes("TimeoutError") ||
+      msg.includes("not connected to broker") ||
+      msg.includes("does not match the account region") ||
+      msg.includes("UNDEPLOYED") ||
+      msg.includes("(404)");
+
+    if (isTransient) {
+      // Account offline / undeployed / wrong region — don't flood logs
       logger.debug(
-        { accountId },
-        "[MasterTradeListener] Account not found on MetaApi (404) — deploy the account to start receiving positions"
+        { accountId, consecutiveErrors, backoffCycles: skipsRemaining },
+        "[MasterTradeListener] Account unreachable (transient) — backing off"
       );
     } else {
-      logger.warn({ err, accountId }, "[MasterTradeListener] Failed to fetch positions — will retry");
+      logger.warn(
+        { err, accountId, consecutiveErrors, backoffCycles: skipsRemaining },
+        "[MasterTradeListener] Failed to fetch positions — will retry with backoff"
+      );
     }
     return;
   }
