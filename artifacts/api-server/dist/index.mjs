@@ -141188,6 +141188,56 @@ router.get("/admin/health-services", requireAdmin, async (_req, res) => {
     });
   }
   {
+    const token2 = process.env["WHATSAPP_TOKEN"];
+    const phoneNumberId = process.env["WHATSAPP_PHONE_NUMBER_ID"];
+    const configured = !!(token2 && phoneNumberId);
+    if (!configured) {
+      services.push({
+        id: "whatsapp",
+        name: "WhatsApp (Notifications)",
+        status: "not_configured",
+        detail: "WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID not set",
+        latencyMs: null
+      });
+    } else {
+      const t0 = Date.now();
+      try {
+        const verifyRes = await fetch(
+          `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number,verified_name`,
+          { headers: { Authorization: `Bearer ${token2}` } }
+        );
+        const latencyMs = Date.now() - t0;
+        if (verifyRes.ok) {
+          const data = await verifyRes.json();
+          services.push({
+            id: "whatsapp",
+            name: "WhatsApp (Notifications)",
+            status: "ok",
+            detail: `${data.verified_name ?? "Verified"} \xB7 ${data.display_phone_number ?? phoneNumberId}`,
+            latencyMs
+          });
+        } else {
+          const err = await verifyRes.json();
+          services.push({
+            id: "whatsapp",
+            name: "WhatsApp (Notifications)",
+            status: "error",
+            detail: err?.error?.message ?? `HTTP ${verifyRes.status}`,
+            latencyMs
+          });
+        }
+      } catch (err) {
+        services.push({
+          id: "whatsapp",
+          name: "WhatsApp (Notifications)",
+          status: "error",
+          detail: err instanceof Error ? err.message : "Verification failed",
+          latencyMs: Date.now() - t0
+        });
+      }
+    }
+  }
+  {
     const jwtSecret = process.env["JWT_SECRET"];
     const isDefault = !jwtSecret || jwtSecret === "pesamatrix-secret-key-change-in-prod";
     services.push({

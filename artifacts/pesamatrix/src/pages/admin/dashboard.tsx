@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Users, ShieldCheck, CreditCard, DollarSign, Loader2,
   Database, Zap, Smartphone, BarChart2, Mail, Bell, KeyRound,
-  RefreshCw, CheckCircle2, XCircle, AlertCircle, Activity,
+  RefreshCw, CheckCircle2, XCircle, AlertCircle, Activity, MessageCircle,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useEffect, useRef, useState } from "react";
@@ -37,6 +37,7 @@ const SERVICE_ICONS: Record<string, React.ElementType> = {
   smtp: Mail,
   vapid: Bell,
   jwt: KeyRound,
+  whatsapp: MessageCircle,
 };
 
 // ─── Status helpers ─────────────────────────────────────────────────────────

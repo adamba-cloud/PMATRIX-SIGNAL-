@@ -116,6 +116,59 @@ router.get("/admin/health-services", requireAdmin, async (_req, res): Promise<vo
     });
   }
 
+  // ── WhatsApp ──────────────────────────────────────────────────────────────
+  {
+    const token = process.env["WHATSAPP_TOKEN"];
+    const phoneNumberId = process.env["WHATSAPP_PHONE_NUMBER_ID"];
+    const configured = !!(token && phoneNumberId);
+
+    if (!configured) {
+      services.push({
+        id: "whatsapp",
+        name: "WhatsApp (Notifications)",
+        status: "not_configured",
+        detail: "WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID not set",
+        latencyMs: null,
+      });
+    } else {
+      const t0 = Date.now();
+      try {
+        const verifyRes = await fetch(
+          `https://graph.facebook.com/v19.0/${phoneNumberId}?fields=display_phone_number,verified_name`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const latencyMs = Date.now() - t0;
+        if (verifyRes.ok) {
+          const data = await verifyRes.json() as { display_phone_number?: string; verified_name?: string };
+          services.push({
+            id: "whatsapp",
+            name: "WhatsApp (Notifications)",
+            status: "ok",
+            detail: `${data.verified_name ?? "Verified"} · ${data.display_phone_number ?? phoneNumberId}`,
+            latencyMs,
+          });
+        } else {
+          const err = await verifyRes.json() as { error?: { message?: string } };
+          services.push({
+            id: "whatsapp",
+            name: "WhatsApp (Notifications)",
+            status: "error",
+            detail: err?.error?.message ?? `HTTP ${verifyRes.status}`,
+            latencyMs,
+          });
+        }
+      } catch (err) {
+        services.push({
+          id: "whatsapp",
+          name: "WhatsApp (Notifications)",
+          status: "error",
+          detail: err instanceof Error ? err.message : "Verification failed",
+          latencyMs: Date.now() - t0,
+        });
+      }
+    }
+  }
+
   // ── JWT ───────────────────────────────────────────────────────────────────
   {
     const jwtSecret = process.env["JWT_SECRET"];
