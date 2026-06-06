@@ -120,3 +120,34 @@ export function waitForRedis(timeoutMs = 15_000): Promise<void> {
 export function isRedisAvailable(): boolean {
   return !_unavailable && _redis !== null && _ready;
 }
+
+/**
+ * Opens a fresh one-shot Redis connection just to ping — completely
+ * independent of the singleton and the _unavailable flag.  Use this
+ * for health checks so the page always reflects the real server state.
+ *
+ * Returns { ok: true, latencyMs } on success or { ok: false, error } on failure.
+ */
+export async function checkRedisDirect(): Promise<
+  { ok: true; latencyMs: number } | { ok: false; error: string }
+> {
+  const url = process.env.REDIS_URL ?? "redis://localhost:6379";
+  const client = new Redis(url, {
+    lazyConnect: true,
+    connectTimeout: 4_000,
+    maxRetriesPerRequest: 0,
+    retryStrategy: () => null,
+    enableOfflineQueue: false,
+  });
+
+  const t0 = Date.now();
+  try {
+    await client.connect();
+    await client.ping();
+    return { ok: true, latencyMs: Date.now() - t0 };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "ping failed" };
+  } finally {
+    client.disconnect();
+  }
+}

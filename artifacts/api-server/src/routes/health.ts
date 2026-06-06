@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { HealthCheckResponse } from "@workspace/api-zod";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { getRedis } from "../lib/redis";
+import { checkRedisDirect } from "../lib/redis";
 import { getSmtpConfig } from "../lib/mailer";
 import { requireAdmin } from "../lib/auth";
 
@@ -37,20 +37,16 @@ router.get("/admin/health-services", requireAdmin, async (_req, res): Promise<vo
 
   // ── Redis ─────────────────────────────────────────────────────────────────
   {
-    const t0 = Date.now();
-    try {
-      const redis = getRedis();
-      await redis.ping();
-      services.push({ id: "redis", name: "Redis", status: "ok", detail: "PONG received", latencyMs: Date.now() - t0 });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Cannot connect";
-      const isUnavailable = msg.includes("not available");
+    const result = await checkRedisDirect();
+    if (result.ok) {
+      services.push({ id: "redis", name: "Redis", status: "ok", detail: "PONG received", latencyMs: result.latencyMs });
+    } else {
       services.push({
         id: "redis",
         name: "Redis",
-        status: isUnavailable ? "not_configured" : "error",
-        detail: isUnavailable ? "Not running — copy trading disabled" : msg,
-        latencyMs: Date.now() - t0,
+        status: "error",
+        detail: result.error,
+        latencyMs: null,
       });
     }
   }

@@ -139205,6 +139205,26 @@ function waitForRedis(timeoutMs = 15e3) {
 function isRedisAvailable() {
   return !_unavailable && _redis !== null && _ready;
 }
+async function checkRedisDirect() {
+  const url2 = process.env.REDIS_URL ?? "redis://localhost:6379";
+  const client = new import_ioredis.default(url2, {
+    lazyConnect: true,
+    connectTimeout: 4e3,
+    maxRetriesPerRequest: 0,
+    retryStrategy: () => null,
+    enableOfflineQueue: false
+  });
+  const t0 = Date.now();
+  try {
+    await client.connect();
+    await client.ping();
+    return { ok: true, latencyMs: Date.now() - t0 };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "ping failed" };
+  } finally {
+    client.disconnect();
+  }
+}
 
 // src/lib/mailer.ts
 import nodemailer from "nodemailer";
@@ -141120,20 +141140,16 @@ router.get("/admin/health-services", requireAdmin, async (_req, res) => {
     }
   }
   {
-    const t0 = Date.now();
-    try {
-      const redis = getRedis();
-      await redis.ping();
-      services.push({ id: "redis", name: "Redis", status: "ok", detail: "PONG received", latencyMs: Date.now() - t0 });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Cannot connect";
-      const isUnavailable = msg.includes("not available");
+    const result = await checkRedisDirect();
+    if (result.ok) {
+      services.push({ id: "redis", name: "Redis", status: "ok", detail: "PONG received", latencyMs: result.latencyMs });
+    } else {
       services.push({
         id: "redis",
         name: "Redis",
-        status: isUnavailable ? "not_configured" : "error",
-        detail: isUnavailable ? "Not running \u2014 copy trading disabled" : msg,
-        latencyMs: Date.now() - t0
+        status: "error",
+        detail: result.error,
+        latencyMs: null
       });
     }
   }
