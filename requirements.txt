@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+gunicorn
+requests
+python-dotenv
+psycopg2-binary
+redis
