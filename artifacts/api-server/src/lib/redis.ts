@@ -140,6 +140,9 @@ export async function checkRedisDirect(): Promise<
     enableOfflineQueue: false,
   });
 
+  // Suppress the default ioredis "unhandled error" throw — we handle it in the catch below
+  client.on("error", () => {});
+
   const t0 = Date.now();
   try {
     await client.connect();
