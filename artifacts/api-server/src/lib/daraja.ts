@@ -10,6 +10,13 @@ function getEnv(key: string): string {
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
 
+function wrapFetchError(err: unknown, context: string): never {
+  if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+    throw new Error(`${context} timed out. Safaricom's API is slow to respond — please try again.`);
+  }
+  throw err;
+}
+
 export async function getDarajaToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt - 30_000) {
     return cachedToken.token;
@@ -19,13 +26,19 @@ export async function getDarajaToken(): Promise<string> {
   const consumerSecret = getEnv("DARAJA_CONSUMER_SECRET");
   const credentials = Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64");
 
-  const res = await fetch(
-    `${DARAJA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
-    {
-      method: "GET",
-      headers: { Authorization: `Basic ${credentials}` },
-    }
-  );
+  let res: Response;
+  try {
+    res = await fetch(
+      `${DARAJA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
+      {
+        method: "GET",
+        headers: { Authorization: `Basic ${credentials}` },
+        signal: AbortSignal.timeout(15_000),
+      }
+    );
+  } catch (err) {
+    wrapFetchError(err, "Daraja OAuth token request");
+  }
 
   if (!res.ok) {
     const body = await res.text();
@@ -112,14 +125,20 @@ export async function initiateStkPush({
 
   logger.info({ phoneNumber, amount, accountReference }, "Initiating STK Push");
 
-  const res = await fetch(`${DARAJA_BASE_URL}/mpesa/stkpush/v1/processrequest`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${DARAJA_BASE_URL}/mpesa/stkpush/v1/processrequest`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (err) {
+    wrapFetchError(err, "STK Push request");
+  }
 
   const data = (await res.json()) as StkPushResult & { errorCode?: string; errorMessage?: string };
 
