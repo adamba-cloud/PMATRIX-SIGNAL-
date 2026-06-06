@@ -1,27 +1,50 @@
 import { useEffect, useState, useRef } from "react";
-import { ExternalLink, ChevronLeft, ChevronRight, Megaphone } from "lucide-react";
-import { useGetActiveAdvertisements, type Advertisement } from "@workspace/api-client-react";
+import { ExternalLink, ChevronLeft, ChevronRight, Megaphone, ImageOff } from "lucide-react";
+import { useGetActiveAdvertisements, useGetAdBroadcastConfig, type Advertisement } from "@workspace/api-client-react";
 
 function AdSlide({ ad }: { ad: Advertisement }) {
-  const inner = (
-    <div className="flex items-center gap-4 h-full px-6 w-full">
-      {ad.mediaType === "IMAGE" && ad.mediaUrl && (
+  const [imgError, setImgError] = useState(false);
+  const [vidError, setVidError] = useState(false);
+
+  const media = (() => {
+    if (ad.mediaType === "IMAGE" && ad.mediaUrl && !imgError) {
+      return (
         <img
           src={ad.mediaUrl}
           alt={ad.title}
           className="h-10 w-16 object-cover rounded flex-shrink-0"
+          onError={() => setImgError(true)}
         />
-      )}
-      {ad.mediaType === "VIDEO" && ad.mediaUrl && (
+      );
+    }
+    if (ad.mediaType === "VIDEO" && ad.mediaUrl && !vidError) {
+      return (
         <video
-          src={ad.mediaUrl}
+          key={ad.mediaUrl}
           className="h-10 w-16 object-cover rounded flex-shrink-0"
           muted
           autoPlay
           loop
           playsInline
-        />
-      )}
+          onError={() => setVidError(true)}
+        >
+          <source src={ad.mediaUrl} />
+        </video>
+      );
+    }
+    if (imgError || vidError) {
+      return (
+        <div className="h-10 w-16 rounded bg-slate-800 flex items-center justify-center flex-shrink-0">
+          <ImageOff className="w-4 h-4 text-slate-600" />
+        </div>
+      );
+    }
+    return null;
+  })();
+
+  const inner = (
+    <div className="flex items-center gap-4 h-full px-6 w-full">
+      {media}
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-slate-100 truncate">{ad.title}</p>
         {ad.description && (
@@ -54,8 +77,13 @@ function AdSlide({ ad }: { ad: Advertisement }) {
 
 export function AdCarousel() {
   const { data: ads = [] } = useGetActiveAdvertisements({
-    query: { refetchInterval: 60000, retry: false },
+    query: { refetchInterval: 60_000, retry: false },
   });
+  const { data: config } = useGetAdBroadcastConfig({
+    query: { retry: false },
+  });
+
+  const intervalMs = (config?.broadcastIntervalSeconds ?? 30) * 1000;
 
   const [index, setIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -63,14 +91,14 @@ export function AdCarousel() {
   const startTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
-      setIndex((i) => (i + 1) % (ads.length || 1));
-    }, 6000);
+      setIndex((i) => (i + 1) % Math.max(ads.length, 1));
+    }, intervalMs);
   };
 
   useEffect(() => {
     if (ads.length > 1) startTimer();
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [ads.length]);
+  }, [ads.length, intervalMs]);
 
   useEffect(() => {
     if (index >= ads.length && ads.length > 0) setIndex(0);

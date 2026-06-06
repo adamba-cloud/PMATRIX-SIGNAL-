@@ -27,6 +27,7 @@ export const advertisementSettingsTable = pgTable("advertisement_settings", {
   feePerDay: numeric("fee_per_day", { precision: 12, scale: 2 }).notNull().default("100"),
   minDays: integer("min_days").notNull().default(1),
   maxDays: integer("max_days").notNull().default(90),
+  broadcastIntervalSeconds: integer("broadcast_interval_seconds").notNull().default(30),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

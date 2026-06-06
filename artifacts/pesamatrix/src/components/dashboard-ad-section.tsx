@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { ExternalLink, ChevronLeft, ChevronRight, Megaphone } from "lucide-react";
-import { useGetActiveAdvertisements, type Advertisement } from "@workspace/api-client-react";
+import { ExternalLink, ChevronLeft, ChevronRight, Megaphone, ImageOff } from "lucide-react";
+import { useGetActiveAdvertisements, useGetAdBroadcastConfig, type Advertisement } from "@workspace/api-client-react";
 
-// ── Single ad slide ───────────────────────────────────────────────────────────
+const DEFAULT_INTERVAL_MS = 30_000;
+
+// ── Media with error fallback ─────────────────────────────────────────────────
 
 function AdMedia({ ad, visible }: { ad: Advertisement; visible: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [imgError, setImgError] = useState(false);
+  const [vidError, setVidError] = useState(false);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -18,7 +22,7 @@ function AdMedia({ ad, visible }: { ad: Advertisement; visible: boolean }) {
     }
   }, [visible]);
 
-  if (ad.mediaType === "IMAGE" && ad.mediaUrl) {
+  if (ad.mediaType === "IMAGE" && ad.mediaUrl && !imgError) {
     return (
       <img
         src={ad.mediaUrl}
@@ -26,41 +30,45 @@ function AdMedia({ ad, visible }: { ad: Advertisement; visible: boolean }) {
         loading="lazy"
         decoding="async"
         className="w-full h-full object-cover"
+        onError={() => setImgError(true)}
       />
     );
   }
 
-  if (ad.mediaType === "VIDEO" && ad.mediaUrl) {
+  if (ad.mediaType === "VIDEO" && ad.mediaUrl && !vidError) {
     return (
       <video
         ref={videoRef}
-        src={ad.mediaUrl}
+        key={ad.mediaUrl}
         className="w-full h-full object-cover"
         muted
         autoPlay
         loop
         playsInline
         preload="metadata"
-      />
+        onError={() => setVidError(true)}
+      >
+        <source src={ad.mediaUrl} />
+      </video>
     );
   }
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900">
-      <Megaphone className="w-12 h-12 text-green-500/40" />
+    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 gap-3">
+      <Megaphone className="w-10 h-10 text-green-500/40" />
+      {(imgError || vidError) && (
+        <div className="flex items-center gap-1.5 text-xs text-slate-600">
+          <ImageOff className="w-3.5 h-3.5" />
+          <span>Media unavailable</span>
+        </div>
+      )}
     </div>
   );
 }
 
-function AdSlide({
-  ad,
-  active,
-  direction,
-}: {
-  ad: Advertisement;
-  active: boolean;
-  direction: "left" | "right";
-}) {
+// ── Single slide ──────────────────────────────────────────────────────────────
+
+function AdSlide({ ad, active }: { ad: Advertisement; active: boolean }) {
   const content = (
     <div className="relative w-full h-full group">
       <AdMedia ad={ad} visible={active} />
@@ -70,11 +78,11 @@ function AdSlide({
       <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5">
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-white font-semibold text-sm sm:text-base leading-tight line-clamp-1">
+            <p className="text-white font-semibold text-sm sm:text-base leading-tight line-clamp-1 drop-shadow">
               {ad.title}
             </p>
             {ad.description && (
-              <p className="text-slate-300 text-xs sm:text-sm mt-0.5 line-clamp-2 leading-snug">
+              <p className="text-slate-300 text-xs sm:text-sm mt-0.5 line-clamp-2 leading-snug drop-shadow">
                 {ad.description}
               </p>
             )}
@@ -106,7 +114,7 @@ function AdSlide({
   return <div className="w-full h-full">{content}</div>;
 }
 
-// ── Progress bar ─────────────────────────────────────────────────────────────
+// ── Progress bar ──────────────────────────────────────────────────────────────
 
 function ProgressBar({ active, duration }: { active: boolean; duration: number }) {
   return (
@@ -122,31 +130,31 @@ function ProgressBar({ active, duration }: { active: boolean; duration: number }
   );
 }
 
-// ── Main section ─────────────────────────────────────────────────────────────
-
-const ROTATE_MS = 6000;
+// ── Main section ──────────────────────────────────────────────────────────────
 
 export function DashboardAdSection() {
   const { data: ads = [] } = useGetActiveAdvertisements({
     query: { refetchInterval: 60_000, retry: false },
   });
+  const { data: config } = useGetAdBroadcastConfig({
+    query: { retry: false },
+  });
+
+  const intervalMs = (config?.broadcastIntervalSeconds ?? 30) * 1000;
 
   const [index, setIndex] = useState(0);
   const [animating, setAnimating] = useState(false);
-  const [slideDir, setSlideDir] = useState<"left" | "right">("right");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   const touchStartX = useRef<number | null>(null);
 
   const goTo = useCallback(
-    (next: number, dir: "left" | "right" = "right") => {
+    (next: number) => {
       if (animating || ads.length <= 1) return;
-      setSlideDir(dir);
       setAnimating(true);
       setTimeout(() => {
         setIndex(next);
         setAnimating(false);
-      }, 350);
+      }, 300);
     },
     [animating, ads.length]
   );
@@ -154,19 +162,13 @@ export function DashboardAdSection() {
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
-      setIndex((i) => {
-        const next = (i + 1) % ads.length;
-        setSlideDir("right");
-        return next;
-      });
-    }, ROTATE_MS);
-  }, [ads.length]);
+      setIndex((i) => (i + 1) % Math.max(ads.length, 1));
+    }, intervalMs);
+  }, [ads.length, intervalMs]);
 
   useEffect(() => {
     if (ads.length > 1) startTimer();
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [ads.length, startTimer]);
 
   useEffect(() => {
@@ -175,7 +177,7 @@ export function DashboardAdSection() {
 
   const navigate = (dir: 1 | -1) => {
     const next = (index + dir + ads.length) % ads.length;
-    goTo(next, dir === 1 ? "right" : "left");
+    goTo(next);
     startTimer();
   };
 
@@ -199,9 +201,7 @@ export function DashboardAdSection() {
     <div className="w-full">
       <div className="flex items-center gap-2 mb-3">
         <Megaphone className="w-4 h-4 text-green-500" />
-        <span className="text-xs font-semibold uppercase tracking-widest text-green-500">
-          Sponsored
-        </span>
+        <span className="text-xs font-semibold uppercase tracking-widest text-green-500">Sponsored</span>
         {ads.length > 1 && (
           <span className="text-xs text-slate-600 ml-auto tabular-nums">
             {index + 1} / {ads.length}
@@ -216,10 +216,10 @@ export function DashboardAdSection() {
         onTouchEnd={onTouchEnd}
       >
         <div
-          className="absolute inset-0 transition-opacity duration-350"
-          style={{ opacity: animating ? 0 : 1, transition: "opacity 350ms ease" }}
+          className="absolute inset-0"
+          style={{ opacity: animating ? 0 : 1, transition: "opacity 300ms ease" }}
         >
-          <AdSlide ad={ad} active={!animating} direction={slideDir} />
+          <AdSlide ad={ad} active={!animating} />
         </div>
 
         {ads.length > 1 && (
@@ -244,10 +244,10 @@ export function DashboardAdSection() {
 
       {ads.length > 1 && (
         <div className="flex items-center gap-1.5 mt-2.5">
-          {ads.map((_, i) => (
+          {ads.map((_a: Advertisement, i: number) => (
             <button
               key={i}
-              onClick={() => { goTo(i, i > index ? "right" : "left"); startTimer(); }}
+              onClick={() => { goTo(i); startTimer(); }}
               className="transition-all duration-300"
               aria-label={`Go to advertisement ${i + 1}`}
             >
@@ -259,7 +259,7 @@ export function DashboardAdSection() {
             </button>
           ))}
           <div className="flex-1 ml-2">
-            <ProgressBar active={!animating} duration={ROTATE_MS} />
+            <ProgressBar active={!animating} duration={intervalMs} />
           </div>
         </div>
       )}

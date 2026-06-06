@@ -1,0 +1,128 @@
+UPGRADE REQUEST: ADVERTISEMENT SYSTEM FIXES AND ENHANCEMENTS
+
+IMPORTANT:
+
+This is an upgrade to the existing Advertisement System. Do NOT remove or redesign existing advertisement creation, payment, approval, fee configuration, or duration settings.
+
+The current workflow must remain:
+
+1. Users create advertisements.
+2. Users pay the advertisement fee.
+3. Users select advertisement duration within Admin-configured limits.
+4. Advertisements remain pending until approved.
+5. Admin approves or rejects advertisements.
+6. Only approved advertisements are broadcast.
+
+ISSUES TO FIX
+
+1. TOP ADVERTISEMENT BANNER
+
+The current advertisement banner at the top of the platform is not displaying advertisements correctly.
+
+Requirements:
+
+- Remove the current top advertisement banner completely OR replace it with a professional animated banner.
+- If replaced, it should support smooth animations and modern styling.
+- It should correctly display approved advertisement content.
+
+2. DASHBOARD ADVERTISEMENT DISPLAY
+
+The Advertisement Section on the User Dashboard is not properly displaying uploaded advertisements.
+
+Requirements:
+
+- Verify advertisement image rendering.
+- Verify advertisement video rendering.
+- Ensure uploaded advertisement media is loaded from the correct storage location.
+- Ensure approved advertisements display correctly.
+- Fix broken image paths.
+- Fix broken video paths.
+- Add proper fallback handling if media is unavailable.
+
+3. CONTENT SECTION MEDIA DISPLAY
+
+Uploaded pictures and videos in the Content Section are not displaying or playing correctly.
+
+Requirements:
+
+- Fix image loading in Content.
+- Fix video playback in Content.
+- Verify file uploads are saved correctly.
+- Verify media URLs are generated correctly.
+- Ensure uploaded media is accessible on both desktop and mobile devices.
+- Ensure videos can play directly within the platform.
+
+4. ADVERTISEMENT BROADCAST SCHEDULING
+
+Many users may have active advertisements at the same time.
+
+Add a broadcast scheduling system that allows the Admin to control how advertisements are rotated and displayed.
+
+Requirements:
+
+- Add an Admin Broadcast Schedule Manager.
+- Allow Admin to set broadcast intervals.
+- Allow Admin to control advertisement rotation frequency.
+- Ensure all approved advertisements receive fair exposure.
+- Prevent a single advertisement from dominating display time.
+- Automatically rotate approved advertisements according to the Admin-defined schedule.
+
+Example:
+
+Admin can configure:
+
+- Advert A = Display for 30 seconds
+- Advert B = Display for 30 seconds
+- Advert C = Display for 30 seconds
+
+The system should automatically rotate through all approved advertisements.
+
+5. FAIR DISTRIBUTION SYSTEM
+
+Because many users may pay for advertisements at the same time:
+
+- Create a fair advertisement rotation system.
+- Give all active approved advertisements equal opportunity to be displayed.
+- Respect advertisement expiry dates.
+- Exclude expired advertisements automatically.
+- Exclude rejected advertisements automatically.
+
+6. MEDIA COMPATIBILITY
+
+Verify support for:
+
+Images:
+
+- JPG
+- JPEG
+- PNG
+- WEBP
+
+Videos:
+
+- MP4
+- WEBM
+
+Ensure all supported media formats display correctly across desktop and mobile devices.
+
+7. PERFORMANCE OPTIMIZATION
+
+- Lazy load images.
+- Optimize video loading.
+- Prevent advertisement sections from slowing the dashboard.
+- Cache active advertisement media when possible.
+
+FINAL REQUIREMENT
+
+Do not change the existing advertisement business logic.
+
+Keep:
+
+- Advertisement fees
+- Minimum advertisement days
+- Maximum advertisement days
+- User advertisement creation
+- Payment workflow
+- Admin approval workflow
+
+Only fix media display issues, improve advertisement visibility, implement broadcast scheduling, and ensure fair rotation of approved advertisements across the platform.

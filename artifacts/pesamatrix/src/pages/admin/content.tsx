@@ -224,12 +224,37 @@ function MediaTab() {
                   <div key={item.id} className="rounded-lg overflow-hidden bg-slate-950 border border-slate-800 group">
                     <div className="aspect-video bg-slate-900 flex items-center justify-center overflow-hidden">
                       {isVid ? (
-                        <div className="flex flex-col items-center text-slate-500">
-                          <VideoIcon className="w-10 h-10 mb-2" />
-                          <span className="text-xs">Video</span>
-                        </div>
+                        <video
+                          key={src}
+                          src={src}
+                          className="w-full h-full object-cover"
+                          controls
+                          preload="metadata"
+                          playsInline
+                          onError={(e) => {
+                            const el = e.currentTarget.parentElement;
+                            if (el) {
+                              el.innerHTML = '<div class="flex flex-col items-center text-slate-500 gap-2"><svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg><span class="text-xs">Video unavailable</span></div>';
+                            }
+                          }}
+                        />
                       ) : (
-                        <img src={src} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
+                        <img
+                          src={src}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                            const parent = e.currentTarget.parentElement;
+                            if (parent && !parent.querySelector(".img-err")) {
+                              const div = document.createElement("div");
+                              div.className = "img-err flex flex-col items-center text-slate-500 gap-2";
+                              div.innerHTML = '<svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span class="text-xs">Image unavailable</span>';
+                              parent.appendChild(div);
+                            }
+                          }}
+                        />
                       )}
                     </div>
                     <div className="p-3 flex items-start justify-between gap-2">

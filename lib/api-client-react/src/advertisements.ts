@@ -46,7 +46,12 @@ export interface AdvertisementSettings {
   feePerDay: string;
   minDays: number;
   maxDays: number;
+  broadcastIntervalSeconds: number;
   updatedAt: string;
+}
+
+export interface AdBroadcastConfig {
+  broadcastIntervalSeconds: number;
 }
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
@@ -55,6 +60,7 @@ export const getActiveAdsQueryKey = () => ["/api/advertisements/active"] as cons
 export const getAdSettingsQueryKey = () => ["/api/advertisements/settings"] as const;
 export const getMyAdsQueryKey = () => ["/api/advertisements/mine"] as const;
 export const getMyAdPaymentsQueryKey = () => ["/api/advertisements/payments/mine"] as const;
+export const getAdBroadcastConfigQueryKey = () => ["/api/advertisements/config"] as const;
 
 export interface AdPayment {
   id: number;
@@ -72,6 +78,21 @@ export interface AdPayment {
 }
 export const getAdminAdsQueryKey = () => ["/api/admin/advertisements"] as const;
 export const getAdminAdSettingsQueryKey = () => ["/api/admin/advertisements/settings"] as const;
+
+// ─── Broadcast Config (public — no auth) ─────────────────────────────────────
+
+export const useGetAdBroadcastConfig = <
+  TData = AdBroadcastConfig,
+  TError = ErrorType<unknown>,
+>(
+  options?: { query?: UseQueryOptions<AdBroadcastConfig, TError, TData> }
+): UseQueryResult<TData, TError> =>
+  useQuery({
+    queryKey: getAdBroadcastConfigQueryKey(),
+    queryFn: () => customFetch<AdBroadcastConfig>("/api/advertisements/config", { method: "GET" }),
+    staleTime: 60_000,
+    ...options?.query,
+  } as UseQueryOptions<AdBroadcastConfig, TError, TData>);
 
 // ─── My Ad Payments ───────────────────────────────────────────────────────────
 
@@ -199,19 +220,19 @@ export const useUpdateAdvertisementSettings = <TError = ErrorType<unknown>, TCon
     mutation?: UseMutationOptions<
       AdvertisementSettings,
       TError,
-      { data: { feePerDay: number; minDays: number; maxDays: number } },
+      { data: { feePerDay: number; minDays: number; maxDays: number; broadcastIntervalSeconds?: number } },
       TContext
     >;
   }
 ): UseMutationResult<
   AdvertisementSettings,
   TError,
-  { data: { feePerDay: number; minDays: number; maxDays: number } },
+  { data: { feePerDay: number; minDays: number; maxDays: number; broadcastIntervalSeconds?: number } },
   TContext
 > => {
   const mutationFn: MutationFunction<
     AdvertisementSettings,
-    { data: { feePerDay: number; minDays: number; maxDays: number } }
+    { data: { feePerDay: number; minDays: number; maxDays: number; broadcastIntervalSeconds?: number } }
   > = ({ data }) =>
     customFetch<AdvertisementSettings>("/api/admin/advertisements/settings", {
       method: "POST",

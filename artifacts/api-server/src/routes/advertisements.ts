@@ -3,7 +3,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { db, advertisementsTable, advertisementSettingsTable } from "@workspace/db";
-import { eq, and, desc, lte, gte, isNotNull } from "drizzle-orm";
+import { eq, and, desc, asc, lte, gte, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { initiateStkPush, formatPhone } from "../lib/daraja";
 import { paymentsTable } from "@workspace/db";
@@ -53,22 +53,33 @@ async function getSettings() {
   if (rows.length > 0) return rows[0];
   const [created] = await db
     .insert(advertisementSettingsTable)
-    .values({ feePerDay: "100", minDays: 1, maxDays: 90 })
+    .values({ feePerDay: "100", minDays: 1, maxDays: 90, broadcastIntervalSeconds: 30 })
     .returning();
   return created;
 }
 
 // ─── Public / User ────────────────────────────────────────────────────────────
 
+// Public broadcast config (no auth) — used by carousels to get rotation interval
+router.get("/advertisements/config", async (_req, res): Promise<void> => {
+  try {
+    const settings = await getSettings();
+    res.json({ broadcastIntervalSeconds: settings.broadcastIntervalSeconds });
+  } catch {
+    res.json({ broadcastIntervalSeconds: 30 });
+  }
+});
+
 router.get("/advertisements/settings", requireAuth, async (_req, res): Promise<void> => {
   try {
     const settings = await getSettings();
     res.json(settings);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to load settings" });
   }
 });
 
+// Returns all APPROVED, non-expired ads in FIFO order (oldest first) for fair rotation
 router.get("/advertisements/active", async (_req, res): Promise<void> => {
   try {
     const now = new Date();
@@ -84,9 +95,9 @@ router.get("/advertisements/active", async (_req, res): Promise<void> => {
           gte(advertisementsTable.endDate, now)
         )
       )
-      .orderBy(desc(advertisementsTable.createdAt));
+      .orderBy(asc(advertisementsTable.createdAt));
     res.json(ads);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to load advertisements" });
   }
 });
@@ -99,7 +110,7 @@ router.get("/advertisements/mine", requireAuth, async (req, res): Promise<void> 
       .where(eq(advertisementsTable.userId, req.userId!))
       .orderBy(desc(advertisementsTable.createdAt));
     res.json(ads);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to load your advertisements" });
   }
 });
@@ -173,7 +184,7 @@ router.post(
         .returning();
 
       res.status(201).json(ad);
-    } catch (err) {
+    } catch {
       res.status(500).json({ error: "Failed to create advertisement" });
     }
   }
@@ -203,7 +214,7 @@ router.get("/advertisements/payments/mine", requireAuth, async (req, res): Promi
       .where(eq(paymentsTable.userId, req.userId!))
       .orderBy(desc(paymentsTable.createdAt));
     res.json(payments);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to load payment history" });
   }
 });
@@ -307,7 +318,7 @@ router.post("/advertisements/:id/pay", requireAuth, async (req, res): Promise<vo
       paymentId: payment.id,
       message: stkResult.CustomerMessage,
     });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to initiate payment" });
   }
 });
@@ -321,7 +332,7 @@ router.get("/admin/advertisements", requireAdmin, async (_req, res): Promise<voi
       .from(advertisementsTable)
       .orderBy(desc(advertisementsTable.createdAt));
     res.json(ads);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to load advertisements" });
   }
 });
@@ -330,23 +341,26 @@ router.get("/admin/advertisements/settings", requireAdmin, async (_req, res): Pr
   try {
     const settings = await getSettings();
     res.json(settings);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to load settings" });
   }
 });
 
 router.post("/admin/advertisements/settings", requireAdmin, async (req, res): Promise<void> => {
   try {
-    const { feePerDay, minDays, maxDays } = req.body as {
+    const { feePerDay, minDays, maxDays, broadcastIntervalSeconds } = req.body as {
       feePerDay?: number;
       minDays?: number;
       maxDays?: number;
+      broadcastIntervalSeconds?: number;
     };
 
     if (feePerDay == null || minDays == null || maxDays == null) {
       res.status(400).json({ error: "feePerDay, minDays, and maxDays are required" });
       return;
     }
+
+    const intervalSecs = Math.max(5, Math.min(300, Number(broadcastIntervalSeconds ?? 30)));
 
     const existing = await db.select().from(advertisementSettingsTable).limit(1);
     const now = new Date();
@@ -355,20 +369,20 @@ router.post("/admin/advertisements/settings", requireAdmin, async (req, res): Pr
     if (existing.length > 0) {
       const [updated] = await db
         .update(advertisementSettingsTable)
-        .set({ feePerDay: String(feePerDay), minDays, maxDays, updatedAt: now })
+        .set({ feePerDay: String(feePerDay), minDays, maxDays, broadcastIntervalSeconds: intervalSecs, updatedAt: now })
         .where(eq(advertisementSettingsTable.id, existing[0].id))
         .returning();
       settings = updated;
     } else {
       const [created] = await db
         .insert(advertisementSettingsTable)
-        .values({ feePerDay: String(feePerDay), minDays, maxDays })
+        .values({ feePerDay: String(feePerDay), minDays, maxDays, broadcastIntervalSeconds: intervalSecs })
         .returning();
       settings = created;
     }
 
     res.json(settings);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to update settings" });
   }
 });
@@ -397,7 +411,7 @@ router.patch("/admin/advertisements/:id/approve", requireAdmin, async (req, res)
       .returning();
 
     res.json(updated);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to approve advertisement" });
   }
 });
@@ -418,7 +432,7 @@ router.patch("/admin/advertisements/:id/reject", requireAdmin, async (req, res):
     }
 
     res.json(updated);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to reject advertisement" });
   }
 });
@@ -445,7 +459,7 @@ router.patch("/admin/advertisements/:id/pause", requireAdmin, async (req, res): 
       .returning();
 
     res.json(updated);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to toggle pause" });
   }
 });
@@ -465,7 +479,7 @@ router.delete("/admin/advertisements/:id", requireAdmin, async (req, res): Promi
 
     await db.delete(advertisementsTable).where(eq(advertisementsTable.id, id));
     res.json({ ok: true });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to delete advertisement" });
   }
 });
