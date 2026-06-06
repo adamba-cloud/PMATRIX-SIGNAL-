@@ -16,7 +16,7 @@ services:
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/pesamatrix run build
     preDeployCommand: pnpm --filter @workspace/db run push
     startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
-    healthCheckPath: /api/healthz
+    healthCheckPath: /api/health
     autoDeploy: true
 
     envVars:

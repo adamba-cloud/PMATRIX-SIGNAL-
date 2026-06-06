@@ -1,18 +1,47 @@
 import { Router, type IRouter } from "express";
-import { HealthCheckResponse } from "@workspace/api-zod";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { checkRedisDirect } from "../lib/redis";
+import { checkRedisDirect, isRedisAvailable } from "../lib/redis";
 import { getSmtpConfig } from "../lib/mailer";
 import { requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
 
-router.get("/healthz", (_req, res) => {
-  const data = HealthCheckResponse.parse({ status: "ok" });
-  res.json(data);
+// ── Liveness — is the process alive? (Render health check) ───────────────────
+// Returns 200 immediately with no DB/Redis calls. Used by Render to decide
+// whether to restart the container.
+router.get("/health", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Legacy alias kept for backwards compatibility
+router.get("/healthz", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// ── Readiness — is the app ready to serve traffic? ────────────────────────────
+// Checks that PostgreSQL is reachable. Returns 503 if not yet ready so that
+// a load balancer can hold traffic until the DB connection is established.
+router.get("/ready", async (_req, res): Promise<void> => {
+  try {
+    await db.execute(sql`SELECT 1`);
+    res.json({
+      status: "ready",
+      db: "ok",
+      redis: isRedisAvailable() ? "ok" : "unavailable",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: "not_ready",
+      db: "error",
+      error: err instanceof Error ? err.message : "DB unreachable",
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// ── Detailed service health — admin only ──────────────────────────────────────
 interface ServiceStatus {
   id: string;
   name: string;
@@ -41,25 +70,15 @@ router.get("/admin/health-services", requireAdmin, async (_req, res): Promise<vo
     if (result.ok) {
       services.push({ id: "redis", name: "Redis", status: "ok", detail: "PONG received", latencyMs: result.latencyMs });
     } else {
-      services.push({
-        id: "redis",
-        name: "Redis",
-        status: "error",
-        detail: result.error,
-        latencyMs: null,
-      });
+      services.push({ id: "redis", name: "Redis", status: "error", detail: result.error, latencyMs: null });
     }
   }
 
   // ── Daraja / M-Pesa ───────────────────────────────────────────────────────
   {
-    const key = process.env["DARAJA_CONSUMER_KEY"];
-    const secret = process.env["DARAJA_CONSUMER_SECRET"];
-    const shortcode = process.env["DARAJA_BUSINESS_SHORTCODE"];
-    const passkey = process.env["DARAJA_PASSKEY"];
-    const allSet = !!(key && secret && shortcode && passkey);
     const missing = ["DARAJA_CONSUMER_KEY", "DARAJA_CONSUMER_SECRET", "DARAJA_BUSINESS_SHORTCODE", "DARAJA_PASSKEY"]
       .filter((k) => !process.env[k]);
+    const allSet = missing.length === 0;
     services.push({
       id: "daraja",
       name: "M-Pesa (Daraja)",
