@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "export NODE_ENV=development && if [ -z \"$REDIS_URL\" ]; then redis-server --daemonize yes --logfile /tmp/redis.log && until redis-cli ping 2>/dev/null | grep -q PONG; do sleep 0.3; done && echo '[Redis] Local Redis ready'; else echo '[Redis] Using external REDIS_URL'; fi && pnpm run build && node --enable-source-maps ./dist/index.mjs",
+    "dev": "export NODE_ENV=development && if [ -z \"$REDIS_URL\" ]; then redis-server --loglevel warning --save '' > /tmp/redis.log 2>&1 & until redis-cli ping 2>/dev/null | grep -q PONG; do sleep 0.2; done && echo '[Redis] Local Redis ready'; else echo '[Redis] Using external REDIS_URL'; fi && pnpm run build && node --enable-source-maps ./dist/index.mjs",
     "build": "node ./build.mjs",
-    "start": "if [ -z \"$REDIS_URL\" ]; then redis-server --daemonize yes --logfile /tmp/redis.log && until redis-cli ping 2>/dev/null | grep -q PONG; do sleep 0.3; done && echo '[Redis] Local Redis ready'; else echo '[Redis] Using external REDIS_URL'; fi && node --enable-source-maps ./dist/index.mjs",
+    "start": "if [ -z \"$REDIS_URL\" ]; then redis-server --loglevel warning --save '' > /tmp/redis.log 2>&1 & until redis-cli ping 2>/dev/null | grep -q PONG; do sleep 0.2; done && echo '[Redis] Local Redis ready'; else echo '[Redis] Using external REDIS_URL'; fi && node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

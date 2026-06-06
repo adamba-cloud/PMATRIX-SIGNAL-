@@ -3,7 +3,7 @@ modules = ["nodejs-20", "web", "bash", "postgresql-16"]
 [deployment]
 router = "application"
 deploymentTarget = "vm"
-run = ["bash", "-c", "redis-server --daemonize yes --logfile /tmp/redis.log && until redis-cli ping 2>/dev/null | grep -q PONG; do sleep 0.3; done && echo '[Redis] Ready' && PORT=8080 node --enable-source-maps artifacts/api-server/dist/index.mjs"]
+run = ["bash", "-c", "if [ -z \"$REDIS_URL\" ]; then redis-server --loglevel warning --save '' > /tmp/redis.log 2>&1 & until redis-cli ping 2>/dev/null | grep -q PONG; do sleep 0.2; done && echo '[Redis] Ready'; else echo '[Redis] Using external REDIS_URL'; fi && PORT=8080 node --enable-source-maps artifacts/api-server/dist/index.mjs"]
 build = ["bash", "-c", "pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/pesamatrix run build"]
 
 [deployment.postBuild]
