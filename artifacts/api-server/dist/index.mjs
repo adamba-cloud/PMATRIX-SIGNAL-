@@ -139115,7 +139115,12 @@ function resolveRedisConfig() {
     const displayUrl = url2.replace(/:\/\/([^@]+)@/, "://<credentials>@");
     const isExternal = !url2.includes("localhost") && !url2.includes("127.0.0.1");
     const tls = url2.startsWith("rediss://") ? { rejectUnauthorized: false } : void 0;
-    return { options: { ...tls ? { tls } : {}, maxRetriesPerRequest: null }, displayUrl, isExternal };
+    return {
+      url: url2,
+      options: { ...tls ? { tls } : {}, maxRetriesPerRequest: null },
+      displayUrl,
+      isExternal
+    };
   }
   const host = process.env.REDIS_HOST;
   const port2 = process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : void 0;
@@ -139143,6 +139148,24 @@ function resolveRedisConfig() {
     isExternal: false
   };
 }
+function makeRetryStrategy() {
+  return (times) => {
+    if (times > 10) {
+      _unavailable = true;
+      logger.error(
+        { attempts: times },
+        "Redis: gave up after 10 retries \u2014 Redis-dependent features disabled."
+      );
+      for (const { reject } of _readyResolvers.splice(0)) {
+        reject(new Error("Redis unavailable after max retries"));
+      }
+      return null;
+    }
+    const delay = Math.min(times * 500, 3e3);
+    logger.warn({ attempt: times, retryInMs: delay }, "Redis: connection lost \u2014 will retry");
+    return delay;
+  };
+}
 function getRedis() {
   if (_unavailable) {
     throw new Error(
@@ -139150,7 +139173,8 @@ function getRedis() {
     );
   }
   if (!_redis) {
-    const { options, displayUrl, isExternal } = resolveRedisConfig();
+    const redisConfig = resolveRedisConfig();
+    const { options, displayUrl, isExternal, url: url2 } = redisConfig;
     if (!isExternal) {
       logger.warn(
         { url: displayUrl },
@@ -139160,32 +139184,11 @@ function getRedis() {
       logger.info({ url: displayUrl }, "Redis: connecting to external instance \u2713");
     }
     logger.info({ redisUrl: displayUrl }, "Redis: REDIS_URL resolved");
-    _redis = new import_ioredis.default({
+    const sharedOptions = {
       ...options,
-      // Do NOT use lazyConnect — BullMQ sends commands immediately on Queue/Worker
-      // creation and needs the connection to be establishing before those arrive.
-      //
-      // Do NOT set enableOfflineQueue: false — with lazyConnect removed the default
-      // (true) lets commands queue while the initial handshake completes. Without
-      // this, every BullMQ command races the connect and fails → retryStrategy fires
-      // → _unavailable=true before Redis even responds.
-      retryStrategy: (times) => {
-        if (times > 10) {
-          _unavailable = true;
-          logger.error(
-            { attempts: times },
-            "Redis: gave up after 10 retries \u2014 Redis-dependent features disabled."
-          );
-          for (const { reject } of _readyResolvers.splice(0)) {
-            reject(new Error("Redis unavailable after max retries"));
-          }
-          return null;
-        }
-        const delay = Math.min(times * 500, 3e3);
-        logger.warn({ attempt: times, retryInMs: delay }, "Redis: connection lost \u2014 will retry");
-        return delay;
-      }
-    });
+      retryStrategy: makeRetryStrategy()
+    };
+    _redis = url2 ? new import_ioredis.default(url2, sharedOptions) : new import_ioredis.default(sharedOptions);
     _redis.on("connect", () => {
       logger.info("Redis: TCP connection established");
     });
@@ -139238,15 +139241,16 @@ function isRedisAvailable() {
   return !_unavailable && _redis !== null && _ready;
 }
 async function checkRedisDirect() {
-  const { options } = resolveRedisConfig();
-  const client = new import_ioredis.default({
+  const { url: url2, options } = resolveRedisConfig();
+  const clientOptions = {
     ...options,
     lazyConnect: true,
     connectTimeout: 5e3,
     maxRetriesPerRequest: 0,
     retryStrategy: () => null,
     enableOfflineQueue: false
-  });
+  };
+  const client = url2 ? new import_ioredis.default(url2, clientOptions) : new import_ioredis.default(clientOptions);
   client.on("error", () => {
   });
   const t0 = Date.now();

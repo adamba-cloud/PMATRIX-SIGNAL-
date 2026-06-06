@@ -10,19 +10,29 @@ const _readyResolvers: Array<{ resolve: () => void; reject: (e: Error) => void }
  * Resolve Redis connection options from environment variables.
  *
  * Priority:
- *  1. REDIS_URL  — full connection string (backward-compat, overrides all below)
+ *  1. REDIS_URL  — full connection string (overrides all below)
  *  2. REDIS_HOST + REDIS_PORT + REDIS_USERNAME + REDIS_PASSWORD + REDIS_TLS
  *  3. localhost:6379 (dev fallback)
  *
  * Credentials are never logged — only the host/port are shown.
  */
-function resolveRedisConfig(): { options: RedisOptions; displayUrl: string; isExternal: boolean } {
+function resolveRedisConfig(): {
+  url?: string;
+  options: RedisOptions;
+  displayUrl: string;
+  isExternal: boolean;
+} {
   const url = process.env.REDIS_URL;
   if (url) {
     const displayUrl = url.replace(/:\/\/([^@]+)@/, "://<credentials>@");
     const isExternal = !url.includes("localhost") && !url.includes("127.0.0.1");
     const tls = url.startsWith("rediss://") ? { rejectUnauthorized: false } : undefined;
-    return { options: { ...(tls ? { tls } : {}), maxRetriesPerRequest: null }, displayUrl, isExternal };
+    return {
+      url,
+      options: { ...(tls ? { tls } : {}), maxRetriesPerRequest: null },
+      displayUrl,
+      isExternal,
+    };
   }
 
   const host = process.env.REDIS_HOST;
@@ -55,6 +65,25 @@ function resolveRedisConfig(): { options: RedisOptions; displayUrl: string; isEx
   };
 }
 
+function makeRetryStrategy() {
+  return (times: number): number | null => {
+    if (times > 10) {
+      _unavailable = true;
+      logger.error(
+        { attempts: times },
+        "Redis: gave up after 10 retries — Redis-dependent features disabled."
+      );
+      for (const { reject } of _readyResolvers.splice(0)) {
+        reject(new Error("Redis unavailable after max retries"));
+      }
+      return null;
+    }
+    const delay = Math.min(times * 500, 3_000);
+    logger.warn({ attempt: times, retryInMs: delay }, "Redis: connection lost — will retry");
+    return delay;
+  };
+}
+
 export function getRedis(): Redis {
   if (_unavailable) {
     throw new Error(
@@ -63,7 +92,8 @@ export function getRedis(): Redis {
   }
 
   if (!_redis) {
-    const { options, displayUrl, isExternal } = resolveRedisConfig();
+    const redisConfig = resolveRedisConfig();
+    const { options, displayUrl, isExternal, url } = redisConfig;
 
     if (!isExternal) {
       logger.warn(
@@ -76,34 +106,14 @@ export function getRedis(): Redis {
 
     logger.info({ redisUrl: displayUrl }, "Redis: REDIS_URL resolved");
 
-    _redis = new Redis({
+    const sharedOptions: RedisOptions = {
       ...options,
+      retryStrategy: makeRetryStrategy(),
+    };
 
-      // Do NOT use lazyConnect — BullMQ sends commands immediately on Queue/Worker
-      // creation and needs the connection to be establishing before those arrive.
-      //
-      // Do NOT set enableOfflineQueue: false — with lazyConnect removed the default
-      // (true) lets commands queue while the initial handshake completes. Without
-      // this, every BullMQ command races the connect and fails → retryStrategy fires
-      // → _unavailable=true before Redis even responds.
-
-      retryStrategy: (times) => {
-        if (times > 10) {
-          _unavailable = true;
-          logger.error(
-            { attempts: times },
-            "Redis: gave up after 10 retries — Redis-dependent features disabled."
-          );
-          for (const { reject } of _readyResolvers.splice(0)) {
-            reject(new Error("Redis unavailable after max retries"));
-          }
-          return null;
-        }
-        const delay = Math.min(times * 500, 3_000);
-        logger.warn({ attempt: times, retryInMs: delay }, "Redis: connection lost — will retry");
-        return delay;
-      },
-    });
+    // When REDIS_URL is set, pass it as the first argument so ioredis parses
+    // the host/port/auth from the connection string rather than defaulting to localhost.
+    _redis = url ? new Redis(url, sharedOptions) : new Redis(sharedOptions);
 
     _redis.on("connect", () => {
       logger.info("Redis: TCP connection established");
@@ -176,16 +186,18 @@ export function isRedisAvailable(): boolean {
 export async function checkRedisDirect(): Promise<
   { ok: true; latencyMs: number } | { ok: false; error: string }
 > {
-  const { options } = resolveRedisConfig();
-  const client = new Redis({
+  const { url, options } = resolveRedisConfig();
+
+  const clientOptions: RedisOptions = {
     ...options,
     lazyConnect: true,
     connectTimeout: 5_000,
     maxRetriesPerRequest: 0,
     retryStrategy: () => null,
     enableOfflineQueue: false,
-  });
+  };
 
+  const client = url ? new Redis(url, clientOptions) : new Redis(clientOptions);
   client.on("error", () => {});
 
   const t0 = Date.now();
