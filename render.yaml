@@ -4,10 +4,6 @@ databases:
     user: pesamatrix
     plan: free
 
-  - name: pesamatrix-redis
-    plan: free
-    ipAllowList: []
-
 services:
   - type: web
     name: pesamatrix
@@ -19,7 +15,6 @@ services:
     autoDeploy: true
 
     envVars:
-      # ── Core ──────────────────────────────────────────────────────────────────
       - key: NODE_ENV
         value: production
 
@@ -28,27 +23,15 @@ services:
           name: pesamatrix-db
           property: connectionString
 
-      - key: REDIS_URL
-        fromService:
-          name: pesamatrix-redis
-          type: redis
-          property: connectionString
-
-      # ── Security (generate with: openssl rand -hex 64) ────────────────────────
       - key: JWT_SECRET
         generateValue: true
 
       - key: ENCRYPTION_SECRET
         generateValue: true
 
-      # ── App URL (update after first deploy with your actual .onrender.com URL) ─
       - key: APP_URL
         value: https://pesamatrix.onrender.com
 
-      - key: DARAJA_CALLBACK_BASE_URL
-        value: https://pesamatrix.onrender.com
-
-      # ── Email (SMTP) ──────────────────────────────────────────────────────────
       - key: SMTP_HOST
         value: smtp.gmail.com
 
@@ -58,42 +41,5 @@ services:
       - key: SMTP_FROM
         value: "PESAMATRIX <noreply@pesamatrix.com>"
 
-      - key: SMTP_USER
-        sync: false        # you will paste this in the Render dashboard
-
-      - key: SMTP_PASS
-        sync: false        # you will paste this in the Render dashboard
-
-      # ── M-Pesa / Daraja ────────────────────────────────────────────────────────
-      - key: DARAJA_CONSUMER_KEY
-        sync: false
-
-      - key: DARAJA_CONSUMER_SECRET
-        sync: false
-
-      - key: DARAJA_BUSINESS_SHORTCODE
-        sync: false
-
-      - key: DARAJA_PASSKEY
-        sync: false
-
-      # ── MetaApi (MT5 copy trading) ─────────────────────────────────────────────
-      - key: METAAPI_TOKEN
-        sync: false
-
       - key: METAAPI_REGION
         value: london
-
-      # ── Web Push Notifications ─────────────────────────────────────────────────
-      - key: VAPID_PUBLIC_KEY
-        sync: false
-
-      - key: VAPID_PRIVATE_KEY
-        sync: false
-
-      # ── WhatsApp Business API ──────────────────────────────────────────────────
-      - key: WHATSAPP_TOKEN
-        sync: false
-
-      - key: WHATSAPP_PHONE_NUMBER_ID
-        sync: false
