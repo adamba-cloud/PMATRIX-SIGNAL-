@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { ExternalLink, ChevronLeft, ChevronRight, Megaphone, ImageOff } from "lucide-react";
-import { useGetActiveAdvertisements, useGetAdBroadcastConfig, type Advertisement } from "@workspace/api-client-react";
+import { useGetActiveAdvertisements, useGetAdBroadcastConfig, recordAdImpression, type Advertisement } from "@workspace/api-client-react";
 
 function AdSlide({ ad }: { ad: Advertisement }) {
   const [imgError, setImgError] = useState(false);
@@ -103,6 +103,12 @@ export function AdCarousel() {
   useEffect(() => {
     if (index >= ads.length && ads.length > 0) setIndex(0);
   }, [ads.length, index]);
+
+  // Record one impression each time a new ad becomes visible
+  useEffect(() => {
+    const currentAd = ads[index];
+    if (currentAd) recordAdImpression(currentAd.id);
+  }, [index, ads]);
 
   if (ads.length === 0) return null;
 

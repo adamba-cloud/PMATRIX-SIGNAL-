@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { ExternalLink, ChevronLeft, ChevronRight, Megaphone, ImageOff } from "lucide-react";
-import { useGetActiveAdvertisements, useGetAdBroadcastConfig, type Advertisement } from "@workspace/api-client-react";
+import { useGetActiveAdvertisements, useGetAdBroadcastConfig, recordAdImpression, type Advertisement } from "@workspace/api-client-react";
 
 const DEFAULT_INTERVAL_MS = 30_000;
 
@@ -174,6 +174,12 @@ export function DashboardAdSection() {
   useEffect(() => {
     if (index >= ads.length && ads.length > 0) setIndex(0);
   }, [ads.length, index]);
+
+  // Record one impression each time a new slide becomes active
+  useEffect(() => {
+    const ad = ads[index];
+    if (ad) recordAdImpression(ad.id);
+  }, [index, ads]);
 
   const navigate = (dir: 1 | -1) => {
     const next = (index + dir + ads.length) % ads.length;

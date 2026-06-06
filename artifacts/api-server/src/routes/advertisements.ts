@@ -3,7 +3,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { db, advertisementsTable, advertisementSettingsTable } from "@workspace/db";
-import { eq, and, desc, asc, lte, gte, isNotNull } from "drizzle-orm";
+import { eq, and, desc, asc, lte, gte, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { initiateStkPush, formatPhone } from "../lib/daraja";
 import { paymentsTable } from "@workspace/db";
@@ -59,6 +59,21 @@ async function getSettings() {
 }
 
 // ─── Public / User ────────────────────────────────────────────────────────────
+
+// Record one impression for an ad (public, no auth — fires when carousel shows the slide)
+router.post("/advertisements/:id/impression", async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+    await db
+      .update(advertisementsTable)
+      .set({ impressions: sql`${advertisementsTable.impressions} + 1` })
+      .where(eq(advertisementsTable.id, id));
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Failed to record impression" });
+  }
+});
 
 // Public broadcast config (no auth) — used by carousels to get rotation interval
 router.get("/advertisements/config", async (_req, res): Promise<void> => {

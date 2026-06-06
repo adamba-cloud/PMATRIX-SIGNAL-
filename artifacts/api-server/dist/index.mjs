@@ -138774,6 +138774,7 @@ var advertisementsTable = pgTable("advertisements", {
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   isPaid: boolean("is_paid").notNull().default(false),
+  impressions: integer("impressions").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow()
 });
@@ -144598,6 +144599,19 @@ async function getSettings() {
   const [created] = await db.insert(advertisementSettingsTable).values({ feePerDay: "100", minDays: 1, maxDays: 90, broadcastIntervalSeconds: 30 }).returning();
   return created;
 }
+router20.post("/advertisements/:id/impression", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+    await db.update(advertisementsTable).set({ impressions: sql`${advertisementsTable.impressions} + 1` }).where(eq(advertisementsTable.id, id));
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Failed to record impression" });
+  }
+});
 router20.get("/advertisements/config", async (_req, res) => {
   try {
     const settings = await getSettings();

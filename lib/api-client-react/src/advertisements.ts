@@ -30,6 +30,7 @@ export interface Advertisement {
   startDate: string | null;
   endDate: string | null;
   isPaid: boolean;
+  impressions: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -273,4 +274,10 @@ export const useDeleteAdvertisement = <TError = ErrorType<unknown>, TContext = u
   const mutationFn: MutationFunction<void, { id: number }> = ({ id }) =>
     customFetch<void>(`/api/admin/advertisements/${id}`, { method: "DELETE" });
   return useMutation({ mutationFn, ...options?.mutation });
+};
+
+// ─── Impression tracking (fire-and-forget, no auth) ──────────────────────────
+
+export const recordAdImpression = (id: number): void => {
+  fetch(`/api/advertisements/${id}/impression`, { method: "POST" }).catch(() => {});
 };

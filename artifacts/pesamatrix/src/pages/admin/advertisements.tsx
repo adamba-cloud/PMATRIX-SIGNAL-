@@ -47,6 +47,7 @@ import {
   Radio,
   RotateCcw,
   CalendarClock,
+  TrendingUp,
 } from "lucide-react";
 
 const STATUS_CONFIG: Record<AdStatus, { label: string; color: string; icon: React.ReactNode }> = {
@@ -395,6 +396,10 @@ export default function AdminAdvertisements() {
                       {ad.startDate && <span>From {new Date(ad.startDate).toLocaleDateString()}</span>}
                       {ad.endDate && <span>To {new Date(ad.endDate).toLocaleDateString()}</span>}
                       <span>Submitted {new Date(ad.createdAt).toLocaleDateString()}</span>
+                      <span className="flex items-center gap-1 text-green-400/80">
+                        <TrendingUp className="w-3 h-3" />
+                        {(ad.impressions ?? 0).toLocaleString()} impression{ad.impressions !== 1 ? "s" : ""}
+                      </span>
                       {ad.externalLink && (
                         <a href={ad.externalLink} target="_blank" rel="noopener noreferrer"
                           className="text-green-400 hover:text-green-300 flex items-center gap-0.5">

@@ -18,6 +18,7 @@ export const advertisementsTable = pgTable("advertisements", {
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   isPaid: boolean("is_paid").notNull().default(false),
+  impressions: integer("impressions").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
