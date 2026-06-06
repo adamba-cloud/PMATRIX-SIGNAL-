@@ -7,6 +7,7 @@ import { eq, and, desc, asc, lte, gte, isNotNull, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { initiateStkPush, formatPhone } from "../lib/daraja";
 import { paymentsTable } from "@workspace/db";
+import { broadcastAdminEvent } from "../lib/forex-ws";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -197,6 +198,16 @@ router.post(
           status: "PENDING",
         })
         .returning();
+
+      broadcastAdminEvent("ad_approval_request", {
+        adId: ad.id,
+        userId: req.userId!,
+        title: ad.title,
+        mediaType: ad.mediaType,
+        totalDays: ad.totalDays,
+        totalAmount: ad.totalAmount,
+        description: ad.description ?? null,
+      });
 
       res.status(201).json(ad);
     } catch {

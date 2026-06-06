@@ -2,12 +2,17 @@ import { useState, useEffect, useRef, useCallback } from "react";
 
 export interface AdminNotification {
   id: string;
-  eventType: "new_user" | "payment_completed" | "subscription_activated";
+  eventType:
+    | "new_user"
+    | "payment_completed"
+    | "subscription_activated"
+    | "copy_trade_fan_out"
+    | "ad_approval_request";
   ts: number;
   [key: string]: unknown;
 }
 
-const MAX_STORED = 50;
+const MAX_STORED = 100;
 
 export function useAdminNotifications() {
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
@@ -59,5 +64,9 @@ export function useAdminNotifications() {
     setUnread(0);
   }, []);
 
-  return { notifications, unread, markAllRead, clearAll };
+  const removeOne = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
+  return { notifications, unread, markAllRead, clearAll, removeOne };
 }

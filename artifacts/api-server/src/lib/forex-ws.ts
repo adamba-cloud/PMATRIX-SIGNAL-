@@ -86,7 +86,12 @@ export function broadcastMt5Status(payload: object): void {
   }
 }
 
-export type AdminEventType = "new_user" | "payment_completed" | "subscription_activated";
+export type AdminEventType =
+  | "new_user"
+  | "payment_completed"
+  | "subscription_activated"
+  | "copy_trade_fan_out"
+  | "ad_approval_request";
 
 export function broadcastAdminEvent(eventType: AdminEventType, data: Record<string, unknown>): void {
   if (!_wss) return;

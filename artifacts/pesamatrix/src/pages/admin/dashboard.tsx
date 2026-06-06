@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useEffect, useRef, useState } from "react";
+import { AdminLivePanel } from "@/components/admin-live-panel";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -305,6 +306,9 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Live Event Feed */}
+      <AdminLivePanel />
 
       {/* Service Health */}
       <ServiceHealthCard />

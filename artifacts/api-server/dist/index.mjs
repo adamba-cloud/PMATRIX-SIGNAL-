@@ -144776,6 +144776,15 @@ router20.post(
         totalAmount,
         status: "PENDING"
       }).returning();
+      broadcastAdminEvent("ad_approval_request", {
+        adId: ad.id,
+        userId: req.userId,
+        title: ad.title,
+        mediaType: ad.mediaType,
+        totalDays: ad.totalDays,
+        totalAmount: ad.totalAmount,
+        description: ad.description ?? null
+      });
       res.status(201).json(ad);
     } catch {
       res.status(500).json({ error: "Failed to create advertisement" });
@@ -146284,6 +146293,15 @@ function startCopyTradeWorker() {
           { logId, slaveMetaApiId, slaveTicket: result.orderId, spread: spread.spread, spreadAvg: spread.avg },
           "Copy trade worker: trade executed successfully"
         );
+        broadcastAdminEvent("copy_trade_fan_out", {
+          logId,
+          slaveMetaApiId,
+          symbol: trade.symbol,
+          direction: trade.direction,
+          volume: trade.volume,
+          slaveTicket: result.orderId ?? null,
+          status: "SUCCESS"
+        });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
         await db.update(copyTradeLogsTable).set({
@@ -146296,6 +146314,15 @@ function startCopyTradeWorker() {
           { err, logId, slaveMetaApiId },
           "Copy trade worker: trade execution failed"
         );
+        broadcastAdminEvent("copy_trade_fan_out", {
+          logId,
+          slaveMetaApiId,
+          symbol: trade.symbol,
+          direction: trade.direction,
+          volume: trade.volume,
+          status: "FAILED",
+          error: errorMessage
+        });
         throw err;
       }
     },

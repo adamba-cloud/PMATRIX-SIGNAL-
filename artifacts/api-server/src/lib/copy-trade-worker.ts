@@ -5,6 +5,7 @@ import { getRedis } from "./redis";
 import { COPY_TRADE_QUEUE, type CopyTradeJobData } from "./copy-trade-queue";
 import { placeTrade } from "./metaapi";
 import { checkSpreadGuard } from "./spread-guard";
+import { broadcastAdminEvent } from "./forex-ws";
 import { logger } from "./logger";
 
 const CONCURRENCY = 10;
@@ -105,6 +106,16 @@ export function startCopyTradeWorker(): Worker<CopyTradeJobData> {
           { logId, slaveMetaApiId, slaveTicket: result.orderId, spread: spread.spread, spreadAvg: spread.avg },
           "Copy trade worker: trade executed successfully"
         );
+
+        broadcastAdminEvent("copy_trade_fan_out", {
+          logId,
+          slaveMetaApiId,
+          symbol: trade.symbol,
+          direction: trade.direction,
+          volume: trade.volume,
+          slaveTicket: result.orderId ?? null,
+          status: "SUCCESS",
+        });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
 
@@ -122,6 +133,16 @@ export function startCopyTradeWorker(): Worker<CopyTradeJobData> {
           { err, logId, slaveMetaApiId },
           "Copy trade worker: trade execution failed"
         );
+
+        broadcastAdminEvent("copy_trade_fan_out", {
+          logId,
+          slaveMetaApiId,
+          symbol: trade.symbol,
+          direction: trade.direction,
+          volume: trade.volume,
+          status: "FAILED",
+          error: errorMessage,
+        });
 
         throw err; // re-throw so BullMQ retries up to job.opts.attempts
       }
