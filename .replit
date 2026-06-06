@@ -2,8 +2,8 @@ modules = ["nodejs-20", "web", "bash", "postgresql-16"]
 
 [deployment]
 router = "application"
-deploymentTarget = "autoscale"
-run = ["bash", "-c", "redis-server --daemonize yes --logfile /tmp/redis.log && PORT=8080 node --enable-source-maps artifacts/api-server/dist/index.mjs"]
+deploymentTarget = "vm"
+run = ["bash", "-c", "redis-server --daemonize yes --logfile /tmp/redis.log && until redis-cli ping 2>/dev/null | grep -q PONG; do sleep 0.3; done && echo '[Redis] Ready' && PORT=8080 node --enable-source-maps artifacts/api-server/dist/index.mjs"]
 build = ["bash", "-c", "pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/pesamatrix run build"]
 
 [deployment.postBuild]
