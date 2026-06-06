@@ -139109,27 +139109,59 @@ var _redis = null;
 var _unavailable = false;
 var _ready = false;
 var _readyResolvers = [];
+function resolveRedisConfig() {
+  const url2 = process.env.REDIS_URL;
+  if (url2) {
+    const displayUrl = url2.replace(/:\/\/([^@]+)@/, "://<credentials>@");
+    const isExternal = !url2.includes("localhost") && !url2.includes("127.0.0.1");
+    const tls = url2.startsWith("rediss://") ? { rejectUnauthorized: false } : void 0;
+    return { options: { ...tls ? { tls } : {}, maxRetriesPerRequest: null }, displayUrl, isExternal };
+  }
+  const host = process.env.REDIS_HOST;
+  const port2 = process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : void 0;
+  const username = process.env.REDIS_USERNAME ?? "default";
+  const password = process.env.REDIS_PASSWORD;
+  const useTls = process.env.REDIS_TLS === "true";
+  if (host && password) {
+    const displayUrl = `${useTls ? "rediss" : "redis"}://${username}@${host}:${port2 ?? 6379}`;
+    return {
+      options: {
+        host,
+        port: port2 ?? 6379,
+        username,
+        password,
+        ...useTls ? { tls: { rejectUnauthorized: false } } : {},
+        maxRetriesPerRequest: null
+      },
+      displayUrl,
+      isExternal: true
+    };
+  }
+  return {
+    options: { host: "localhost", port: 6379, maxRetriesPerRequest: null },
+    displayUrl: "redis://localhost:6379",
+    isExternal: false
+  };
+}
 function getRedis() {
   if (_unavailable) {
     throw new Error(
-      "Redis is not available in this environment. Set the REDIS_URL environment variable to connect to an external Redis instance."
+      "Redis is not available. Set REDIS_HOST + REDIS_PASSWORD (or REDIS_URL) to connect to an external instance."
     );
   }
   if (!_redis) {
-    const url2 = process.env.REDIS_URL ?? "redis://localhost:6379";
-    const isLocalhost = url2.includes("localhost") || url2.includes("127.0.0.1");
-    const displayUrl = url2.replace(/:\/\/([^@]+)@/, "://<credentials>@");
-    if (isLocalhost) {
+    const { options, displayUrl, isExternal } = resolveRedisConfig();
+    if (!isExternal) {
       logger.warn(
         { url: displayUrl },
-        "Redis: connecting to localhost \u2014 set REDIS_URL to an external instance (e.g. Upstash) for reliability"
+        "Redis: connecting to localhost \u2014 set REDIS_HOST + REDIS_PASSWORD for a reliable external instance"
       );
     } else {
       logger.info({ url: displayUrl }, "Redis: connecting to external instance \u2713");
     }
-    _redis = new import_ioredis.default(url2, {
-      // Required by BullMQ
-      maxRetriesPerRequest: null,
+    logger.info({ redisUrl: displayUrl }, "Redis: REDIS_URL resolved");
+    _redis = new import_ioredis.default({
+      ...options,
       // Do NOT use lazyConnect — BullMQ sends commands immediately on Queue/Worker
       // creation and needs the connection to be establishing before those arrive.
       //
@@ -139142,7 +139174,7 @@ function getRedis() {
           _unavailable = true;
           logger.error(
             { attempts: times },
-            "Redis: gave up after 10 retries \u2014 Redis-dependent features disabled. Set REDIS_URL to fix."
+            "Redis: gave up after 10 retries \u2014 Redis-dependent features disabled."
           );
           for (const { reject } of _readyResolvers.splice(0)) {
             reject(new Error("Redis unavailable after max retries"));
@@ -139206,10 +139238,11 @@ function isRedisAvailable() {
   return !_unavailable && _redis !== null && _ready;
 }
 async function checkRedisDirect() {
-  const url2 = process.env.REDIS_URL ?? "redis://localhost:6379";
-  const client = new import_ioredis.default(url2, {
+  const { options } = resolveRedisConfig();
+  const client = new import_ioredis.default({
+    ...options,
     lazyConnect: true,
-    connectTimeout: 4e3,
+    connectTimeout: 5e3,
     maxRetriesPerRequest: 0,
     retryStrategy: () => null,
     enableOfflineQueue: false
