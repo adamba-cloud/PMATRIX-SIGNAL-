@@ -6,6 +6,7 @@ import {
   useGetAdvertisementSettings,
   useInitiateAdPayment,
   useGetPaymentStatus,
+  useVerifyPayment,
   useGetMyAdPayments,
   getGetPaymentStatusQueryKey,
   getMyAdsQueryKey,
@@ -13,6 +14,7 @@ import {
   type AdMediaType,
   type Advertisement,
   type AdPayment,
+  type AdPaymentResponse,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +42,8 @@ import {
   Receipt,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
+  Info,
 } from "lucide-react";
 
 // ─── Status config ─────────────────────────────────────────────────────────────
@@ -69,7 +73,7 @@ function StatusBadge({ status }: { status: AdStatus }) {
 
 // ─── STK Polling step ──────────────────────────────────────────────────────────
 
-type PayStage = "idle" | "awaiting_stk" | "polling" | "success" | "failed";
+type PayStage = "idle" | "awaiting_stk" | "polling" | "verifying" | "success" | "failed";
 
 function PaymentStep({
   ad,
@@ -89,8 +93,10 @@ function PaymentStep({
   const [checkoutRequestId, setCheckoutRequestId] = useState<string | null>(null);
   const [pollCount, setPollCount] = useState(0);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const verifyTriggered = useRef(false);
 
   const payMutation = useInitiateAdPayment();
+  const verifyMutation = useVerifyPayment();
   const { refetch: refetchStatus } = useGetPaymentStatus(
     checkoutRequestId ?? "",
     { query: { enabled: false, queryKey: getGetPaymentStatusQueryKey(checkoutRequestId ?? "") } }
@@ -100,6 +106,32 @@ function PaymentStep({
     if (pollTimer.current) { clearTimeout(pollTimer.current); pollTimer.current = null; }
   }, []);
 
+  const triggerVerify = useCallback(async () => {
+    if (!checkoutRequestId || verifyTriggered.current) return;
+    verifyTriggered.current = true;
+    setStage("verifying");
+    try {
+      const result = await verifyMutation.mutateAsync(checkoutRequestId);
+      if (result.status === "COMPLETED") {
+        stopPolling();
+        setStage("success");
+        queryClient.invalidateQueries({ queryKey: getMyAdsQueryKey() });
+        toast({
+          title: "Payment confirmed!",
+          description: result.mpesaReceiptNumber ? `M-Pesa receipt: ${result.mpesaReceiptNumber}` : "Payment verified.",
+        });
+        setTimeout(onSuccess, 2000);
+      } else {
+        setStage("polling");
+        verifyTriggered.current = false;
+        toast({ title: "Not confirmed yet", description: "Payment not yet confirmed by Safaricom. Keep waiting.", variant: "destructive" });
+      }
+    } catch {
+      setStage("polling");
+      verifyTriggered.current = false;
+    }
+  }, [checkoutRequestId, verifyMutation, stopPolling, queryClient, toast, onSuccess]);
+
   const poll = useCallback(async (count: number) => {
     if (!checkoutRequestId) return;
     if (count >= 24) {
@@ -108,12 +140,17 @@ function PaymentStep({
       toast({ title: "Payment Timeout", description: "No response received. Please try again.", variant: "destructive" });
       return;
     }
+    // At 20 seconds trigger server-side Daraja verification
+    if (count === 4 && !verifyTriggered.current) {
+      void triggerVerify();
+      return;
+    }
     const { data } = await refetchStatus();
     if (data?.status === "COMPLETED") {
       stopPolling();
       setStage("success");
       queryClient.invalidateQueries({ queryKey: getMyAdsQueryKey() });
-      toast({ title: "Payment confirmed!", description: `M-Pesa receipt: ${data.mpesaReceiptNumber}` });
+      toast({ title: "Payment confirmed!", description: data.mpesaReceiptNumber ? `M-Pesa receipt: ${data.mpesaReceiptNumber}` : "Payment verified." });
       setTimeout(onSuccess, 2000);
     } else if (data?.status === "FAILED" || data?.status === "CANCELLED") {
       stopPolling();
@@ -124,10 +161,13 @@ function PaymentStep({
       setPollCount(next);
       pollTimer.current = setTimeout(() => poll(next), 5000);
     }
-  }, [checkoutRequestId, refetchStatus, stopPolling, queryClient, toast, onSuccess]);
+  }, [checkoutRequestId, refetchStatus, stopPolling, queryClient, toast, onSuccess, triggerVerify]);
 
   useEffect(() => {
-    if (stage === "polling" && checkoutRequestId) poll(0);
+    if (stage === "polling" && checkoutRequestId) {
+      verifyTriggered.current = false;
+      poll(0);
+    }
     return () => stopPolling();
   }, [stage, checkoutRequestId, poll, stopPolling]);
 
@@ -141,7 +181,7 @@ function PaymentStep({
     payMutation.mutate(
       { id: ad.id, phoneNumber: trimmed },
       {
-        onSuccess: (data) => {
+        onSuccess: (data: AdPaymentResponse) => {
           setCheckoutRequestId(data.checkoutRequestId);
           setStage("polling");
           setPollCount(0);
@@ -154,6 +194,16 @@ function PaymentStep({
         },
       }
     );
+  };
+
+  const handleReset = () => {
+    stopPolling();
+    setStage("idle");
+    setCheckoutRequestId(null);
+    setPollCount(0);
+    verifyTriggered.current = false;
+    payMutation.reset();
+    verifyMutation.reset();
   };
 
   const totalAmount = parseFloat(ad.totalAmount);
@@ -180,7 +230,7 @@ function PaymentStep({
         </div>
       </CardHeader>
 
-      <CardContent className="relative z-10 space-y-6">
+      <CardContent className="relative z-10 space-y-5">
         {/* Amount summary */}
         <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 flex items-center justify-between">
           <div>
@@ -198,37 +248,75 @@ function PaymentStep({
             <p className="text-lg font-semibold text-slate-100">Payment Confirmed!</p>
             <p className="text-slate-400 text-sm">Your ad is now pending admin review.</p>
           </div>
+
         ) : stage === "failed" ? (
           <div className="text-center py-6 space-y-4">
             <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
             <p className="text-slate-300 font-medium">Payment failed or cancelled</p>
-            <Button onClick={() => { setStage("idle"); setCheckoutRequestId(null); setPollCount(0); payMutation.reset(); }}
-              variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800">
+            <Button onClick={handleReset} variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800">
               Try Again
             </Button>
           </div>
+
+        ) : stage === "verifying" ? (
+          <div className="text-center py-8 space-y-4">
+            <div className="relative mx-auto w-16 h-16">
+              <div className="w-16 h-16 rounded-full border-4 border-yellow-500/20 border-t-yellow-500 animate-spin" />
+              <RefreshCw className="w-6 h-6 text-yellow-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-slate-200 font-semibold">Verifying with Safaricom…</p>
+              <p className="text-slate-400 text-sm">Checking payment status directly with Safaricom.</p>
+            </div>
+          </div>
+
         ) : stage === "polling" || stage === "awaiting_stk" ? (
           <div className="text-center py-8 space-y-4">
-            <div className="w-16 h-16 rounded-full bg-green-500/10 border-2 border-green-500/30 flex items-center justify-center mx-auto">
-              <Loader2 className="w-7 h-7 text-green-500 animate-spin" />
+            <div className="relative mx-auto w-16 h-16">
+              <div className="w-16 h-16 rounded-full border-4 border-green-500/20 border-t-green-500 animate-spin" />
+              <Smartphone className="w-6 h-6 text-green-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
             </div>
-            <div>
+            <div className="space-y-1.5">
               <p className="text-slate-100 font-semibold">
-                {stage === "awaiting_stk" ? "Sending STK Push…" : "Awaiting confirmation…"}
+                {stage === "awaiting_stk" ? "Sending STK Push…" : "Check Your Phone"}
               </p>
-              <p className="text-slate-400 text-sm mt-1">
+              <p className="text-slate-400 text-sm">
                 {stage === "awaiting_stk"
                   ? "Connecting to Safaricom…"
-                  : `Check your phone and enter your M-Pesa PIN · ${pollCount > 0 ? `${pollCount * 5}s` : ""}`}
+                  : `An M-Pesa prompt has been sent to `}
+                {stage === "polling" && <span className="text-green-400 font-mono">{phone}</span>}
               </p>
+              {stage === "polling" && (
+                <p className="text-slate-400 text-sm">Enter your M-Pesa PIN to complete the payment.</p>
+              )}
             </div>
             {stage === "polling" && (
-              <p className="text-xs text-slate-600">Will timeout after 2 minutes</p>
+              <>
+                <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+                  <Clock className="w-3.5 h-3.5" />
+                  Waiting for confirmation… ({pollCount * 5}s)
+                </div>
+                <Button
+                  className="w-full bg-green-700 hover:bg-green-600 text-white font-semibold"
+                  onClick={() => { verifyTriggered.current = false; void triggerVerify(); }}
+                  disabled={verifyMutation.isPending}
+                >
+                  {verifyMutation.isPending
+                    ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Checking…</>
+                    : <><RefreshCw className="w-4 h-4 mr-2" /> I've Already Paid — Verify Now</>
+                  }
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleReset}
+                  className="text-slate-500 hover:text-slate-300 hover:bg-slate-800">
+                  Cancel
+                </Button>
+              </>
             )}
           </div>
+
         ) : (
-          /* idle — phone input */
-          <div className="space-y-4">
+          /* idle — phone input + instructions */
+          <div className="space-y-5">
             <div className="space-y-2">
               <Label className="text-slate-300 flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5" /> M-Pesa Phone Number
@@ -243,6 +331,33 @@ function PaymentStep({
               />
               <p className="text-xs text-slate-500">The Safaricom number that will receive the payment prompt.</p>
             </div>
+
+            {/* Payment Instructions */}
+            <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Info className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+                <p className="text-xs font-semibold text-green-400 uppercase tracking-wide">How to Pay</p>
+              </div>
+              <ol className="space-y-2">
+                {[
+                  "Enter your Safaricom M-Pesa number above.",
+                  `Click "Pay KES ${totalAmount.toLocaleString()} via M-Pesa" — an STK Push prompt will appear on your phone.`,
+                  "Open the prompt and enter your M-Pesa PIN to approve the transaction.",
+                  "Once confirmed, your ad will be submitted for admin review and go live shortly.",
+                ].map((step, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-xs text-slate-400">
+                    <span className="flex-shrink-0 w-4 h-4 rounded-full bg-green-500/15 text-green-400 flex items-center justify-center text-[10px] font-bold mt-0.5">
+                      {i + 1}
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+              <p className="text-xs text-slate-600 mt-3">
+                If the prompt doesn't arrive within 30 seconds, tap "I've Already Paid — Verify Now" after clicking Pay.
+              </p>
+            </div>
+
             <Button
               onClick={handlePay}
               className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"

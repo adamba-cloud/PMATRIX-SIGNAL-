@@ -343,6 +343,32 @@ export default function Subscription() {
                     <span className="text-2xl font-bold text-green-400">KES {totalAmount.toLocaleString()}</span>
                   </div>
                 </div>
+
+                {/* Payment Instructions */}
+                <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ShieldCheck className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
+                    <p className="text-xs font-semibold text-green-400 uppercase tracking-wide">How to Pay</p>
+                  </div>
+                  <ol className="space-y-2">
+                    {[
+                      "Enter your Safaricom M-Pesa number above and set your preferred duration.",
+                      `Click "Pay KES ${totalAmount.toLocaleString()} via M-Pesa" — an STK Push prompt will appear on your phone.`,
+                      "Open the prompt and enter your M-Pesa PIN to approve the transaction.",
+                      "Once confirmed, your subscription activates instantly and you get full access to all trading signals.",
+                    ].map((step, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-xs text-slate-400">
+                        <span className="flex-shrink-0 w-4 h-4 rounded-full bg-green-500/15 text-green-400 flex items-center justify-center text-[10px] font-bold mt-0.5">
+                          {i + 1}
+                        </span>
+                        {step}
+                      </li>
+                    ))}
+                  </ol>
+                  <p className="text-xs text-slate-600 mt-3">
+                    If the prompt doesn't arrive, click "I've Already Paid — Verify Now" after the payment page appears.
+                  </p>
+                </div>
               </>
             ) : stage === "polling" ? (
               <div className="text-center space-y-5 py-6">
