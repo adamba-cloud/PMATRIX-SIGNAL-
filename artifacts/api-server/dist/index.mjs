@@ -139214,6 +139214,8 @@ async function checkRedisDirect() {
     retryStrategy: () => null,
     enableOfflineQueue: false
   });
+  client.on("error", () => {
+  });
   const t0 = Date.now();
   try {
     await client.connect();
