@@ -327,7 +327,7 @@ async function fanOutToSlaves(
       direction,
       masterLots,
       masterBalance,
-      totalSlaves: links.length,
+      totalSlaves: slaves.length,
       succeeded,
       failed,
     },
